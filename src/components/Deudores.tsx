@@ -128,7 +128,7 @@ export default function Deudores() {
         <div className="relative flex-1 w-full group">
            <Search className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-emerald-500 transition-colors" size={20} />
            <input 
-            placeholder="Buscar por unidad (ej: 7-302) o nombre..."
+            placeholder="Buscar por unidad (ej: 5-101) o nombre..."
             className="w-full bg-slate-50 border border-slate-100 pl-14 pr-8 py-5 rounded-3xl font-bold text-slate-700 outline-none focus:ring-4 ring-emerald-500/5 focus:border-emerald-500 transition-all placeholder:text-slate-300"
             onChange={(e) => setBusqueda(e.target.value)}
            />
