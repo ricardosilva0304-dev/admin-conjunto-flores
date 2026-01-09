@@ -17,7 +17,7 @@ const menuItems = [
   { id: 'config', label: 'Configuración', icon: <Settings size={18} /> },
 ];
 
-export default function Sidebar({ activeTab, setActiveTab }: any) {
+export default function Sidebar({ activeTab, setActiveTab, onLogout }: any) {
   return (
     <div className="w-64 h-screen bg-[#0F1115] flex flex-col border-r border-white/5 shadow-2xl z-20">
       <div className="p-8 mb-4">
@@ -45,6 +45,13 @@ export default function Sidebar({ activeTab, setActiveTab }: any) {
               </span>
             </div>
           </div>
+          <button 
+            onClick={onLogout}
+            title="Cerrar sesión"
+            className="p-2 hover:bg-rose-500/20 text-zinc-500 hover:text-rose-500 rounded-lg transition-all active:scale-90"
+          >
+            <LogOut size={16} />
+          </button>
         </div>
       </div>
 
