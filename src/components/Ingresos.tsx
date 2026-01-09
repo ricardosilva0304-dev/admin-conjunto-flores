@@ -50,6 +50,7 @@ export default function Ingresos() {
       data.forEach((d: any) => initialAbonos[d.id] = 0);
       setAbonos(initialAbonos);
     }
+    await sugerirSiguienteRecibo();
   }
 
   const calcularSaldoRealHoy = (deuda: any) => {
@@ -80,7 +81,7 @@ export default function Ingresos() {
 
     try {
       const mesesNombres = ["ENERO", "FEBRERO", "MARZO", "ABRIL", "MAYO", "JUNIO", "JULIO", "AGOSTO", "SEPTIEMBRE", "OCTUBRE", "NOVIEMBRE", "DICIEMBRE"];
-      
+
       const textoParaDB = deudas
         .filter(d => Number(abonos[d.id]) > 0)
         .map(d => {
@@ -120,7 +121,7 @@ export default function Ingresos() {
         numero: formRecibo.numero,
         fecha: formRecibo.fecha,
         nombre: resSeleccionado.nombre,
-        unidad: `${resSeleccionado.torre.replace("Torre ","T")}-${resSeleccionado.apartamento}`,
+        unidad: `${resSeleccionado.torre.replace("Torre ", "T")}-${resSeleccionado.apartamento}`,
         valor: totalAPagarRecibo,
         concepto: textoParaDB,
         metodo: formRecibo.metodo,
@@ -135,6 +136,25 @@ export default function Ingresos() {
 
     } catch (e: any) { alert(e.message); }
     finally { setProcesando(false); }
+  }
+
+  // Función para encontrar el número de recibo más alto y sugerir el siguiente
+  async function sugerirSiguienteRecibo() {
+    const { data, error } = await supabase
+      .from("pagos")
+      .select("numero_recibo")
+      .order("created_at", { ascending: false }) // Buscamos el último creado
+      .limit(1);
+
+    if (data && data.length > 0) {
+      // Extraemos solo los números (por si acaso el recibo tiene letras como "RC-1")
+      const ultimoNumeroStr = data[0].numero_recibo.replace(/\D/g, "");
+      const siguiente = parseInt(ultimoNumeroStr) + 1;
+      setFormRecibo(prev => ({ ...prev, numero: siguiente.toString() }));
+    } else {
+      // Si no hay ningún recibo en la base de datos (está vacío)
+      setFormRecibo(prev => ({ ...prev, numero: "1" }));
+    }
   }
 
   const sugerencias = busqueda.length > 0 ? residentes.filter(r => {
