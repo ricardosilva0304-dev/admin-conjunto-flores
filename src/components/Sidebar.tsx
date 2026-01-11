@@ -1,7 +1,7 @@
 "use client";
 import { 
   Building2, PieChart, Wallet, Calendar, LogOut, 
-  Users, Map, BarChart3, Settings, UserCircle2, 
+  Users, Map, BarChart3, Settings, UserCircle2, History,
   ChevronRight, Receipt, X // Agregamos el icono X para cerrar
 } from "lucide-react";
 
@@ -9,6 +9,7 @@ const menuItems = [
   { id: 'resumen', label: 'Resumen', icon: <PieChart size={18} /> },
   { id: 'ingresos', label: 'Ingresos', icon: <Wallet size={18} /> },
   { id: 'recibos', label: 'Historial Recibos', icon: <Receipt size={18} /> },
+  { id: 'balance', label: 'Balance Histórico', icon: <History size={18} /> },
   { id: 'causacion', label: 'Causación', icon: <Calendar size={18} /> },
   { id: 'egresos', label: 'Egresos', icon: <LogOut size={18} /> },
   { id: 'deudores', label: 'Deudores', icon: <UserCircle2 size={18} /> },

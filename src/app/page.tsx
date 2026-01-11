@@ -2,7 +2,7 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 
-// Importación de Componentes de Secciones
+// --- IMPORTACIÓN DE COMPONENTES ---
 import Sidebar from "@/components/Sidebar";
 import Residentes from "@/components/Residentes";
 import Configuracion from "@/components/Configuracion";
@@ -14,17 +14,18 @@ import Resumen from "@/components/Resumen";
 import Reportes from "@/components/Reportes";
 import Egresos from "@/components/Egresos";
 import Deudores from "@/components/Deudores";
+import BalanceHistorial from "@/components/BalanceHistorial";
 
-// Iconos
+// --- ICONOS ---
 import {
   Lock, Fingerprint, AlertCircle, Loader2, ChevronRight,
   LayoutDashboard, Settings, Users, MapPin, Zap,
   PieChart, Wallet, LogOut, UserCircle2, BarChart3, Receipt,
-  Menu // <--- IMPORTANTE PARA EL BOTÓN MÓVIL
+  Menu, History, Info
 } from "lucide-react";
 
 export default function App() {
-  // --- 1. TODOS LOS HOOKS (ESTADOS) SIEMPRE AL PRINCIPIO ---
+  // --- 1. TODOS LOS HOOKS (ESTADOS) AL PRINCIPIO ---
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [activeTab, setActiveTab] = useState("resumen");
   const [cedula, setCedula] = useState("");
@@ -34,18 +35,16 @@ export default function App() {
   const [adminName, setAdminName] = useState("");
   const [currentTime, setCurrentTime] = useState(new Date());
   
-  // Control de menú lateral en celular
+  // Control de menú lateral para celular
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
-  // Timer del Reloj
+  // Timer para el reloj en tiempo real
   useEffect(() => {
-    const timer = setInterval(() => {
-      setCurrentTime(new Date());
-    }, 1000);
+    const timer = setInterval(() => setCurrentTime(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
 
-  // --- 2. LÓGICAS ---
+  // --- 2. LÓGICAS DE SISTEMA ---
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -65,69 +64,73 @@ export default function App() {
         setIsLoggedIn(true);
       }
     } catch (err) {
-      setError("Error de conexión.");
+      setError("Error de conexión al servidor.");
     } finally {
       setLoading(false);
     }
   };
 
   const handleLogout = () => {
-    setIsLoggedIn(false);
-    setAdminName("");
-    setActiveTab("resumen");
+    if(confirm("¿Estás segura de que deseas cerrar sesión?")) {
+      setIsLoggedIn(false);
+      setAdminName("");
+      setActiveTab("resumen");
+      setIsSidebarOpen(false);
+    }
   };
 
-  // Mapeo para los iconos y títulos del Header
+  // Mapeo dinámico para Títulos e Iconos en el Header
   const sectionMeta: any = {
-    resumen: { label: "Resumen Financiero", icon: <PieChart size={24} strokeWidth={2.5} /> },
+    resumen: { label: "Panel Principal", icon: <LayoutDashboard size={24} strokeWidth={2.5} /> },
+    balance: { label: "Balance Histórico", icon: <History size={24} strokeWidth={2.5} /> },
     ingresos: { label: "Caja de Ingresos", icon: <Wallet size={24} strokeWidth={2.5} /> },
-    recibos: { label: "Historial de Recibos", icon: <Receipt size={24} strokeWidth={2.5} /> },
+    recibos: { label: "Historial Recibos", icon: <Receipt size={24} strokeWidth={2.5} /> },
     causacion: { label: "Causación Mensual", icon: <Zap size={24} strokeWidth={2.5} /> },
-    egresos: { label: "Gestión de Egresos", icon: <LogOut size={24} strokeWidth={2.5} /> },
-    deudores: { label: "Control de Cartera", icon: <UserCircle2 size={24} strokeWidth={2.5} /> },
-    residentes: { label: "Directorio de Residentes", icon: <Users size={24} strokeWidth={2.5} /> },
-    zonas: { label: "Reservas de Zonas", icon: <MapPin size={24} strokeWidth={2.5} /> },
-    reportes: { label: "Reportes Mensuales", icon: <BarChart3 size={24} strokeWidth={2.5} /> },
+    egresos: { label: "Gestión de Gastos", icon: <LogOut size={24} strokeWidth={2.5} /> },
+    deudores: { label: "Control Cartera", icon: <UserCircle2 size={24} strokeWidth={2.5} /> },
+    residentes: { label: "Base Residentes", icon: <Users size={24} strokeWidth={2.5} /> },
+    zonas: { label: "Reservas Áreas", icon: <MapPin size={24} strokeWidth={2.5} /> },
+    reportes: { label: "Reporte Mensual", icon: <BarChart3 size={24} strokeWidth={2.5} /> },
     config: { label: "Configuración", icon: <Settings size={24} strokeWidth={2.5} /> },
   };
 
-  const currentMeta = sectionMeta[activeTab] || { label: activeTab, icon: <LayoutDashboard size={24} strokeWidth={2.5} /> };
+  const currentMeta = sectionMeta[activeTab] || { label: activeTab, icon: <Info size={24} /> };
 
-  // --- 3. RENDER CONDICIONAL DE LOGIN ---
+  // --- 3. VISTA CONDICIONAL (LOGIN DARK) ---
   if (!isLoggedIn) {
     return (
-      <main className="min-h-screen bg-[#09090b] flex items-center justify-center p-6 relative overflow-hidden font-sans">
+      <main className="min-h-screen bg-[#09090b] flex items-center justify-center p-6 relative overflow-hidden font-sans text-white">
         <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-emerald-500/10 blur-[130px] rounded-full"></div>
         <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-emerald-500/5 blur-[130px] rounded-full"></div>
 
-        <div className="w-full max-w-[420px] z-10">
-          <div className="flex flex-col items-center mb-10 animate-in fade-in slide-in-from-top-6 duration-1000">
-            <div className="w-20 h-20 bg-gradient-to-tr from-emerald-600 to-emerald-400 rounded-[2rem] flex items-center justify-center shadow-2xl shadow-emerald-500/20 mb-8 rotate-3 transition-all duration-500 group">
+        <div className="w-full max-w-[420px] z-10 animate-in fade-in zoom-in-95 duration-700">
+          <div className="flex flex-col items-center mb-10">
+            <div className="w-20 h-20 bg-gradient-to-tr from-emerald-600 to-emerald-400 rounded-[2rem] flex items-center justify-center shadow-2xl shadow-emerald-500/20 mb-8 rotate-3 transition-all hover:rotate-0 duration-500">
               <Fingerprint className="text-black" size={42} strokeWidth={2.5} />
             </div>
-            <h1 className="text-white text-4xl font-black tracking-tighter mb-2 text-center uppercase italic">Bienvenida</h1>
-            <p className="text-zinc-500 font-medium tracking-wide uppercase text-[10px]">Portal Administrativo Residencial</p>
+            <h1 className="text-4xl font-black tracking-tighter mb-2 italic">ADMIN.</h1>
+            <p className="text-zinc-500 font-bold uppercase text-[10px] tracking-[0.4em]">Parque de las Flores</p>
           </div>
 
-          <div className="bg-[#18181b]/40 backdrop-blur-3xl border border-white/5 p-10 rounded-[3rem] shadow-2xl">
+          <div className="bg-zinc-900/40 backdrop-blur-3xl border border-white/5 p-10 rounded-[3rem] shadow-2xl">
             <form onSubmit={handleLogin} className="space-y-6">
               <div className="space-y-2">
                 <label className="text-zinc-500 text-[10px] font-black uppercase tracking-[0.2em] ml-2">Cédula</label>
-                <div className="relative">
-                  <Fingerprint className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-600" size={20} />
-                  <input type="number" required placeholder="Identificación" className="w-full bg-black/40 border border-white/5 text-white pl-12 pr-4 py-4 rounded-2xl outline-none focus:ring-2 ring-emerald-500/10 focus:border-emerald-500 font-medium" onChange={(e) => setCedula(e.target.value)} />
+                <div className="relative group">
+                  <Fingerprint className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-600 group-focus-within:text-emerald-500 transition-colors" size={20} />
+                  <input type="number" required placeholder="Número Identificación" className="w-full bg-black/40 border border-white/5 text-white pl-12 pr-4 py-4 rounded-2xl outline-none focus:ring-2 ring-emerald-500/10 focus:border-emerald-500 font-bold transition-all" onChange={(e) => setCedula(e.target.value)} />
                 </div>
               </div>
               <div className="space-y-2">
-                <label className="text-zinc-500 text-[10px] font-black uppercase tracking-[0.2em] ml-2">Contraseña</label>
-                <div className="relative">
-                  <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-600" size={20} />
-                  <input type="password" required placeholder="••••••••" className="w-full bg-black/40 border border-white/5 text-white pl-12 pr-4 py-4 rounded-2xl outline-none focus:ring-2 ring-emerald-500/10 focus:border-emerald-500 font-medium" onChange={(e) => setPassword(e.target.value)} />
+                <label className="text-zinc-500 text-[10px] font-black uppercase tracking-[0.2em] ml-2">Clave Acceso</label>
+                <div className="relative group">
+                  <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-600 group-focus-within:text-emerald-500 transition-colors" size={20} />
+                  <input type="password" required placeholder="••••••••" className="w-full bg-black/40 border border-white/5 text-white pl-12 pr-4 py-4 rounded-2xl outline-none focus:ring-2 ring-emerald-500/10 focus:border-emerald-500 font-bold transition-all" onChange={(e) => setPassword(e.target.value)} />
                 </div>
               </div>
-              {error && <p className="text-rose-500 text-center text-[11px] font-bold bg-rose-500/10 py-3 rounded-xl">{error}</p>}
-              <button type="submit" disabled={loading} className="w-full bg-emerald-500 text-black font-black py-5 rounded-2xl transition-all shadow-xl active:scale-[0.98]">
-                {loading ? <Loader2 className="animate-spin mx-auto" /> : "ENTRAR AL PANEL"}
+              {error && <p className="text-rose-500 text-center text-[11px] font-black bg-rose-500/10 py-4 rounded-2xl border border-rose-500/10">{error}</p>}
+              <button type="submit" disabled={loading} className="w-full bg-emerald-500 hover:bg-emerald-400 text-black font-black py-5 rounded-2xl transition-all shadow-xl active:scale-95 disabled:opacity-30 uppercase tracking-widest text-xs">
+                {loading ? <Loader2 className="animate-spin mx-auto" /> : "Iniciar Gestión"}
               </button>
             </form>
           </div>
@@ -136,66 +139,89 @@ export default function App() {
     );
   }
 
-  // --- 4. VISTA DEL DASHBOARD ---
+  // --- 4. VISTA DEL DASHBOARD (USER LOGGED IN) ---
   return (
     <div className="flex h-screen bg-[#F8FAFC] overflow-hidden font-sans text-slate-900">
       
-      {/* SIDEBAR CON CONTROL MÓVIL */}
+      {/* MENU SIDEBAR (Responsive listo) */}
       <Sidebar 
         activeTab={activeTab} 
-        setActiveTab={setActiveTab} 
+        setActiveTab={(t: string) => { setActiveTab(t); setIsSidebarOpen(false); }} 
         onLogout={handleLogout}
         isOpen={isSidebarOpen}
         setIsOpen={setIsSidebarOpen}
       />
 
-      <main className="flex-1 overflow-y-auto relative scroll-smooth">
-        {/* HEADER RESPONSIVE ACTUALIZADO */}
-        <header className="sticky top-0 bg-white/70 backdrop-blur-xl border-b border-slate-100 px-6 md:px-10 py-4 md:py-6 flex justify-between items-center z-40">
-          <div className="flex items-center gap-3 md:gap-6">
+      <main className="flex-1 overflow-y-auto relative scroll-smooth flex flex-col">
+        
+        {/* HEADER RESPONSIVE PREMIUM */}
+        <header className="sticky top-0 bg-white/70 backdrop-blur-xl border-b border-slate-100 px-6 md:px-12 py-4 md:py-8 flex justify-between items-center z-40">
+          <div className="flex items-center gap-3 md:gap-8">
             
-            {/* Botón menú solo en móviles */}
+            {/* Gatillo del Menú en Móvil */}
             <button 
               onClick={() => setIsSidebarOpen(true)}
-              className="md:hidden p-3 bg-slate-900 text-white rounded-2xl shadow-lg active:scale-90 transition-all shrink-0"
+              className="md:hidden p-3.5 bg-slate-900 text-white rounded-2xl shadow-xl shadow-slate-900/10 active:scale-90 transition-all shrink-0"
             >
-              <Menu size={22} />
+              <Menu size={22} strokeWidth={2.5} />
             </button>
 
-            <div className="hidden sm:flex w-12 h-12 bg-white border border-slate-100 rounded-2xl items-center justify-center text-emerald-600 shadow-sm shrink-0">
+            <div className="hidden sm:flex w-12 h-12 md:w-14 md:h-14 bg-white border border-slate-100 rounded-[1.2rem] items-center justify-center text-emerald-600 shadow-sm shadow-slate-100/50">
               {currentMeta.icon}
             </div>
             
             <div className="min-w-0">
-              <h1 className="text-slate-900 text-lg md:text-2xl font-black tracking-tighter uppercase leading-none truncate">
+              <h1 className="text-slate-900 text-xl md:text-3xl font-black tracking-tighter uppercase leading-none truncate">
                 {currentMeta.label}
               </h1>
-              <p className="text-slate-400 text-[9px] font-bold uppercase tracking-widest mt-1 truncate">Admin: {adminName}</p>
+              <div className="flex items-center gap-2 mt-1 md:mt-2">
+                 <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></div>
+                 <p className="text-slate-400 text-[10px] md:text-[11px] font-black uppercase tracking-[0.2em] truncate">{adminName}</p>
+              </div>
             </div>
           </div>
 
-          <div className="flex flex-col items-end shrink-0">
-            <div className="text-slate-900 font-black text-xl md:text-3xl tracking-tighter tabular-nums leading-none">
-              {currentTime.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', hour12: true })}
+          <div className="flex flex-col items-end shrink-0 ml-4">
+            <div className="text-slate-900 font-black text-xl md:text-4xl tracking-tighter tabular-nums leading-none">
+              {currentTime.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true })}
             </div>
-            <p className="hidden md:block text-slate-400 text-[10px] font-bold uppercase tracking-widest mt-2">
-               {currentTime.toLocaleDateString('es-CO', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+            <p className="hidden md:block text-slate-300 text-[9px] font-black uppercase tracking-[0.3em] mt-3 bg-slate-50 px-3 py-1 rounded-full">
+               {currentTime.toLocaleDateString('es-CO', { weekday: 'long', day: 'numeric', month: 'long' })}
             </p>
           </div>
         </header>
 
-        {/* CONTENEDOR DE SECCIONES */}
-        <div className="p-4 md:p-10 max-w-7xl mx-auto min-h-[calc(100vh-100px)]">
-          {activeTab === "resumen" && <Resumen adminName={adminName} goToDeudores={() => setActiveTab("deudores")}/>}
+        {/* ÁREA CENTRAL DINÁMICA */}
+        <div className="flex-1 p-4 md:p-12 max-w-[1400px] w-full mx-auto animate-in fade-in duration-1000">
+          
+          {activeTab === "resumen" && <Resumen adminName={adminName} goToDeudores={() => setActiveTab("deudores")} />}
+          
+          {activeTab === "balance" && <BalanceHistorial />}
+          
           {activeTab === "ingresos" && <Ingresos />}
+          
           {activeTab === "recibos" && <HistorialRecibos />}
+          
           {activeTab === "causacion" && <Causacion />}
-          {activeTab === "residentes" && <Residentes />}
-          {activeTab === "zonas" && <ZonasComunes />}
-          {activeTab === "reportes" && <Reportes />}
-          {activeTab === "config" && <Configuracion />}
+          
           {activeTab === "egresos" && <Egresos />}
+          
           {activeTab === "deudores" && <Deudores />}
+          
+          {activeTab === "residentes" && <Residentes />}
+          
+          {activeTab === "zonas" && <ZonasComunes />}
+          
+          {activeTab === "reportes" && <Reportes />}
+          
+          {activeTab === "config" && <Configuracion />}
+
+          {/* Protección en caso de tabs inexistentes */}
+          {!sectionMeta[activeTab] && (
+            <div className="flex flex-col items-center justify-center py-40 opacity-20">
+               <Loader2 className="animate-spin text-slate-500" size={60} />
+            </div>
+          )}
         </div>
       </main>
     </div>
