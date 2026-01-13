@@ -32,13 +32,14 @@ const ReciboContenido = ({ datos }: { datos: any }) => (
       
       <div className="flex-1 text-center px-4">
         <h2 className="font-black text-[13px] uppercase leading-none mb-1">Agrupación Res. El Parque de las Flores</h2>
-        <p className="font-bold text-[9px] text-slate-600">NIT. 832.011.421-3 • Soacha, Cundinamarca</p>
+        <p className="font-bold text-[9px] text-slate-600">NIT. 832.011.421-3 • DG 9 #4B-90 • Soacha, Cundinamarca</p>
         <div className="text-[8px] text-slate-500 space-x-2 mt-1">
           <span>Cel.: 315 340 0657</span>
           <span>•</span>
-          <span className="font-black text-emerald-800 uppercase tracking-tighter">Cta. Ahorros 24511819298 Banco Caja Social</span>
+          <span>Convenio 15939402 Torre - Apto</span>
         </div>
-        <p className="text-[7px] italic text-slate-400 mt-1 lowercase">e-mail: cr.parquedelasflores@gmail.com</p>
+        <p className="font-black text-emerald-800 uppercase tracking-tighter">Cta. Ahorros 24511819298 Banco Caja Social</p>
+        <p className="font-bold text-[9px] text-slate-600">correo: cr.parquedelasflores@gmail.com </p>
       </div>
 
       <div className="w-[150px] border-2 border-slate-900 p-2 text-center rounded-md bg-slate-50 shadow-inner">
