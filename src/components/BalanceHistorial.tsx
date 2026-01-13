@@ -1,10 +1,10 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { 
   TrendingUp, TrendingDown, Target, Landmark, 
-  ArrowUpRight, ArrowDownRight, Search, FileBarChart,
-  Calendar, CheckCircle2, AlertTriangle, Loader2
+  ArrowUpRight, FileBarChart, Calendar, 
+  CheckCircle2, Loader2, Banknote 
 } from "lucide-react";
 
 export default function BalanceHistorial() {
@@ -13,147 +13,148 @@ export default function BalanceHistorial() {
   const [resumen, setResumen] = useState<any>(null);
 
   async function cargarBalance() {
-    if (!periodo) return alert("Selecciona un mes");
+    if (!periodo) return;
     setLoading(true);
 
-    const [anio, mes] = periodo.split("-");
     const primerDia = `${periodo}-01`;
     const ultimoDia = `${periodo}-31`;
 
-    // 1. Lo que se debió cobrar (Causación)
-    const { data: causaciones } = await supabase.from("causaciones_globales").select("*").eq("mes_causado", periodo);
-    
-    // 2. Lo que realmente se cobró (Pagos)
-    const { data: pagos } = await supabase.from("pagos").select("monto_total").gte("fecha_pago", primerDia).lte("fecha_pago", ultimoDia);
-    
-    // 3. Lo que se gastó (Egresos)
-    const { data: egresos } = await supabase.from("egresos").select("monto").gte("fecha", primerDia).lte("fecha", ultimoDia);
+    try {
+      // Carga paralela de datos para máxima velocidad
+      const [causado, recaudado, egresos] = await Promise.all([
+        supabase.from("deudas_residentes")
+          .select("monto_original")
+          .eq("causaciones_globales.mes_causado", periodo),
+        
+        supabase.from("pagos")
+          .select("monto_total, metodo_pago")
+          .gte("fecha_pago", primerDia)
+          .lte("fecha_pago", ultimoDia),
 
-    const esperado = causaciones?.reduce((acc, c) => acc + (c.monto_total || 0), 0) || 0; // Tendrías que asegurar que este campo sume en causación
-    const recaudado = pagos?.reduce((acc, p) => acc + Number(p.monto_total), 0) || 0;
-    const gastos = egresos?.reduce((acc, e) => acc + Number(e.monto), 0) || 0;
+        supabase.from("egresos")
+          .select("monto")
+          .gte("fecha", primerDia)
+          .lte("fecha", ultimoDia)
+      ]);
 
-    setResumen({
-      esperado: 0, // Esto se llenaría mejor con una suma de deudas_residentes original_monto
-      recaudado,
-      gastos,
-      excedente: recaudado - gastos,
-      efectividad: esperado > 0 ? (recaudado / esperado) * 100 : 100
-    });
-    setLoading(false);
+      const sumaEsperado = causado.data?.reduce((acc, d) => acc + Number(d.monto_original), 0) || 0;
+      const sumaRecaudado = recaudado.data?.reduce((acc, p) => acc + Number(p.monto_total), 0) || 0;
+      const sumaGastos = egresos.data?.reduce((acc, e) => acc + Number(e.monto), 0) || 0;
+
+      setResumen({
+        esperado: sumaEsperado,
+        recaudado: sumaRecaudado,
+        gastos: sumaGastos,
+        excedente: sumaRecaudado - sumaGastos,
+        banco: recaudado.data?.filter(p => p.metodo_pago === 'Transferencia').reduce((acc, p) => acc + Number(p.monto_total), 0) || 0,
+        efectivo: recaudado.data?.filter(p => p.metodo_pago === 'Efectivo').reduce((acc, p) => acc + Number(p.monto_total), 0) || 0,
+        efectividad: sumaEsperado > 0 ? (sumaRecaudado / sumaEsperado) * 100 : 100
+      });
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
-    <div className="max-w-6xl mx-auto space-y-10 animate-in fade-in duration-700 pb-20">
+    <div className="max-w-6xl mx-auto space-y-6 pb-20 px-2 md:px-0 font-sans">
       
-      {/* 1. SELECTOR DE PERIODO */}
-      <section className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-xl shadow-slate-200/30 flex flex-col md:flex-row items-center justify-between gap-6">
-        <div className="flex items-center gap-5">
-           <div className="w-14 h-14 bg-emerald-600 rounded-[1.2rem] flex items-center justify-center text-white shadow-lg shadow-emerald-200">
-              <Calendar size={28} />
-           </div>
-           <div>
-              <h2 className="text-slate-900 text-2xl font-black uppercase tracking-tight">Balance Mensual</h2>
-              <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest">Análisis de rendimiento histórico</p>
-           </div>
+      {/* 1. FILTROS SIMPLES */}
+      <section className="bg-white p-5 rounded-xl border border-slate-200 flex flex-col md:flex-row items-center gap-4">
+        <div className="flex items-center gap-3 w-full md:w-auto flex-1">
+           <Calendar className="text-slate-400" size={20} />
+           <h2 className="text-slate-700 font-bold text-lg uppercase tracking-tight">Cierre de Mes</h2>
         </div>
 
-        <div className="flex items-center gap-4 w-full md:w-auto">
+        <div className="flex items-center gap-2 w-full md:w-auto">
           <input 
             type="month" 
-            className="flex-1 bg-slate-50 border border-slate-200 p-5 rounded-2xl outline-none focus:ring-4 ring-emerald-500/5 font-black text-slate-700"
-            onChange={(e) => setPeriodo(e.target.value)}
+            className="flex-1 bg-slate-50 border border-slate-200 p-3 rounded-lg outline-none focus:border-emerald-500 font-bold text-slate-700"
+            onChange={(e) => { setPeriodo(e.target.value); setResumen(null); }}
           />
           <button 
             onClick={cargarBalance}
-            className="bg-slate-900 hover:bg-black text-white px-10 py-5 rounded-2xl font-black text-xs tracking-widest active:scale-95 transition-all shadow-xl shadow-slate-900/10"
+            disabled={loading || !periodo}
+            className="bg-slate-900 hover:bg-slate-800 text-white px-6 py-3 rounded-lg font-bold text-xs tracking-widest disabled:opacity-30 transition-all flex items-center gap-2"
           >
-            CONSULTAR
+            {loading ? <Loader2 className="animate-spin" size={16} /> : "AUDITAR"}
           </button>
         </div>
       </section>
 
-      {/* 2. RESULTADOS DEL BALANCE */}
-      {loading ? (
-        <div className="h-64 flex items-center justify-center"><Loader2 className="animate-spin text-emerald-500" size={50} /></div>
-      ) : resumen ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+      {/* 2. DASHBOARD DE RESULTADOS (DISEÑO LIMPIO) */}
+      {resumen ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           
-          {/* CARRETERA DE INGRESO (METRICAS) */}
-          <div className="space-y-6">
-            <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm group">
-               <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest mb-4 flex items-center gap-2">
-                 <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full"></div> Ingresos Percibidos
-               </p>
-               <h4 className="text-4xl font-black text-slate-900 tabular-nums">${resumen.recaudado.toLocaleString()}</h4>
-               <p className="text-[11px] font-bold text-slate-300 mt-2 italic">Dinero total que entró a caja</p>
-            </div>
-
-            <div className="bg-slate-900 p-8 rounded-[2.5rem] text-white shadow-xl group">
-               <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest mb-4 flex items-center gap-2">
-                 <div className="w-1.5 h-1.5 bg-emerald-400 rounded-full"></div> Utilidad Operativa
-               </p>
-               <h4 className="text-4xl font-black text-emerald-400 tabular-nums">
-                 ${resumen.excedente.toLocaleString()}
-               </h4>
-               <p className="text-[11px] font-bold text-slate-500 mt-2">Saldo final libre después de egresos</p>
-            </div>
-          </div>
-
-          {/* ESTADÍSTICAS DE EFICACIA */}
-          <div className="bg-white p-8 rounded-[3rem] border border-slate-100 shadow-sm flex flex-col justify-between overflow-hidden relative group">
-             <div className="relative z-10">
-                <Target className="text-slate-100 mb-4 group-hover:text-emerald-50 transition-colors" size={60} />
-                <h3 className="text-slate-900 font-black text-xl mb-1 uppercase tracking-tighter">Eficiencia Recaudo</h3>
-                <p className="text-slate-400 text-xs font-bold leading-tight">Porcentaje de éxito vs Meta causada</p>
-                
-                <div className="mt-12 space-y-4">
-                   <div className="flex items-end gap-3">
-                      <span className="text-5xl font-black text-slate-900 tracking-tighter">{resumen.efectividad === 100 ? '---' : Math.round(resumen.efectividad) + '%'}</span>
-                      <TrendingUp className="text-emerald-500 mb-2" size={24} />
-                   </div>
-                   <div className="w-full h-3 bg-slate-100 rounded-full overflow-hidden border border-slate-100">
-                      <div className="h-full bg-emerald-500" style={{ width: `${resumen.efectividad}%` }}></div>
-                   </div>
+          {/* Ingresos Detallados */}
+          <div className="bg-white p-6 rounded-xl border border-slate-200 space-y-4">
+             <div>
+                <p className="text-slate-400 text-[10px] font-bold uppercase tracking-wider mb-1">Recaudado Real</p>
+                <h4 className="text-3xl font-black text-slate-900">${resumen.recaudado.toLocaleString()}</h4>
+             </div>
+             <div className="pt-4 border-t border-slate-100 flex flex-col gap-2">
+                <div className="flex justify-between text-xs font-medium text-slate-500">
+                   <span className="flex items-center gap-2"><Landmark size={14} className="text-slate-400" /> Bancos</span>
+                   <span className="text-slate-900 font-bold">${resumen.banco.toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between text-xs font-medium text-slate-500">
+                   <span className="flex items-center gap-2"><Banknote size={14} className="text-slate-400" /> Efectivo</span>
+                   <span className="text-slate-900 font-bold">${resumen.efectivo.toLocaleString()}</span>
                 </div>
              </div>
-             <div className="absolute -bottom-10 -right-10 w-40 h-40 bg-emerald-50 rounded-full blur-3xl opacity-50"></div>
           </div>
 
-          {/* EGRESOS VS IMPACTO */}
-          <div className="bg-rose-50 border border-rose-100 p-8 rounded-[3rem] shadow-sm flex flex-col justify-center text-center space-y-4">
-             <div className="w-16 h-16 bg-white rounded-3xl mx-auto flex items-center justify-center text-rose-500 shadow-xl shadow-rose-200/50 mb-2">
-                <TrendingDown size={32} />
+          {/* Eficacia y Meta */}
+          <div className="bg-white p-6 rounded-xl border border-slate-200 flex flex-col justify-between">
+             <div className="flex items-center justify-between">
+                <p className="text-slate-400 text-[10px] font-bold uppercase tracking-wider">Efectividad Cobro</p>
+                <Target size={16} className="text-emerald-500" />
              </div>
+             <div className="mt-4 flex items-end justify-between">
+                <span className="text-5xl font-black text-slate-900 tracking-tighter">{Math.round(resumen.efectividad)}%</span>
+                <span className="text-[10px] text-slate-400 font-bold mb-2">FACTURADO: ${resumen.esperado.toLocaleString()}</span>
+             </div>
+             <div className="mt-4 w-full h-2.5 bg-slate-100 rounded-full overflow-hidden">
+                <div className="h-full bg-emerald-500" style={{ width: `${resumen.efectividad}%` }}></div>
+             </div>
+          </div>
+
+          {/* Balance Operativo (Gasto vs Utilidad) */}
+          <div className="bg-white p-6 rounded-xl border border-slate-200 flex flex-col justify-between relative overflow-hidden group">
+             {/* Sutil indicador de saldo positivo/negativo */}
+             <div className={`absolute top-0 right-0 p-4 font-black text-[10px] ${resumen.excedente >= 0 ? 'text-emerald-500 bg-emerald-50' : 'text-rose-500 bg-rose-50'} rounded-bl-xl`}>
+                {resumen.excedente >= 0 ? '+ DISPONIBLE' : '- DEFICIT'}
+             </div>
+             
              <div>
-                <p className="text-[10px] font-black text-rose-400 uppercase tracking-widest mb-1">Gasto Consumido</p>
-                <h4 className="text-3xl font-black text-rose-700">${resumen.gastos.toLocaleString()}</h4>
+                <p className="text-slate-400 text-[10px] font-bold uppercase tracking-wider mb-1">Resultado Neto</p>
+                <h4 className={`text-3xl font-black ${resumen.excedente >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                  ${resumen.excedente.toLocaleString()}
+                </h4>
              </div>
-             <p className="text-[11px] font-bold text-rose-900/40 uppercase tracking-tighter">Equivale al {resumen.recaudado > 0 ? Math.round((resumen.gastos/resumen.recaudado)*100) : 0}% del ingreso</p>
+             <div className="mt-6 flex items-center justify-between text-xs text-slate-400">
+                <span>Gastos registrados</span>
+                <span className="text-rose-500 font-bold">-${resumen.gastos.toLocaleString()}</span>
+             </div>
           </div>
 
         </div>
       ) : (
-        <div className="py-32 text-center opacity-30 flex flex-col items-center">
-           <FileBarChart size={100} strokeWidth={1} />
-           <p className="mt-4 font-black uppercase tracking-widest text-sm">Selecciona un periodo fiscal para comenzar</p>
+        <div className="py-20 text-center bg-slate-50 border border-slate-200 rounded-xl border-dashed">
+           <FileBarChart className="mx-auto text-slate-200 mb-4" size={48} />
+           <p className="text-slate-400 text-xs font-bold uppercase tracking-widest">Esperando Selección de Periodo</p>
         </div>
       )}
 
-      {/* FOOTER INFORMATIVO */}
+      {/* CONCLUSIÓN (MENSAJE FINAL LIMPIO) */}
       {resumen && (
-        <div className="bg-emerald-900 p-10 rounded-[3rem] text-white flex items-center gap-10 shadow-2xl relative overflow-hidden">
-           <div className="flex-1 space-y-4 relative z-10">
-              <h3 className="text-emerald-400 font-black uppercase tracking-widest text-[10px]">Conclusión Administrativa</h3>
-              <p className="text-xl font-bold leading-snug">
-                El mes de <span className="underline decoration-emerald-500 decoration-4">{periodo}</span> cerró con una disponibilidad real en banco de <span className="text-emerald-300 font-black text-2xl tracking-tighter italic ml-2">${resumen.excedente.toLocaleString()}</span>. 
-              </p>
-              <div className="flex items-center gap-2 text-emerald-400/50 text-[10px] font-black">
-                 <CheckCircle2 size={14}/> TODOS LOS REGISTROS ESTÁN AUDITADOS Y RESPALDADOS
-              </div>
-           </div>
-           <ArrowUpRight className="text-emerald-800 opacity-20" size={150} />
-           <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-400/10 blur-[100px] rounded-full -mt-20"></div>
+        <div className="bg-slate-50 p-8 rounded-xl border border-slate-200">
+          <p className="text-slate-800 font-bold text-sm leading-relaxed uppercase">
+            Conclusión: <span className="text-slate-500 font-normal ml-2">El cierre administrativo del mes arroja un {resumen.excedente >= 0 ? 'Excedente' : 'Déficit'} de </span> 
+            <span className={resumen.excedente >= 0 ? 'text-emerald-600' : 'text-rose-600'}> ${resumen.excedente.toLocaleString()} </span>
+            <span className="text-slate-500 font-normal italic lowercase ml-2">Basado en auditoría de caja.</span>
+          </p>
         </div>
       )}
 

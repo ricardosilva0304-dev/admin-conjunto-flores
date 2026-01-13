@@ -3,11 +3,12 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import { 
   Calendar as CalendarIcon, User, ChevronLeft, ChevronRight, 
-  X, Loader2, Sun, Moon, Flame, Search, CheckCircle2, Clock
+  X, Loader2, Sun, Moon, Flame, Search, CheckCircle2, 
+  Trash2, Filter, Info
 } from "lucide-react";
 import { 
   format, addMonths, subMonths, startOfMonth, endOfMonth, 
-  startOfWeek, endOfWeek, isSameMonth, isSameDay, addDays 
+  startOfWeek, endOfWeek, isSameMonth, isSameDay, addDays, parseISO 
 } from "date-fns";
 import { es } from "date-fns/locale";
 
@@ -18,69 +19,55 @@ export default function ZonasComunes() {
   const [loading, setLoading] = useState(true);
   const [guardando, setGuardando] = useState(false);
   
-  // Estados del Formulario
-  const [searchResidente, setSearchResidente] = useState("");
-  const [residenteSeleccionado, setResidenteSeleccionado] = useState<any>(null);
-  const [zona, setZona] = useState("");
-  const [fecha, setFecha] = useState("");
+  // Estados de Formulario
+  const [searchRes, setSearchRes] = useState("");
+  const [resSeleccionado, setResSeleccionado] = useState<any>(null);
+  const [zona, setZona] = useState("Salón Comunal");
   const [jornada, setJornada] = useState("Día");
+  const [fecha, setFecha] = useState("");
 
   useEffect(() => { cargarDatos(); }, [currentMonth]);
 
   async function cargarDatos() {
     setLoading(true);
-    const { data: resData } = await supabase.from("residentes").select("*");
-    const { data: rsvData } = await supabase.from("reservas").select("*");
-    if (resData) setResidentes(resData);
-    if (rsvData) setReservas(rsvData);
-    setLoading(false);
+    try {
+      const [resRes, resSrv] = await Promise.all([
+        supabase.from("residentes").select("*"),
+        supabase.from("reservas").select("*")
+      ]);
+      if (resRes.data) setResidentes(resRes.data);
+      if (resSrv.data) setReservas(resSrv.data);
+    } catch (e) { console.error(e); }
+    finally { setLoading(false); }
   }
 
-  const residentesSugeridos = searchResidente.length > 1 ? residentes.filter(r => {
-    const term = searchResidente.toLowerCase();
-    if (term.includes("-")) {
-      const [t, a] = term.split("-");
-      return r.torre.includes(t) && r.apartamento.startsWith(a);
-    }
-    return r.nombre.toLowerCase().includes(term) || r.apartamento.includes(term);
-  }).slice(0, 5) : [];
+  const sugerencias = searchRes.length > 1 ? residentes.filter(r => {
+    const term = searchRes.toLowerCase();
+    const unidad = `${r.torre.replace("Torre ","T")}-${r.apartamento}`;
+    return r.nombre.toLowerCase().includes(term) || unidad.toLowerCase().includes(term);
+  }).slice(0, 4) : [];
 
-  async function hacerReserva(e: React.FormEvent) {
+  async function manejarReserva(e: React.FormEvent) {
     e.preventDefault();
-    if (!residenteSeleccionado || !zona || !fecha) return alert("Completa todos los datos");
+    if (!resSeleccionado || !fecha) return alert("Faltan datos obligatorios.");
+
     setGuardando(true);
-    
     const { error } = await supabase.from("reservas").insert([{
-      residente_nombre: residenteSeleccionado.nombre,
-      residente_unidad: `${residenteSeleccionado.torre.replace("Torre ", "")}-${residenteSeleccionado.apartamento}`,
-      zona: zona,
-      fecha: fecha,
-      jornada: zona === "Salón Comunal" ? jornada : "Todo el día"
+      residente_nombre: resSeleccionado.nombre,
+      residente_unidad: `${resSeleccionado.torre.replace("Torre ", "T")}-${resSeleccionado.apartamento}`,
+      zona,
+      fecha,
+      jornada: zona === "Salón Comunal" ? jornada : "Día Completo"
     }]);
 
     if (!error) {
-      setResidenteSeleccionado(null);
-      setSearchResidente("");
-      setZona("");
+      setResSeleccionado(null); setSearchRes(""); setFecha("");
       cargarDatos();
     }
     setGuardando(false);
   }
 
-  // --- COMPONENTES DE INTERFAZ ---
-
-  const renderDaysHeader = () => {
-    const days = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
-    return (
-      <div className="grid grid-cols-7 border-b border-slate-100 bg-slate-50/50">
-        {days.map(d => (
-          <div key={d} className="py-4 text-center text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] border-r border-slate-100 last:border-0">
-            {d}
-          </div>
-        ))}
-      </div>
-    );
-  };
+  // --- COMPONENTES VISUALES ---
 
   const renderCells = () => {
     const monthStart = startOfMonth(currentMonth);
@@ -93,27 +80,28 @@ export default function ZonasComunes() {
 
     while (day <= endDate) {
       for (let i = 0; i < 7; i++) {
-        const formattedDate = format(day, "yyyy-MM-dd");
-        const reservasDelDia = reservas.filter(r => r.fecha === formattedDate);
-        const esHoy = isSameDay(day, new Date());
-        
+        const dFmt = format(day, "yyyy-MM-dd");
+        const listRes = reservas.filter(r => r.fecha === dFmt);
+        const hoy = isSameDay(day, new Date());
+
         days.push(
-          <div key={day.toString()} className={`min-h-[140px] border-r border-b border-slate-100 p-3 transition-all relative ${!isSameMonth(day, monthStart) ? "bg-slate-50/20 opacity-30" : "bg-white hover:bg-slate-50/50"}`}>
-            <div className={`flex items-center justify-center w-7 h-7 text-xs font-black rounded-lg mb-2 ${esHoy ? "bg-emerald-500 text-white shadow-lg shadow-emerald-200" : "text-slate-300"}`}>
+          <div key={day.toString()} className={`min-h-[120px] border-r border-b border-slate-100 p-2 flex flex-col gap-1 transition-all ${!isSameMonth(day, monthStart) ? "bg-slate-50/20 opacity-20" : "bg-white hover:bg-slate-50/40"}`}>
+            <div className={`w-6 h-6 flex items-center justify-center text-[10px] font-black rounded-md mb-1 ${hoy ? "bg-emerald-600 text-white shadow-lg" : "text-slate-300"}`}>
               {format(day, "d")}
             </div>
             
-            <div className="space-y-1.5">
-              {reservasDelDia.map(r => (
-                <div key={r.id} className={`p-2 rounded-xl border shadow-sm animate-in fade-in zoom-in-95 duration-300 ${
-                  r.zona === "BBQ" ? "bg-amber-50 border-amber-100 text-amber-700" : "bg-blue-50 border-blue-100 text-blue-700"
-                }`}>
-                  <div className="flex justify-between items-center mb-1">
-                    <span className="text-[10px] font-black uppercase tracking-tighter">{r.residente_unidad}</span>
-                    {r.jornada === 'Día' ? <Sun size={10} /> : r.jornada === 'Noche' ? <Moon size={10} /> : <Flame size={10} />}
-                  </div>
-                  <p className="text-[9px] font-bold leading-none truncate">{r.residente_nombre}</p>
-                  <p className="text-[8px] mt-1 opacity-60 font-black uppercase tracking-widest">{r.jornada}</p>
+            <div className="space-y-1">
+              {listRes.map(r => (
+                <div key={r.id} className={`p-1.5 rounded-lg border text-[8.5px] font-black uppercase flex flex-col group relative ${r.zona === "BBQ" ? "bg-amber-50 border-amber-200 text-amber-700" : "bg-blue-50 border-blue-200 text-blue-700"}`}>
+                   <div className="flex justify-between items-center leading-none">
+                     <span>{r.residente_unidad}</span>
+                     {r.jornada === 'Día' ? <Sun size={8}/> : r.jornada === 'Noche' ? <Moon size={8}/> : <Flame size={8}/>}
+                   </div>
+                   <p className="truncate mt-0.5 opacity-80">{r.residente_nombre}</p>
+                   {/* Boton para borrar rapido desde el calendario */}
+                   <button onClick={async()=> {if(confirm("¿Eliminar reserva?")){await supabase.from("reservas").delete().eq("id", r.id); cargarDatos();}}} className="absolute inset-0 bg-rose-500 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity rounded-lg">
+                      <Trash2 size={12}/>
+                   </button>
                 </div>
               ))}
             </div>
@@ -124,120 +112,124 @@ export default function ZonasComunes() {
       rows.push(<div className="grid grid-cols-7" key={day.toString()}>{days}</div>);
       days = [];
     }
-    return <div className="bg-white">{rows}</div>;
+    return <div className="border-t border-slate-100">{rows}</div>;
   };
 
   return (
-    <div className="w-full space-y-6 animate-in fade-in duration-700 pb-10">
+    <div className="max-w-7xl mx-auto space-y-6 pb-20 px-2 md:px-0 font-sans text-slate-800">
       
-      {/* BARRA HORIZONTAL DE RESERVAS (ESTILO PREMIUM) */}
-      <div className="bg-white p-6 rounded-[2.5rem] border border-slate-100 shadow-xl shadow-slate-200/40">
-        <form onSubmit={hacerReserva} className="flex flex-col xl:flex-row items-end gap-6">
+      {/* 1. BARRA DE COMANDOS TIPO "AUDITOR" (PARA COMPUTADOR Y MÓVIL) */}
+      <section className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+        <form onSubmit={manejarReserva} className="flex flex-col xl:flex-row items-center gap-4">
           
-          {/* Buscador 5-101 */}
-          <div className="flex-1 w-full space-y-2 relative">
-            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Residente</label>
-            <div className="relative group">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-emerald-500 transition-colors" size={18} />
-              <input 
-                type="text"
-                placeholder="Ej: 5-101"
-                className="w-full bg-slate-50 border border-slate-100 p-4 pl-12 rounded-2xl outline-none focus:ring-4 ring-emerald-500/5 focus:border-emerald-500 font-bold text-slate-700 transition-all"
-                value={residenteSeleccionado ? `${residenteSeleccionado.torre.replace("Torre ", "")}-${residenteSeleccionado.apartamento}` : searchResidente}
-                onChange={(e) => { setSearchResidente(e.target.value); setResidenteSeleccionado(null); }}
-              />
-              {residenteSeleccionado && <button type="button" onClick={() => {setResidenteSeleccionado(null); setSearchResidente("");}} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-300 hover:text-rose-500"><X size={16}/></button>}
+          {/* BUSCADOR 5-101 */}
+          <div className="flex-1 w-full relative group">
+             <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-1 block">Apto Responsable</label>
+             <div className="relative">
+                <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" />
+                <input 
+                  placeholder="Apto o Nombre..."
+                  className="w-full bg-slate-50 border border-slate-100 p-3.5 pl-10 rounded-xl outline-none font-bold text-slate-700 text-sm focus:bg-white transition-all"
+                  value={resSeleccionado ? `${resSeleccionado.torre.replace("Torre ","T")}-${resSeleccionado.apartamento} | ${resSeleccionado.nombre}` : searchRes}
+                  onChange={(e)=> {setSearchRes(e.target.value); setResSeleccionado(null);}}
+                />
+                {resSeleccionado && <button type="button" onClick={()=>{setResSeleccionado(null); setSearchRes("");}} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-rose-500 transition-colors"><X size={16}/></button>}
+             </div>
+             
+             {/* SUGERENCIAS */}
+             {sugerencias.length > 0 && (
+               <div className="absolute top-[105%] left-0 right-0 bg-white border border-slate-200 rounded-xl shadow-2xl z-[150] overflow-hidden">
+                  {sugerencias.map(r => (
+                    <button key={r.id} type="button" onClick={()=>{setResSeleccionado(r); setSearchRes("");}} className="w-full p-4 text-left hover:bg-slate-50 flex items-center justify-between border-b border-slate-50 last:border-0 font-bold text-xs text-slate-600">
+                      <span className="truncate pr-4 uppercase">{r.nombre}</span>
+                      <span className="bg-emerald-50 text-emerald-600 px-2 py-0.5 rounded text-[10px] font-black whitespace-nowrap">{r.torre.replace("Torre ","T")}-{r.apartamento}</span>
+                    </button>
+                  ))}
+               </div>
+             )}
+          </div>
+
+          <div className="w-full xl:w-56 space-y-1">
+             <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1 block">Ubicación</label>
+             <div className="flex bg-slate-50 p-1 rounded-xl border border-slate-100">
+               {['Salón Comunal', 'BBQ'].map(z => (
+                 <button key={z} type="button" onClick={()=>setZona(z)} className={`flex-1 py-2 rounded-lg text-[9px] font-black transition-all ${zona === z ? "bg-white text-slate-900 shadow-sm border border-slate-100" : "text-slate-400 uppercase"}`}>
+                   {z === 'Salón Comunal' ? 'SALÓN' : 'ZONA BBQ'}
+                 </button>
+               ))}
+             </div>
+          </div>
+
+          {zona === "Salón Comunal" && (
+            <div className="w-full xl:w-40 space-y-1 animate-in zoom-in-95">
+               <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1 block">Tramo Horario</label>
+               <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-100">
+                 {['Día', 'Noche'].map(j => (
+                   <button key={j} type="button" onClick={()=>setJornada(j)} className={`flex-1 py-2 rounded-lg text-[9px] font-black transition-all ${jornada === j ? "bg-white text-slate-900 shadow-sm border border-slate-100" : "text-slate-400 uppercase"}`}>
+                      {j}
+                   </button>
+                 ))}
+               </div>
             </div>
+          )}
 
-            {residentesSugeridos.length > 0 && (
-              <div className="absolute top-full left-0 right-0 bg-white border border-slate-100 mt-2 rounded-[1.5rem] shadow-2xl z-50 overflow-hidden animate-in slide-in-from-top-2">
-                {residentesSugeridos.map(r => (
-                  <button key={r.id} type="button" onClick={() => { setResidenteSeleccionado(r); setSearchResidente(""); }} className="w-full p-4 text-left hover:bg-slate-50 flex justify-between items-center transition-colors border-b border-slate-50 last:border-0">
-                    <span className="font-bold text-slate-700 text-sm">{r.nombre}</span>
-                    <span className="text-[10px] font-black text-emerald-600 bg-emerald-50 px-3 py-1 rounded-lg">{r.torre.replace("Torre ","T")}-{r.apartamento}</span>
-                  </button>
-                ))}
-              </div>
-            )}
+          <div className="w-full xl:w-48 space-y-1">
+             <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1 block">Agenda</label>
+             <input type="date" className="w-full bg-slate-50 border border-slate-100 p-3.5 rounded-xl font-bold text-sm outline-none" value={fecha} onChange={(e)=>setFecha(e.target.value)} required />
           </div>
 
-          {/* Selector de Zona */}
-          <div className="w-full xl:w-72 space-y-2">
-            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Zona</label>
-            <div className="grid grid-cols-2 gap-2 bg-slate-50 p-1.5 rounded-2xl border border-slate-100">
-              <button type="button" onClick={() => setZona("Salón Comunal")} className={`py-3 rounded-xl text-[10px] font-black transition-all flex items-center justify-center gap-2 ${zona === 'Salón Comunal' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}>
-                <Clock size={14}/> SALÓN
-              </button>
-              <button type="button" onClick={() => setZona("BBQ")} className={`py-3 rounded-xl text-[10px] font-black transition-all flex items-center justify-center gap-2 ${zona === 'BBQ' ? 'bg-white text-amber-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}>
-                <Flame size={14}/> BBQ
-              </button>
-            </div>
-          </div>
-
-          {/* Jornada (Solo Salon) */}
-          <div className={`w-full xl:w-48 space-y-2 transition-all duration-500 ${zona === 'Salón Comunal' ? 'opacity-100 scale-100' : 'opacity-30 grayscale pointer-events-none'}`}>
-            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Jornada</label>
-            <div className="flex bg-slate-50 p-1.5 rounded-2xl border border-slate-100">
-              <button type="button" onClick={() => setJornada("Día")} className={`flex-1 py-3 rounded-xl text-[10px] font-black transition-all flex items-center justify-center gap-2 ${jornada === 'Día' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-400'}`}>
-                <Sun size={14}/> DÍA
-              </button>
-              <button type="button" onClick={() => setJornada("Noche")} className={`flex-1 py-3 rounded-xl text-[10px] font-black transition-all flex items-center justify-center gap-2 ${jornada === 'Noche' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400'}`}>
-                <Moon size={14}/> NOCHE
-              </button>
-            </div>
-          </div>
-
-          {/* Fecha */}
-          <div className="w-full xl:w-56 space-y-2">
-            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Fecha</label>
-            <input type="date" className="w-full bg-slate-50 border border-slate-100 p-4 rounded-2xl outline-none focus:border-emerald-500 font-bold text-slate-700" value={fecha} onChange={(e) => setFecha(e.target.value)} />
-          </div>
-
-          {/* Botón Acción */}
           <button 
-            type="submit" 
-            disabled={guardando}
-            className="w-full xl:w-auto bg-emerald-600 hover:bg-emerald-700 text-white font-black px-10 py-5 rounded-2xl shadow-xl shadow-emerald-100 flex items-center justify-center gap-3 transition-all active:scale-95 disabled:opacity-50"
+            type="submit" disabled={guardando} 
+            className="w-full xl:w-auto mt-5 md:mt-0 px-8 py-4 bg-slate-900 text-white rounded-xl font-black text-[10px] tracking-widest uppercase hover:bg-black active:scale-95 disabled:opacity-20 shadow-lg shadow-slate-900/10"
           >
-            {guardando ? <Loader2 className="animate-spin" /> : <><CheckCircle2 size={20}/> RESERVAR</>}
+             {guardando ? <Loader2 className="animate-spin" size={14} /> : "CREAR RESERVA"}
           </button>
         </form>
-      </div>
+      </section>
 
-      {/* CALENDARIO FULL WIDTH */}
-      <div className="bg-white rounded-[3rem] border border-slate-100 shadow-sm overflow-hidden">
+      {/* 2. CALENDARIO CORPORATIVO (GRAN TAMAÑO) */}
+      <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm flex flex-col min-h-[700px]">
         
-        {/* Cabecera del Calendario */}
-        <div className="p-8 flex items-center justify-between bg-white">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 bg-slate-900 rounded-2xl flex items-center justify-center text-white shadow-xl shadow-slate-200">
-              <CalendarIcon size={24} />
-            </div>
-            <div>
-              <h2 className="text-3xl font-black text-slate-900 uppercase tracking-tighter leading-none">
-                {format(currentMonth, "MMMM yyyy", { locale: es })}
-              </h2>
-              <p className="text-slate-400 text-[10px] font-bold uppercase tracking-[0.2em] mt-1">Control de Disponibilidad</p>
-            </div>
-          </div>
-          
-          <div className="flex gap-2">
-            <button onClick={() => setCurrentMonth(subMonths(currentMonth, 1))} className="p-3 bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-xl transition-all border border-slate-100"><ChevronLeft size={20}/></button>
-            <button onClick={() => setCurrentMonth(addMonths(currentMonth, 1))} className="p-3 bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-xl transition-all border border-slate-100"><ChevronRight size={20}/></button>
-          </div>
+        {/* BARRA DE NAVEGACIÓN MES */}
+        <div className="p-6 md:p-10 border-b border-slate-100 flex items-center justify-between">
+           <div className="flex items-center gap-4">
+              <div className="w-12 h-12 bg-slate-100 rounded-xl flex items-center justify-center text-slate-400">
+                 <CalendarIcon size={24} />
+              </div>
+              <div>
+                 <h2 className="text-2xl font-black text-slate-900 uppercase tracking-tighter">
+                   {format(currentMonth, "MMMM yyyy", { locale: es })}
+                 </h2>
+                 <div className="flex gap-4 text-[9px] font-black text-slate-400 uppercase mt-1">
+                   <span className="flex items-center gap-1.5"><div className="w-1.5 h-1.5 bg-blue-500 rounded-full"></div> {reservas.filter(r => r.zona === 'Salón Comunal').length} Salones</span>
+                   <span className="flex items-center gap-1.5"><div className="w-1.5 h-1.5 bg-amber-500 rounded-full"></div> {reservas.filter(r => r.zona === 'BBQ').length} BBQ</span>
+                 </div>
+              </div>
+           </div>
+
+           <div className="flex bg-slate-50 p-1.5 rounded-xl border border-slate-100">
+              <button onClick={() => setCurrentMonth(subMonths(currentMonth, 1))} className="p-2 hover:bg-white hover:shadow-sm rounded-lg transition-all text-slate-400"><ChevronLeft size={20}/></button>
+              <div className="w-[1px] h-6 bg-slate-200 mx-2 self-center"></div>
+              <button onClick={() => setCurrentMonth(addMonths(currentMonth, 1))} className="p-2 hover:bg-white hover:shadow-sm rounded-lg transition-all text-slate-400"><ChevronRight size={20}/></button>
+           </div>
         </div>
 
-        {renderDaysHeader()}
-        {loading ? (
-          <div className="h-[600px] flex items-center justify-center bg-white"><Loader2 className="animate-spin text-emerald-500" size={50} /></div>
-        ) : (
-          renderCells()
-        )}
+        {/* DIAS SEMANA HEADER */}
+        <div className="grid grid-cols-7 border-b border-slate-100 bg-slate-50/40">
+          {["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"].map(d => (
+            <div key={d} className="py-4 text-center text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">{d}</div>
+          ))}
+        </div>
 
-        {/* Leyenda Inferior */}
-        <div className="p-6 bg-slate-50/50 border-t border-slate-100 flex gap-8 justify-center">
-          <div className="flex items-center gap-2 text-[9px] font-black text-slate-400 uppercase tracking-widest"><div className="w-3 h-3 bg-blue-500 rounded-full shadow-sm"></div> Salón Comunal</div>
-          <div className="flex items-center gap-2 text-[9px] font-black text-slate-400 uppercase tracking-widest"><div className="w-3 h-3 bg-amber-500 rounded-full shadow-sm"></div> Zona BBQ</div>
+        {loading ? (
+          <div className="flex-1 flex items-center justify-center opacity-30 italic"><Loader2 className="animate-spin text-slate-900" size={32}/></div>
+        ) : renderCells()}
+
+        {/* PIE DE NOTA INFO */}
+        <div className="p-4 bg-slate-50/50 flex justify-center items-center gap-6">
+           <p className="text-[9px] font-black text-slate-300 uppercase tracking-widest flex items-center gap-2">
+              <Info size={14} className="text-slate-200" /> Pase el ratón o mantenga presionado un evento para gestionarlo
+           </p>
         </div>
       </div>
     </div>

@@ -4,10 +4,11 @@ import { supabase } from "@/lib/supabase";
 import { 
   Search, Users, Printer, FileText, 
   Loader2, X, CheckCircle2, TrendingUp, 
-  ArrowUpRight, ArrowDownWideNarrow
+  ArrowUpRight, LayoutGrid, Building2, User,
+  Mail, Phone
 } from "lucide-react";
 
-// Importación de los dos documentos que se van a generar
+// Documentos
 import EstadoCuenta from "./EstadoCuenta";
 import CuentaCobro from "./CuentaCobro";
 
@@ -19,9 +20,8 @@ export default function Deudores() {
   const [filtroTorre, setFiltroTorre] = useState("TODAS");
   const [orden, setOrden] = useState("mayor");
   
-  // ESTADOS PARA LOS MODALES
-  const [residenteDetalle, setResidenteDetalle] = useState<any>(null); // Para el Estado de Cuenta
-  const [cobroResidente, setCobroResidente] = useState<any>(null);    // Para la Cuenta de Cobro
+  const [residenteDetalle, setResidenteDetalle] = useState<any>(null); 
+  const [cobroResidente, setCobroResidente] = useState<any>(null);
 
   useEffect(() => { cargarInformacion(); }, []);
 
@@ -38,8 +38,8 @@ export default function Deudores() {
     setLoading(false);
   }
 
-  // --- CÁLCULO DE DEUDA REAL DINÁMICA ---
-  const calcularDeudaHoy = (resId: number) => {
+  // --- CÁLCULO DINÁMICO POR TRAMOS ---
+  const calcularDeudaReal = (resId: number) => {
     const deudasRes = deudas.filter(d => d.residente_id === resId);
     return deudasRes.reduce((acc, d) => {
       const hoy = new Date();
@@ -48,155 +48,128 @@ export default function Deudores() {
       const anioAct = hoy.getFullYear();
       const [yC, mC] = d.causaciones_globales.mes_causado.split("-").map(Number);
 
-      let precioActual = d.precio_m1;
-      if (anioAct > yC || (anioAct === yC && mesAct > mC)) precioActual = d.precio_m3;
+      let precioPlazo = d.precio_m1;
+      if (anioAct > yC || (anioAct === yC && mesAct > mC)) precioPlazo = d.precio_m3;
       else {
-        if (dia > 10 && dia <= 20) precioActual = d.precio_m2;
-        if (dia > 20) precioActual = d.precio_m3;
+        if (dia > 10 && dia <= 20) precioPlazo = d.precio_m2;
+        if (dia > 20) precioPlazo = d.precio_m3;
       }
-
+      // Restar lo ya abonado
       const abonado = (d.monto_original || 0) - (d.saldo_pendiente || 0);
-      return acc + Math.max(0, precioActual - abonado);
+      return acc + Math.max(0, precioPlazo - abonado);
     }, 0);
   };
 
-  const listaProcesada = residentes.map(r => ({
+  const lista = residentes.map(r => ({
     ...r,
-    deudaTotal: calcularDeudaHoy(r.id)
+    saldoReal: calcularDeudaReal(r.id)
   })).filter(r => {
     const term = busqueda.toLowerCase().trim();
-    const cumpleTorre = filtroTorre === "TODAS" || r.torre === filtroTorre;
+    const coincideTorre = filtroTorre === "TODAS" || r.torre === filtroTorre;
+    if (!term) return coincideTorre;
     if (term.includes("-")) {
         const [t, a] = term.split("-");
-        return r.torre.includes(t) && r.apartamento.startsWith(a) && cumpleTorre;
+        return r.torre.includes(t) && r.apartamento.startsWith(a) && coincideTorre;
     }
-    return (r.nombre.toLowerCase().includes(term) || r.apartamento.includes(term)) && cumpleTorre;
-  }).sort((a, b) => orden === "mayor" ? b.deudaTotal - a.deudaTotal : a.deudaTotal - b.deudaTotal);
+    return (r.nombre.toLowerCase().includes(term) || r.apartamento.includes(term)) && coincideTorre;
+  }).sort((a, b) => orden === "mayor" ? b.saldoReal - a.saldoReal : a.saldoReal - b.saldoReal);
 
-  if (loading) return <div className="flex h-96 items-center justify-center"><Loader2 className="animate-spin text-emerald-500" size={50} /></div>;
+  if (loading) return <div className="flex h-screen items-center justify-center"><Loader2 className="animate-spin text-slate-300" size={30} /></div>;
 
   return (
-    <div className="max-w-6xl mx-auto space-y-10 animate-in fade-in duration-1000 pb-24">
+    <div className="max-w-6xl mx-auto space-y-6 pb-20 px-2 md:px-0 font-sans text-slate-800">
       
-      {/* 1. DOCUMENTOS DINÁMICOS (MODALES) */}
-      {residenteDetalle && (
-        <EstadoCuenta 
-          residente={residenteDetalle} 
-          deudas={deudas.filter(d => d.residente_id === residenteDetalle.id)}
-          onClose={() => setResidenteDetalle(null)} 
-        />
-      )}
-
-      {cobroResidente && (
-        <CuentaCobro 
-          residente={cobroResidente} 
-          deudas={deudas.filter(d => d.residente_id === cobroResidente.id)} 
-          onClose={() => setCobroResidente(null)} 
-        />
-      )}
-
-      {/* 2. KPIS DE CARTERA */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-slate-900 p-8 rounded-[2.5rem] text-white shadow-2xl relative overflow-hidden group">
-           <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest mb-1 z-10 relative">Cartera Total Hoy</p>
-           <h3 className="text-4xl font-black tracking-tighter text-emerald-400 tabular-nums z-10 relative">
-             ${listaProcesada.reduce((acc, r) => acc + r.deudaTotal, 0).toLocaleString('es-CO')}
-           </h3>
-           <TrendingUp className="absolute right-0 bottom-0 text-white/5 translate-x-1/4 translate-y-1/4" size={160} />
-        </div>
-        
-        <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm">
-           <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest mb-1">Unidades con Saldo</p>
-           <h3 className="text-3xl font-black text-rose-600">
-             {listaProcesada.filter(r => r.deudaTotal > 0).length} <span className="text-slate-300 text-xs font-bold uppercase tracking-widest ml-1">Apartamentos</span>
+      {/* 1. KPIS SIMPLES Y ELEGANTES */}
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-4 md:gap-6">
+        <div className="bg-slate-900 p-6 rounded-xl text-white">
+           <p className="text-[10px] font-black uppercase text-slate-400 tracking-wider mb-2">Total en Calle</p>
+           <h3 className="text-2xl md:text-3xl font-black tabular-nums text-emerald-400">
+             ${lista.reduce((acc, r) => acc + r.saldoReal, 0).toLocaleString('es-CO')}
            </h3>
         </div>
-
-        <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm flex items-center justify-between">
+        <div className="bg-white p-6 rounded-xl border border-slate-200">
+           <p className="text-[10px] font-black uppercase text-slate-400 tracking-wider mb-2 text-center md:text-left">Unidades con Mora</p>
+           <h3 className="text-2xl md:text-3xl font-black text-rose-500 text-center md:text-left">
+             {lista.filter(r => r.saldoReal > 0).length}
+           </h3>
+        </div>
+        <div className="hidden md:flex bg-white p-6 rounded-xl border border-slate-200 items-center justify-between">
            <div>
-              <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest mb-1">Cartera Saneada</p>
+              <p className="text-[10px] font-black uppercase text-slate-400 tracking-wider mb-2">Paz y Salvo</p>
               <h3 className="text-3xl font-black text-emerald-600">
-                {listaProcesada.filter(r => r.deudaTotal === 0).length}
+                {lista.filter(r => r.saldoReal === 0).length}
               </h3>
            </div>
-           <CheckCircle2 className="text-emerald-100" size={56} strokeWidth={1} />
+           <CheckCircle2 className="text-emerald-100" size={36} />
         </div>
       </div>
 
-      {/* 3. BARRA DE HERRAMIENTAS (Filtros y Búsqueda) */}
-      <section className="bg-white p-5 rounded-[2.5rem] border border-slate-100 shadow-xl shadow-slate-200/20 flex flex-col xl:flex-row items-center gap-6">
-        <div className="relative flex-1 w-full group">
-           <Search className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-emerald-500 transition-colors" size={20} />
+      {/* 2. BARRA DE HERRAMIENTAS MÓVIL-OPTIMIZADA */}
+      <div className="bg-white p-2 rounded-2xl border border-slate-200 shadow-sm flex flex-col md:flex-row gap-2">
+        <div className="relative flex-1 group">
+           <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
            <input 
-            placeholder="Buscar por unidad (ej: 5-101) o nombre..."
-            className="w-full bg-slate-50 border border-slate-100 pl-14 pr-8 py-5 rounded-3xl font-bold text-slate-700 outline-none focus:ring-4 ring-emerald-500/5 focus:border-emerald-500 transition-all placeholder:text-slate-300"
+            placeholder="Buscar por apto o nombre..."
+            className="w-full bg-transparent pl-11 pr-4 py-4 font-bold text-slate-700 outline-none placeholder:text-slate-300"
             onChange={(e) => setBusqueda(e.target.value)}
            />
         </div>
         
-        <div className="flex bg-slate-100 p-1.5 rounded-3xl gap-1 overflow-x-auto w-full xl:w-auto">
-           {["TODAS", "Torre 1", "Torre 5", "Torre 6", "Torre 7", "Torre 8"].map(t => (
+        <div className="flex gap-2 p-1 overflow-x-auto no-scrollbar md:bg-slate-50 md:rounded-xl">
+           {["TODAS", "1", "5", "6", "7", "8"].map(t => (
              <button 
                 key={t}
-                onClick={() => setFiltroTorre(t)}
-                className={`px-6 py-3 rounded-2xl text-[10px] font-black tracking-widest transition-all whitespace-nowrap ${filtroTorre === t ? "bg-white text-emerald-600 shadow-sm" : "text-slate-400 hover:text-slate-600 uppercase"}`}
+                onClick={() => setFiltroTorre(t === "TODAS" ? "TODAS" : `Torre ${t}`)}
+                className={`px-5 py-2.5 rounded-lg text-[9px] font-black transition-all ${
+                  (filtroTorre === "TODAS" && t === "TODAS") || filtroTorre === `Torre ${t}` 
+                    ? "bg-slate-900 text-white" 
+                    : "text-slate-400"
+                }`}
              >
-               {t === "TODAS" ? "VER TODO" : t.replace("Torre ", "T-")}
+               {t === "TODAS" ? "VER TODAS" : `T${t}`}
              </button>
            ))}
         </div>
+      </div>
 
-        <select 
-          className="bg-slate-900 text-white px-8 py-5 rounded-3xl text-[10px] font-black uppercase tracking-[0.2em] outline-none active:scale-95 transition-all appearance-none cursor-pointer text-center"
-          onChange={(e) => setOrden(e.target.value)}
-        >
-          <option value="mayor">Por Mayor Deuda</option>
-          <option value="menor">Por Menor Deuda</option>
-        </select>
-      </section>
-
-      {/* 4. LISTADO TIPO CARD PREMIUM */}
-      <div className="grid gap-3">
-        {listaProcesada.map(res => (
-          <div key={res.id} className="bg-white border border-slate-100 px-8 py-6 rounded-[2.5rem] flex flex-col md:flex-row items-center justify-between hover:shadow-xl hover:shadow-emerald-500/5 transition-all group border-b-4 border-b-transparent hover:border-b-emerald-100 relative">
+      {/* 3. LISTADO EJECUTIVO */}
+      <div className="space-y-2 md:space-y-3">
+        {lista.map(res => (
+          <div key={res.id} className="bg-white border border-slate-100 p-4 md:p-6 rounded-xl md:rounded-2xl flex flex-col md:flex-row md:items-center justify-between transition-all hover:bg-slate-50">
             
-            <div className="flex items-center gap-8 flex-1 w-full md:w-auto">
-              {/* BADGE DE UNIDAD CORREGIDO */}
-              <div className={`w-24 h-16 rounded-[1.8rem] flex flex-col items-center justify-center font-black transition-all shadow-md shrink-0 border border-slate-100 ${res.deudaTotal > 0 ? "bg-rose-50 text-rose-600 border-rose-100 shadow-rose-200/20" : "bg-emerald-50 text-emerald-600 border-emerald-100"}`}>
-                 <span className="text-[7px] uppercase opacity-60 tracking-[0.2em] mb-1 font-bold">Unidad</span>
-                 <span className="text-xl tracking-tighter leading-none italic uppercase">T{res.torre.replace("Torre ","")}-{res.apartamento}</span>
+            <div className="flex items-center gap-5 md:w-1/3 mb-4 md:mb-0">
+              <div className={`w-14 h-12 rounded-lg flex flex-col items-center justify-center font-black ${res.saldoReal > 0 ? "bg-rose-50 text-rose-600 border border-rose-100" : "bg-emerald-50 text-emerald-600 border border-emerald-100"}`}>
+                 <span className="text-[7px] uppercase font-bold mb-0.5">UNIDAD</span>
+                 <span className="text-sm">T{res.torre.replace("Torre ","")}-{res.apartamento}</span>
               </div>
-              
-              <div className="truncate">
-                <h4 className="text-slate-900 font-black text-lg tracking-tight uppercase group-hover:text-emerald-700 transition-colors truncate max-w-[200px] md:max-w-md">
-                   {res.nombre}
-                </h4>
-                <div className="flex items-center gap-3 mt-1.5">
-                   <div className={`px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest border flex items-center gap-1.5 ${res.deudaTotal > 0 ? "bg-rose-500/5 text-rose-500 border-rose-500/10" : "bg-emerald-500/5 text-emerald-500 border-emerald-500/10"}`}>
-                      <div className={`w-1 h-1 rounded-full ${res.deudaTotal > 0 ? "bg-rose-500 animate-pulse" : "bg-emerald-500"}`}></div>
-                      {res.deudaTotal > 0 ? "Pendiente" : "Paz y Salvo"}
-                   </div>
+              <div className="min-w-0">
+                <h4 className="text-slate-800 font-bold text-sm uppercase truncate max-w-[150px]">{res.nombre}</h4>
+                <div className="flex items-center gap-2 mt-1">
+                   <div className={`w-1.5 h-1.5 rounded-full ${res.saldoReal > 0 ? "bg-rose-500 animate-pulse" : "bg-emerald-500"}`}></div>
+                   <p className="text-[9px] font-black uppercase text-slate-400 tracking-wider">
+                     {res.saldoReal > 0 ? "Tiene Pendientes" : "Al día"}
+                   </p>
                 </div>
               </div>
             </div>
 
-            <div className="flex flex-col items-end md:mr-16 my-4 md:my-0 w-full md:w-auto">
-               <p className="text-[9px] font-black text-slate-300 uppercase mb-1 tracking-widest">Saldo Activo al día</p>
-               <span className={`text-3xl font-black tabular-nums tracking-tighter ${res.deudaTotal > 0 ? "text-slate-900 underline decoration-rose-400 decoration-2 underline-offset-8" : "text-slate-200"}`}>
-                 ${res.deudaTotal.toLocaleString('es-CO')}
+            <div className="text-right flex items-center md:flex-col justify-between md:justify-center border-t md:border-t-0 md:border-x border-slate-100 pt-3 md:pt-0 md:px-10 mb-4 md:mb-0">
+               <p className="text-[9px] font-black text-slate-400 uppercase md:mb-1 tracking-widest">Saldo Real Hoy</p>
+               <span className={`text-xl md:text-2xl font-black tabular-nums tracking-tighter ${res.saldoReal > 0 ? "text-rose-600" : "text-slate-200"}`}>
+                 ${res.saldoReal.toLocaleString('es-CO')}
                </span>
             </div>
 
-            <div className="flex gap-2 w-full md:w-auto mt-4 md:mt-0">
+            <div className="flex gap-2">
                <button 
-                 onClick={() => setResidenteDetalle(res)} // <-- Botón Estado de Cuenta funcional
-                 className="flex-1 md:flex-none px-6 py-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl text-[9px] font-black uppercase tracking-[0.1em] transition-all shadow-md active:scale-95 shadow-emerald-500/10"
+                 onClick={() => setResidenteDetalle(res)}
+                 className="flex-1 md:flex-none px-6 py-3 border border-slate-200 text-slate-600 rounded-lg text-[9px] font-black uppercase tracking-widest hover:bg-white hover:text-emerald-600 hover:border-emerald-200 transition-all active:scale-95"
                >
                  Estado Cuenta
                </button>
                <button 
-                 onClick={() => setCobroResidente(res)}   // <-- CORRECCIÓN: Ahora vinculamos la Cuenta de Cobro aquí
-                 className={`flex-1 md:flex-none px-6 py-4 rounded-2xl text-[9px] font-black uppercase tracking-[0.1em] transition-all shadow-md ${res.deudaTotal > 0 ? "bg-amber-500 hover:bg-amber-600 text-white shadow-amber-200 active:scale-95" : "bg-slate-50 text-slate-300 pointer-events-none opacity-40 grayscale"}`}
+                 onClick={() => setCobroResidente(res)}
+                 className={`flex-1 md:flex-none px-6 py-3 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all active:scale-95 ${res.saldoReal > 0 ? "bg-slate-900 text-white" : "bg-slate-50 text-slate-300 pointer-events-none"}`}
                >
                  Cuenta Cobro
                </button>
@@ -205,14 +178,14 @@ export default function Deudores() {
           </div>
         ))}
       </div>
-      
-      {/* PIE DE PÁGINA */}
-      <div className="py-2 text-center">
-         <p className="text-[9px] font-black text-slate-300 uppercase tracking-[0.4em] italic leading-relaxed">
-            Gestión Integrada • Parque de las Flores
-         </p>
-      </div>
 
+      {/* MODALES TÁCTILES */}
+      {residenteDetalle && (
+        <EstadoCuenta residente={residenteDetalle} deudas={deudas.filter(d => d.residente_id === residenteDetalle.id)} onClose={() => setResidenteDetalle(null)} />
+      )}
+      {cobroResidente && (
+        <CuentaCobro residente={cobroResidente} deudas={deudas.filter(d => d.residente_id === cobroResidente.id)} onClose={() => setCobroResidente(null)} />
+      )}
     </div>
   );
 }
