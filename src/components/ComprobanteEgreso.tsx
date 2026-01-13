@@ -58,8 +58,10 @@ export default function ComprobanteEgreso({ datos, onClose }: any) {
               <span>•</span>
               <span>Convenio 15939402 Torre - Apto</span>
             </div>
-            <p className="font-black text-emerald-800 uppercase tracking-tighter">Cta. Ahorros 24511819298 Banco Caja Social</p>
-            <p className="font-bold text-[9px] text-slate-600">correo: cr.parquedelasflores@gmail.com </p>
+            <div className="text-[8px] text-slate-500 space-x-2 mt-1">
+              <span>Cta. Ahorros 24511819298 Banco Caja Social</span>
+              <span>correo: cr.parquedelasflores@gmail.com </span>
+            </div>
           </div>
           <div className="w-40 border-2 border-slate-900 p-3 text-center bg-slate-50 rounded-sm">
             <p className="text-[9px] font-black uppercase mb-1 opacity-40">Folio de Gasto</p>
