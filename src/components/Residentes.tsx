@@ -123,7 +123,7 @@ export default function Residentes() {
          <div className="relative flex-1 group">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
             <input 
-               placeholder="Busca por Nombre o Apto (7-302)..."
+               placeholder="Busca por Nombre o Apto (5-101)..."
                className="w-full bg-slate-50 border border-slate-100 pl-12 pr-4 py-4 rounded-xl outline-none font-bold text-slate-600 placeholder:text-slate-300 focus:bg-white transition-all"
                onChange={(e) => setBusqueda(e.target.value)}
             />

@@ -21,7 +21,7 @@ import {
   Lock, Fingerprint, AlertCircle, Loader2, ChevronRight,
   LayoutDashboard, Settings, Users, MapPin, Zap,
   PieChart, Wallet, LogOut, UserCircle2, BarChart3, Receipt,
-  Menu, History, Info
+  Menu, History, Info, Calendar
 } from "lucide-react";
 
 export default function App() {
@@ -34,7 +34,7 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [adminName, setAdminName] = useState("");
   const [currentTime, setCurrentTime] = useState(new Date());
-  
+
   // Control de menú lateral para celular
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
@@ -71,7 +71,7 @@ export default function App() {
   };
 
   const handleLogout = () => {
-    if(confirm("¿Estás segura de que deseas cerrar sesión?")) {
+    if (confirm("¿Estás segura de que deseas cerrar sesión?")) {
       setIsLoggedIn(false);
       setAdminName("");
       setActiveTab("resumen");
@@ -142,84 +142,103 @@ export default function App() {
   // --- 4. VISTA DEL DASHBOARD (USER LOGGED IN) ---
   return (
     <div className="flex h-screen bg-[#F8FAFC] overflow-hidden font-sans text-slate-900">
-      
+
       {/* MENU SIDEBAR (Responsive listo) */}
-      <Sidebar 
-        activeTab={activeTab} 
-        setActiveTab={(t: string) => { setActiveTab(t); setIsSidebarOpen(false); }} 
+      <Sidebar
+        activeTab={activeTab}
+        setActiveTab={(t: string) => { setActiveTab(t); setIsSidebarOpen(false); }}
         onLogout={handleLogout}
         isOpen={isSidebarOpen}
         setIsOpen={setIsSidebarOpen}
       />
 
       <main className="flex-1 overflow-y-auto relative scroll-smooth flex flex-col">
-        
-        {/* HEADER RESPONSIVE PREMIUM */}
-        <header className="sticky top-0 bg-white/70 backdrop-blur-xl border-b border-slate-100 px-6 md:px-12 py-4 md:py-8 flex justify-between items-center z-40">
-          <div className="flex items-center gap-3 md:gap-8">
-            
-            {/* Gatillo del Menú en Móvil */}
-            <button 
+
+        {/* HEADER SUPERIOR NIVEL PRO */}
+        <header className="sticky top-0 bg-white/70 backdrop-blur-xl border-b border-slate-100 px-4 md:px-12 py-3 md:py-6 flex justify-between items-center z-40">
+
+          {/* LADO IZQUIERDO: MENU Y SECCIÓN */}
+          <div className="flex items-center gap-2 md:gap-8">
+
+            {/* BOTÓN HAMBURGUESA (Móvil) - Rediseñado más táctil */}
+            <button
               onClick={() => setIsSidebarOpen(true)}
-              className="md:hidden p-3.5 bg-slate-900 text-white rounded-2xl shadow-xl shadow-slate-900/10 active:scale-90 transition-all shrink-0"
+              className="md:hidden p-3 bg-slate-900 text-white rounded-xl shadow-lg active:scale-90 transition-all shrink-0"
             >
-              <Menu size={22} strokeWidth={2.5} />
+              <Menu size={20} strokeWidth={3} />
             </button>
 
-            <div className="hidden sm:flex w-12 h-12 md:w-14 md:h-14 bg-white border border-slate-100 rounded-[1.2rem] items-center justify-center text-emerald-600 shadow-sm shadow-slate-100/50">
+            {/* ICONO SECCIÓN (Solo PC) */}
+            <div className="hidden sm:flex w-12 h-12 md:w-14 md:h-14 bg-white border border-slate-100 rounded-2xl items-center justify-center text-emerald-600 shadow-sm border-b-2 border-b-emerald-100 transition-all hover:rotate-3">
               {currentMeta.icon}
             </div>
-            
+
+            {/* TÍTULO Y SALUDO */}
             <div className="min-w-0">
-              <h1 className="text-slate-900 text-xl md:text-3xl font-black tracking-tighter uppercase leading-none truncate">
+              <h1 className="text-slate-900 text-base md:text-2xl font-black tracking-tighter uppercase leading-none truncate max-w-[120px] md:max-w-none">
                 {currentMeta.label}
               </h1>
-              <div className="flex items-center gap-2 mt-1 md:mt-2">
-                 <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></div>
-                 <p className="text-slate-400 text-[10px] md:text-[11px] font-black uppercase tracking-[0.2em] truncate">{adminName}</p>
+              <div className="flex items-center gap-1.5 mt-0.5 md:mt-1.5">
+                <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse shadow-[0_0_8px_#10b981]"></div>
+                <p className="text-slate-400 text-[8px] md:text-[10px] font-black uppercase tracking-[0.2em] truncate">{adminName}</p>
               </div>
             </div>
           </div>
 
-          <div className="flex flex-col items-end shrink-0 ml-4">
-            <div className="text-slate-900 font-black text-xl md:text-4xl tracking-tighter tabular-nums leading-none">
-              {currentTime.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true })}
+          {/* LADO DERECHO: RELOJ Y FECHA DINÁMICA */}
+          <div className="flex flex-col items-end shrink-0 pl-4 border-l border-slate-100 md:border-none">
+            <div className="text-slate-900 font-black text-lg md:text-3xl tracking-tighter tabular-nums leading-none">
+              {currentTime.toLocaleTimeString('es-CO', {
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+                hour12: true
+              })}
             </div>
-            <p className="hidden md:block text-slate-300 text-[9px] font-black uppercase tracking-[0.3em] mt-3 bg-slate-50 px-3 py-1 rounded-full">
-               {currentTime.toLocaleDateString('es-CO', { weekday: 'long', day: 'numeric', month: 'long' })}
+
+            <div className="hidden md:flex items-center gap-2 mt-2 bg-slate-50 px-3 py-1 rounded-full border border-slate-100">
+              <Calendar size={12} className="text-slate-300" />
+              <p className="text-slate-400 text-[9px] font-black uppercase tracking-widest">
+                {currentTime.toLocaleDateString('es-CO', { weekday: 'long', day: 'numeric', month: 'long' })}
+              </p>
+            </div>
+
+            {/* Fecha resumida solo para Celular */}
+            <p className="md:hidden text-slate-300 text-[8px] font-black uppercase tracking-widest mt-1">
+              {currentTime.toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit', year: '2-digit' })}
             </p>
           </div>
         </header>
 
         {/* ÁREA CENTRAL DINÁMICA */}
         <div className="flex-1 p-4 md:p-12 max-w-[1400px] w-full mx-auto animate-in fade-in duration-1000">
-          
+
           {activeTab === "resumen" && <Resumen adminName={adminName} goToDeudores={() => setActiveTab("deudores")} />}
-          
+
           {activeTab === "balance" && <BalanceHistorial />}
-          
+
           {activeTab === "ingresos" && <Ingresos />}
-          
+
           {activeTab === "recibos" && <HistorialRecibos />}
-          
+
           {activeTab === "causacion" && <Causacion />}
-          
+
           {activeTab === "egresos" && <Egresos />}
-          
+
           {activeTab === "deudores" && <Deudores />}
-          
+
           {activeTab === "residentes" && <Residentes />}
-          
+
           {activeTab === "zonas" && <ZonasComunes />}
-          
+
           {activeTab === "reportes" && <Reportes />}
-          
+
           {activeTab === "config" && <Configuracion />}
 
           {/* Protección en caso de tabs inexistentes */}
           {!sectionMeta[activeTab] && (
             <div className="flex flex-col items-center justify-center py-40 opacity-20">
-               <Loader2 className="animate-spin text-slate-500" size={60} />
+              <Loader2 className="animate-spin text-slate-500" size={60} />
             </div>
           )}
         </div>

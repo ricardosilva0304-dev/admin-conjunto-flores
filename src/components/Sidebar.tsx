@@ -24,12 +24,12 @@ export default function Sidebar({ activeTab, setActiveTab, onLogout, isOpen, set
     <>
       {/* MÁSCARA FONDO MÓVIL */}
       {isOpen && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-[55] md:hidden" onClick={() => setIsOpen(false)}></div>
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-[200] md:hidden" onClick={() => setIsOpen(false)}></div>
       )}
 
       {/* CONTENEDOR SIDEBAR */}
       <div className={`
-        fixed md:relative inset-y-0 left-0 w-72 bg-[#090a0c] flex flex-col z-[60] transition-all duration-500 border-r border-white/5 shadow-2xl
+        fixed md:relative inset-y-0 left-0 w-72 bg-[#090a0c] flex flex-col z-[210] transition-all duration-500 border-r border-white/5 shadow-2xl
         ${isOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"}
       `}>
         

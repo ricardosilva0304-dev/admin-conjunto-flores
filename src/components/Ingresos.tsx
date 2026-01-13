@@ -144,7 +144,7 @@ export default function Ingresos() {
     finally { setProcesando(false); }
   }
 
-  // Filtrado 7-302 o Nombre
+  // Filtrado 5-101 o Nombre
   const filteredRes = busqueda.length > 0 ? residentes.filter(r => {
     const term = busqueda.toLowerCase();
     const unidadId = `${r.torre.replace("Torre ","")}-${r.apartamento}`;
@@ -164,7 +164,7 @@ export default function Ingresos() {
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
           <input 
             className="w-full bg-slate-50 border border-slate-100 pl-11 pr-4 py-4 rounded-lg outline-none font-bold text-slate-700 focus:bg-white transition-all"
-            placeholder="Escribe Apto (Ej: 7-302) o Nombre..."
+            placeholder="Escribe Apto (Ej: 5-101) o Nombre..."
             value={resSeleccionado ? `${resSeleccionado.nombre} | ${resSeleccionado.torre.replace("Torre ","T")}-${resSeleccionado.apartamento}` : busqueda}
             onChange={(e) => { setBusqueda(e.target.value); setResSeleccionado(null); }}
           />

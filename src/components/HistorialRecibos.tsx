@@ -26,7 +26,7 @@ export default function HistorialRecibos() {
     setLoading(false);
   }
 
-  // Filtrado inteligente (Soporta 7-302 o Nombre)
+  // Filtrado inteligente (Soporta 5-101 o Nombre)
   const filtrados = pagos.filter(p => {
     const term = busqueda.toLowerCase().trim();
     const unidad = p.unidad?.toLowerCase() || "";
@@ -55,7 +55,7 @@ export default function HistorialRecibos() {
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
           <input 
             type="text"
-            placeholder="Buscar por unidad (7-302), propietario o recibo..."
+            placeholder="Buscar por unidad (5-101), propietario o recibo..."
             className="w-full bg-slate-50 border border-slate-100 pl-11 pr-4 py-4 rounded-xl outline-none focus:bg-white focus:border-emerald-500 transition-all font-medium text-slate-700 shadow-inner md:shadow-none"
             onChange={(e) => setBusqueda(e.target.value)}
           />
