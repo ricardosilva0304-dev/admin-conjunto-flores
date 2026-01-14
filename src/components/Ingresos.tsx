@@ -98,19 +98,21 @@ export default function Ingresos() {
     setProcesando(true);
 
     try {
+      // Reemplaza esa parte en tu archivo Ingresos.tsx:
       const mesesNombres = ["ENERO", "FEBRERO", "MARZO", "ABRIL", "MAYO", "JUNIO", "JULIO", "AGOSTO", "SEPTIEMBRE", "OCTUBRE", "NOVIEMBRE", "DICIEMBRE"];
 
-      // Busca este bloque en Ingresos.tsx y reemplázalo:
+      // Generar el texto antes de guardar con el separador de precio |
       const conceptoTextoParaDB = deudas
         .filter(d => Number(abonos[d.id]) > 0)
         .map(d => {
           const [anio, mes] = d.causaciones_globales.mes_causado.split("-");
-          const mNom = mesesNombres[parseInt(mes) - 1];
-          // Agregamos el monto específico de este abono al texto
-          const montoIndividual = Number(abonos[d.id]).toLocaleString('es-CO');
-          return `${d.causaciones_globales.conceptos_pago?.nombre || d.causaciones_globales.concepto_nombre} (${mNom} ${anio})|$${montoIndividual}`;
+          const mesNombre = mesesNombres[parseInt(mes) - 1];
+          const montoInd = Number(abonos[d.id]).toLocaleString('es-CO');
+          const nombreC = d.causaciones_globales?.concepto_nombre || "ADMINISTRACIÓN";
+          // Formato: Nombre (Mes Año)|$Precio
+          return `${nombreC} (${mesNombre} ${anio})|$${montoInd}`;
         })
-        .join("||"); // Usamos un separador especial para procesarlo en el recibo
+        .join("||"); // Separador de bloques
 
       const { error: errP } = await supabase.from("pagos").insert([{
         residente_id: resSeleccionado.id,
