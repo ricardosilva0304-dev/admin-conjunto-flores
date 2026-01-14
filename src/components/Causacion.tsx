@@ -85,31 +85,38 @@ export default function Causacion() {
 
     setGenerando(true);
     try {
-      const { data: lote } = await supabase.from("causaciones_globales").insert([{
+      // 1. Crear el lote principal
+      const { data: lote, error: errLote } = await supabase.from("causaciones_globales").insert([{
         mes_causado: mesDeuda,
         concepto_nombre: concepto.nombre,
         total_residentes: residentesAfectados.length,
         fecha_limite: fechaLimite
       }]).select().single();
 
+      if (errLote) throw errLote;
+
+      // 2. Mapear residentes a deudas con LOGS de depuración
       const deudas = residentesAfectados.map(res => {
         let factor = 1;
 
-        // --- LÓGICA CORREGIDA: Detectar factor por el nombre del concepto ---
-        if (concepto.cobro_por_vehiculo) {
-          const nombreC = concepto.nombre.toUpperCase();
-          if (nombreC.includes("CARRO")) {
+        // Forzamos el nombre a mayúsculas para evitar errores de escritura
+        const nombreConcepto = concepto.nombre.toUpperCase();
+
+        // SOLO si el concepto está configurado como VARIABLE (cobro_por_vehiculo === true)
+        if (concepto.cobro_por_vehiculo === true) {
+          if (nombreConcepto.includes("CARRO")) {
             factor = Number(res.carros) || 0;
-          } else if (nombreC.includes("MOTO")) {
+          } else if (nombreConcepto.includes("MOTO")) {
             factor = Number(res.motos) || 0;
-          } else if (nombreC.includes("BICI")) {
+          } else if (nombreConcepto.includes("BICI")) {
             factor = Number(res.bicis) || 0;
           }
         }
 
-        // Si por alguna razón el factor es 0 (ej: el residente no tiene el vehículo), 
-        // pero entró en el filtro, le ponemos 0 para que no genere deuda vacía o errónea.
-        const montoBase = (concepto.monto_1_10 || 0) * factor;
+        // --- LOG PARA DEPURACIÓN (Míralo en la consola F12) ---
+        console.log(`Unidad: ${res.apartamento} | Concepto: ${nombreConcepto} | Cantidad Vehículos: ${factor}`);
+
+        const montoBase = (Number(concepto.monto_1_10) || 0) * factor;
 
         return {
           causacion_id: lote.id,
@@ -117,25 +124,27 @@ export default function Causacion() {
           unidad: `${res.torre.replace("Torre ", "")}-${res.apartamento}`,
           monto_original: montoBase,
           precio_m1: montoBase,
-          precio_m2: (concepto.monto_11_20 || 0) * factor,
-          precio_m3: (concepto.monto_21_adelante || 0) * factor,
+          precio_m2: (Number(concepto.monto_11_20) || montoBase) * factor,
+          precio_m3: (Number(concepto.monto_21_adelante) || montoBase) * factor,
           saldo_pendiente: montoBase,
           fecha_vencimiento: fechaLimite
         };
-      }).filter(d => d.monto_original > 0); // Opcional: No generar deudas de $0
+      }).filter(d => d.monto_original > 0);
 
       if (deudas.length > 0) {
-        await supabase.from("deudas_residentes").insert(deudas);
+        const { error: errIns } = await supabase.from("deudas_residentes").insert(deudas);
+        if (errIns) throw errIns;
       }
 
-      cargarDatos();
+      await cargarDatos();
       setConceptoId("");
-      alert("Causación generada exitosamente.");
-    } catch (err: any) { // <--- Agrega el ": any" aquí
+      alert("¡Causación generada! Revisa el historial.");
+    } catch (err: any) {
       console.error(err);
-      alert("Error al generar: " + err.message);
+      alert("Error: " + err.message);
+    } finally {
+      setGenerando(false);
     }
-    finally { setGenerando(false); }
   }
 
   const residentesAfectados = residentes.filter(r => {
