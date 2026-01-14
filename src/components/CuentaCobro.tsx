@@ -140,7 +140,7 @@ export default function CuentaCobro({ residente, deudas, onClose }: any) {
                 {deudas.map((d: any) => (
                   <tr key={d.id} className="text-slate-600 hover:bg-slate-50/50">
                     <td className="py-4 px-6 text-slate-900">{d.causaciones_globales?.mes_causado}</td>
-                    <td className="py-4 px-6 text-center uppercase text-[10px] tracking-tight">{d.concepto_nombre || "Gasto Común Administrativo"}</td>
+                    <td className="py-4 px-6 text-center uppercase text-[10px] tracking-tight">{d.concepto_nombre || "CARGO PENDIENTE"}</td>
                     <td className="py-4 px-6 text-right tabular-nums text-slate-900 font-black italic">
                       ${calcularValorACobrar(d).toLocaleString('es-CO')}
                     </td>

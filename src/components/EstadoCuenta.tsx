@@ -161,7 +161,7 @@ export default function EstadoCuenta({ residente, deudas, onClose }: any) {
                     return (
                       <tr key={d.id} className="text-slate-600 hover:bg-slate-50">
                         <td className="py-4 px-3 text-slate-900">{d.causaciones_globales?.mes_causado}</td>
-                        <td className="py-4 px-3 font-normal text-[10px]">{d.concepto_nombre || "PAGO ADMINISTRACIÓN"}</td>
+                        <td className="py-4 px-3 font-normal text-[10px]">{d.concepto_nombre || "CARGO MENSUAL"}</td>
                         <td className="py-4 px-3 text-right text-slate-400 font-medium">${saldos.causado.toLocaleString()}</td>
                         <td className="py-4 px-3 text-right text-rose-600 font-black text-sm">${saldos.pendiente.toLocaleString()}</td>
                       </tr>

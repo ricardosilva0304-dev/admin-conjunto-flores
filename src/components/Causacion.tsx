@@ -122,6 +122,7 @@ export default function Causacion() {
           causacion_id: lote.id,
           residente_id: res.id,
           unidad: `${res.torre.replace("Torre ", "")}-${res.apartamento}`,
+          concepto_nombre: concepto.nombre,
           monto_original: montoBase,
           precio_m1: montoBase,
           precio_m2: (Number(concepto.monto_11_20) || montoBase) * factor,
