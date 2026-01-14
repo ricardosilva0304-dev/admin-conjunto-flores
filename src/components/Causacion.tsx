@@ -131,7 +131,7 @@ export default function Causacion() {
       cargarDatos();
       setConceptoId("");
       alert("Causación generada exitosamente.");
-    } catch (err) {
+    } catch (err: any) { // <--- Agrega el ": any" aquí
       console.error(err);
       alert("Error al generar: " + err.message);
     }
