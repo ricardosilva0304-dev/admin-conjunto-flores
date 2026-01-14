@@ -4,7 +4,7 @@ import { supabase } from "@/lib/supabase";
 import {
    UserPlus, Search, Phone, MapPin,
    Car, Bike, Trash2, Edit, X, Loader2,
-   Users, AtSign, ChevronRight, Hash, Info
+   Users, AtSign, ChevronRight, Info,
 } from "lucide-react";
 
 const ESTRUCTURA_TORRES: any = {
@@ -33,6 +33,25 @@ export default function Residentes() {
    const [filtroTorre, setFiltroTorre] = useState("TODAS");
    const [showModal, setShowModal] = useState(false);
    const [editandoId, setEditandoId] = useState<number | null>(null);
+   const MotoIcon = ({ className, size = 14 }: { className?: string, size?: number }) => (
+      <svg
+         width={size}
+         height={size}
+         viewBox="0 0 24 24"
+         fill="none"
+         stroke="currentColor"
+         strokeWidth="2"
+         strokeLinecap="round"
+         strokeLinejoin="round"
+         className={className}
+      >
+         <circle cx="7" cy="18" r="3" />
+         <circle cx="17" cy="18" r="3" />
+         <path d="M12 18V9c0-2 1-3 3-3 1 0 2 .5 3 1.5" />
+         <path d="M16 18H8" />
+         <path d="M7 15c-1-2-1-4 1-5l4-2 2 3h4" />
+      </svg>
+   );
 
    const [form, setForm] = useState({
       nombre: "", celular: "", email: "", torre: "", apto: "",
@@ -107,7 +126,7 @@ export default function Residentes() {
                <div className="mt-1 flex gap-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
                   <span>Personas: {residentes.length}</span>
                   <span className="flex items-center gap-1"><Car size={10} /> {residentes.reduce((a, r) => a + (r.carros || 0), 0)}</span>
-                  <span className="flex items-center gap-1"><Hash size={10} /> {residentes.reduce((a, r) => a + (r.motos || 0), 0)}</span>
+                  <span className="flex items-center gap-1"><MotoIcon size={10} /> {residentes.reduce((a, r) => a + (r.motos || 0), 0)}</span>
                   <span className="flex items-center gap-1"><Bike size={10} /> {residentes.reduce((a, r) => a + (r.bicis || 0), 0)}</span>
                </div>
             </div>
@@ -176,7 +195,7 @@ export default function Residentes() {
                                  <span className="text-[9px] font-black block mt-0.5 text-slate-900">{res.carros}</span>
                               </div>
                               <div className="text-center">
-                                 <Hash size={14} className={res.motos > 0 ? "text-amber-500" : "text-slate-200"} />
+                                 <MotoIcon size={14} className={res.motos > 0 ? "text-amber-500" : "text-slate-200"} />
                                  <span className="text-[9px] font-black block mt-0.5 text-slate-900">{res.motos}</span>
                               </div>
                               <div className="text-center">
