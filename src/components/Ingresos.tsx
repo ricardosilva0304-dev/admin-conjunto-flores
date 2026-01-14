@@ -121,8 +121,9 @@ export default function Ingresos() {
         fecha_pago: formRecibo.fecha,
         metodo_pago: formRecibo.metodo,
         comprobante: formRecibo.referencia.toUpperCase(),
-        concepto_texto: conceptoTextoParaDB
-      }]);
+        concepto_texto: conceptoTextoParaDB,
+        saldo_anterior: totalDeudaAcumulada
+      }]); // <--- Agrega esto justo aquí antes de cerrar el corchete y paréntesis
       if (errP) throw errP;
 
       for (const dId in abonos) {

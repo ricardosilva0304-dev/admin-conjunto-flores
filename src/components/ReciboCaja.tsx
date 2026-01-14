@@ -41,7 +41,7 @@ const ReciboContenido = ({ datos }: { datos: any }) => {
           <div className="text-[8.5px] text-slate-500 space-x-2 mt-1">
             <span>Cel.: 315 340 0657</span>
             <span>•</span>
-            <span className="font-black">Convenio 15939402 Torre - Apto</span>
+            <span>Convenio 15939402 Torre - Apto</span>
           </div>
           <div className="text-[8.5px] text-slate-500 space-x-2 mt-1">
             <span>Cta. Ahorros 24511819298 Banco Caja Social</span>

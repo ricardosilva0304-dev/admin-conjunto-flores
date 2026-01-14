@@ -129,7 +129,7 @@ export default function HistorialRecibos() {
             concepto: reciboSeleccionado.concepto_texto || "GESTIÓN CARTERA (RESUMEN)",
             metodo: reciboSeleccionado.metodo_pago,
             comprobante: reciboSeleccionado.comprobante,
-            saldoAnterior: reciboSeleccionado.monto_total, // Mostramos lo pagado como referencia anterior
+            saldoAnterior: reciboSeleccionado.saldo_anterior || reciboSeleccionado.monto_total,  // Mostramos lo pagado como referencia anterior
             email: reciboSeleccionado.residentes?.email
           }}
           onClose={() => setReciboSeleccionado(null)}
