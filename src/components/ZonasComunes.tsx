@@ -164,7 +164,7 @@ export default function ZonasComunes() {
             <div className="w-full xl:w-40 space-y-1 animate-in zoom-in-95">
                <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1 block">Tramo Horario</label>
                <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-100">
-                 {['Día', 'Noche'].map(j => (
+                 {['Dia', 'Noche'].map(j => (
                    <button key={j} type="button" onClick={()=>setJornada(j)} className={`flex-1 py-2 rounded-lg text-[9px] font-black transition-all ${jornada === j ? "bg-white text-slate-900 shadow-sm border border-slate-100" : "text-slate-400 uppercase"}`}>
                       {j}
                    </button>
