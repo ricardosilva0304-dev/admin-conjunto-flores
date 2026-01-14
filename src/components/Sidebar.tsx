@@ -19,7 +19,7 @@ const menuItems = [
   { id: 'config', label: 'Configuración', icon: <Settings size={18} /> },
 ];
 
-export default function Sidebar({ activeTab, setActiveTab, onLogout, isOpen, setIsOpen }: any) {
+export default function Sidebar({ activeTab, setActiveTab, onLogout, isOpen, setIsOpen, adminName }: any) {
   return (
     <>
       {/* MÁSCARA FONDO MÓVIL */}
