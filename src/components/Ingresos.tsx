@@ -90,7 +90,7 @@ export default function Ingresos() {
     return Math.max(0, precioBaseTramo - yaPagadoPrevio);
   };
 
-  const totalAPagarRecibo = Object.values(abonos).reduce((acc: number, val: any) => acc + (Number(val) || 0), 0);
+  const totalAPagarRecibo = deudas.reduce((acc, d) => acc + (Number(abonos[d.id]) || 0), 0);
   const totalDeudaAcumulada = deudas.reduce((acc, d) => acc + calcularSaldoRealHoy(d), 0);
 
   async function procesarPago() {
@@ -98,21 +98,20 @@ export default function Ingresos() {
     setProcesando(true);
 
     try {
-      // Reemplaza esa parte en tu archivo Ingresos.tsx:
       const mesesNombres = ["ENERO", "FEBRERO", "MARZO", "ABRIL", "MAYO", "JUNIO", "JULIO", "AGOSTO", "SEPTIEMBRE", "OCTUBRE", "NOVIEMBRE", "DICIEMBRE"];
 
-      // Generar el texto antes de guardar con el separador de precio |
+      // Generar el texto con el separador | para que ReciboCaja lo rompa bien
       const conceptoTextoParaDB = deudas
         .filter(d => Number(abonos[d.id]) > 0)
         .map(d => {
           const [anio, mes] = d.causaciones_globales.mes_causado.split("-");
           const mesNombre = mesesNombres[parseInt(mes) - 1];
+          // Aquí formateamos el precio individual
           const montoInd = Number(abonos[d.id]).toLocaleString('es-CO');
           const nombreC = d.causaciones_globales?.concepto_nombre || "ADMINISTRACIÓN";
-          // Formato: Nombre (Mes Año)|$Precio
           return `${nombreC} (${mesNombre} ${anio})|$${montoInd}`;
         })
-        .join("||"); // Separador de bloques
+        .join("||");
 
       const { error: errP } = await supabase.from("pagos").insert([{
         residente_id: resSeleccionado.id,
