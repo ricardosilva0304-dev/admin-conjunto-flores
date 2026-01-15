@@ -21,79 +21,73 @@ interface ReciboProps {
 }
 
 const ReciboContenido = ({ datos }: { datos: any }) => {
-  // Dividimos la cadena para obtener cada cargo por separado
   const cargos = datos.concepto.includes("||")
     ? datos.concepto.split("||")
     : [datos.concepto];
 
   return (
-    <div className="w-full bg-white p-12 border border-slate-300 text-slate-800 font-sans text-[11.5px] leading-tight h-auto min-h-[13.8cm] flex flex-col relative box-border overflow-visible shadow-sm print:shadow-none">
+    // Reducimos padding en móvil (p-4) y lo mantenemos en PC (md:p-12)
+    <div className="w-full bg-white p-4 md:p-12 border border-slate-300 text-slate-800 font-sans text-[11px] md:text-[11.5px] leading-tight h-auto flex flex-col relative box-border shadow-sm print:shadow-none">
 
-      {/* HEADER CORREGIDO */}
-      <div className="flex justify-between items-center mb-6 border-b-2 border-slate-900 pb-4">
-        <div className="w-[180px]">
+      {/* HEADER: Se apila en móvil (flex-col) y se alinea en PC (md:flex-row) */}
+      <div className="flex flex-col md:flex-row justify-between items-center mb-6 border-b-2 border-slate-900 pb-4 gap-4">
+        <div className="w-[140px] md:w-[180px]">
           <img src="/logo.png" alt="Logo" className="w-full h-auto object-contain" />
         </div>
 
-        <div className="flex-1 text-center px-4">
-          <h2 className="font-black text-[13px] uppercase leading-none mb-1">Agrupación Res. El Parque de las Flores</h2>
-          <p className="font-bold text-[9px] text-slate-600">NIT. 832.011.421-3 • DG 9 #4B-90 • Soacha, Cundinamarca</p>
-          <div className="text-[8.5px] text-slate-500 space-x-2 mt-1">
+        <div className="text-center px-0 md:px-4">
+          <h2 className="font-black text-[11px] md:text-[13px] uppercase leading-none mb-1">Agrupación Res. El Parque de las Flores</h2>
+          <p className="font-bold text-[8px] md:text-[9px] text-slate-600">NIT. 832.011.421-3 • DG 9 #4B-90 • Soacha</p>
+          <div className="text-[7.5px] md:text-[8.5px] text-slate-500 flex flex-wrap justify-center gap-1 mt-1">
             <span>Cel.: 315 340 0657</span>
-            <span>•</span>
-            <span>Convenio 15939402 Torre - Apto</span>
-          </div>
-          <div className="text-[8.5px] text-slate-500 space-x-2 mt-1">
-            <span>Cta. Ahorros 24511819298 Banco Caja Social</span>
-            <span>e-mail: cr.parquedelasflores@gmail.com</span>
+            <span className="hidden md:inline">•</span>
+            <span className="font-black">Convenio 15939402</span>
           </div>
         </div>
 
-        <div className="w-[160px] border-2 border-slate-900 p-2 text-center rounded-sm bg-slate-50 shadow-inner">
-          <p className="font-black text-[9px] uppercase text-slate-400 mb-0.5 tracking-widest">Recibo de Caja</p>
-          <p className="text-2xl font-black text-slate-900 tabular-nums leading-none tracking-tighter">Nº {datos.numero}</p>
+        <div className="w-full md:w-[160px] border-2 border-slate-900 p-2 text-center rounded-sm bg-slate-50">
+          <p className="font-black text-[8px] md:text-[9px] uppercase text-slate-400 mb-0.5 tracking-widest">Recibo de Caja</p>
+          <p className="text-xl md:text-2xl font-black text-slate-900 tabular-nums leading-none">Nº {datos.numero}</p>
         </div>
       </div>
 
-      {/* CUADRO TÉCNICO DE DATOS */}
+      {/* CUADRO TÉCNICO */}
       <div className="border border-slate-900 rounded-sm mb-0.5">
-        <div className="flex border-b border-slate-900">
-          <div className="flex-1 p-2.5 border-r border-slate-900 bg-slate-50/30 uppercase">
-            <span className="font-black text-[8.5px] text-slate-400 mr-4 tracking-widest uppercase">Ciudad y Fecha:</span>
-            <span className="font-bold text-[12.5px]">SOACHA, {datos.fecha}</span>
+        <div className="flex flex-col md:flex-row border-b border-slate-900">
+          <div className="flex-1 p-2 border-b md:border-b-0 md:border-r border-slate-900 bg-slate-50/30">
+            <span className="font-black text-[8px] text-slate-400 mr-2 uppercase">Fecha:</span>
+            <span className="font-bold uppercase text-[11px] md:text-[12.5px]">{datos.fecha}</span>
           </div>
-          <div className="w-[180px] p-2.5 bg-slate-100 flex items-center justify-between">
-            <span className="font-bold text-[8.5px] text-slate-400">VALOR:</span>
-            <span className="font-black text-emerald-600 text-lg tabular-nums leading-none">${datos.valor.toLocaleString('es-CO')}</span>
+          <div className="w-full md:w-[180px] p-2 bg-slate-100 flex items-center justify-between">
+            <span className="font-bold text-[8px] text-slate-400">VALOR:</span>
+            <span className="font-black text-emerald-600 text-base md:text-lg tabular-nums">${datos.valor.toLocaleString('es-CO')}</span>
           </div>
         </div>
 
-        <div className="flex border-b border-slate-900 uppercase font-bold text-[11.5px]">
-          <div className="flex-1 p-2.5 border-r border-slate-900"><span className="text-[8.5px] font-black text-slate-300 mr-4 uppercase">Recibido de:</span> {datos.nombre}</div>
-          <div className="w-[180px] p-2.5 text-center bg-white"><span className="text-[8.5px] font-black text-slate-300 mr-2 uppercase tracking-tighter">Unidad:</span> {datos.unidad}</div>
-        </div>
-
-        <div className="p-2.5 border-b border-slate-900 italic text-[11px] font-bold bg-slate-50/10">
-          <span className="not-italic uppercase font-black mr-4 text-[8px] text-slate-300 tracking-widest">La suma de:</span>
-          {numeroALetras(datos.valor)}
-        </div>
-
-        <div className="bg-white flex flex-col font-bold min-h-[80px]">
-          <div className="p-1.5 border-b border-slate-50 text-[8px] font-black text-slate-400 tracking-[0.2em] bg-slate-50/50 uppercase">
-            Relación detallada de causaciones pagadas
+        <div className="flex flex-col md:flex-row border-b border-slate-900 uppercase font-bold text-[10px] md:text-[11.5px]">
+          <div className="flex-1 p-2 border-b md:border-b-0 md:border-r border-slate-900">
+            <span className="text-[8px] font-black text-slate-300 mr-2 uppercase">Recibido de:</span> {datos.nombre}
           </div>
-          <div className="flex-1 px-5 py-3 space-y-1.5 uppercase">
+          <div className="w-full md:w-[150px] p-2 bg-white">
+            <span className="text-[8px] font-black text-slate-300 mr-2 uppercase">Unidad:</span> {datos.unidad}
+          </div>
+        </div>
+
+        <div className="p-2 border-b border-slate-900 italic text-[10px] md:text-[11px] font-bold bg-slate-50/10">
+          <span className="not-italic uppercase font-black mr-2 text-[8px] text-slate-300">La suma de:</span>
+          <span className="uppercase">{numeroALetras(datos.valor)}</span>
+        </div>
+
+        {/* DETALLE POR ITEM */}
+        <div className="bg-white flex flex-col font-bold">
+          <div className="p-1.5 border-b border-slate-50 text-[7.5px] font-black text-slate-400 tracking-widest bg-slate-50/50 uppercase">Detalle de pago</div>
+          <div className="px-3 md:px-5 py-3 space-y-1.5 uppercase">
             {cargos.map((cargo: string, idx: number) => {
-              // Separamos por el caracter pipe "|"
-              const [nombreConcepto, precioIndividual] = cargo.split("|");
-              if (!nombreConcepto) return null; // Salta si está vacío
-
+              const parts = cargo.split("|");
               return (
-                <div key={idx} className="flex justify-between items-center text-[10.5px] border-b border-dotted border-slate-100 pb-1">
-                  <span className="text-slate-800">{nombreConcepto}</span>
-                  <span className="text-slate-900 font-black tabular-nums">
-                    {precioIndividual || ""}
-                  </span>
+                <div key={idx} className="flex justify-between items-center text-[10px] md:text-[10.5px] border-b border-dotted border-slate-100 pb-1">
+                  <span className="text-slate-800 pr-2">{parts[0] || "Concepto"}</span>
+                  <span className="text-slate-900 font-black tabular-nums">{parts[1] || ""}</span>
                 </div>
               );
             })}
@@ -101,44 +95,41 @@ const ReciboContenido = ({ datos }: { datos: any }) => {
         </div>
       </div>
 
-      {/* METODO PAGO ADJUNTO A TABLA */}
-      <div className="border border-slate-900 px-6 py-2 mb-6 bg-slate-50/50 flex items-center gap-12 text-[10px] font-black">
-        <div className="flex items-center gap-2"><div className="w-3.5 h-3.5 border-2 border-slate-900 flex items-center justify-center font-black">{datos.metodo === 'Efectivo' ? 'X' : ''}</div> <span>EFECTIVO</span></div>
-        <div className="flex items-center gap-2"><div className="w-3.5 h-3.5 border-2 border-slate-900 flex items-center justify-center font-black">{datos.metodo === 'Transferencia' ? 'X' : ''}</div> <span>BANCO / TRANSF.</span></div>
-        <div className="flex-1 text-[9px] text-slate-400 text-right italic font-bold">Referencia Soporte: {datos.comprobante || 'TRANSACCIÓN DIGITAL'}</div>
+      {/* METODO PAGO: Se ajusta para que no se desborde */}
+      <div className="border border-slate-900 px-3 md:px-6 py-2 mb-4 bg-slate-50/50 flex flex-wrap items-center gap-4 md:gap-12 text-[9px] md:text-[10px] font-black">
+        <div className="flex items-center gap-2">
+          <div className="w-3 h-3 border border-slate-900 flex items-center justify-center">{datos.metodo === 'Efectivo' ? 'X' : ''}</div>
+          <span>EFECTIVO</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="w-3 h-3 border border-slate-900 flex items-center justify-center">{datos.metodo === 'Transferencia' ? 'X' : ''}</div>
+          <span>TRANSF.</span>
+        </div>
+        <div className="flex-1 text-[8px] text-slate-400 text-right italic font-bold truncate">Ref: {datos.comprobante || 'Digital'}</div>
       </div>
 
-      {/* RESUMEN DE SALDOS */}
-      <div className="flex justify-between items-center px-10 mb-8 py-5 border-y border-slate-100 bg-[#fdfdfd]">
+      {/* RESUMEN DE SALDOS: Se apila en móvil */}
+      <div className="flex flex-col md:flex-row justify-between items-center px-4 md:px-10 mb-6 py-4 border-y border-slate-100 bg-[#fdfdfd] gap-4">
         <div className="text-center">
-          <p className="text-[8px] font-black text-slate-300 uppercase tracking-widest mb-0.5">Saldo Ant.</p>
-          <p className="font-bold text-sm text-slate-500 tabular-nums">${datos.saldoAnterior.toLocaleString('es-CO')}</p>
+          <p className="text-[7px] font-black text-slate-300 uppercase tracking-widest">Saldo Ant.</p>
+          <p className="font-bold text-xs md:text-sm text-slate-500">${datos.saldoAnterior.toLocaleString('es-CO')}</p>
         </div>
-        <div className="text-slate-200 font-light text-2xl pb-1">-</div>
-        <div className="text-center group">
-          <p className="text-[8px] font-black text-emerald-500 uppercase tracking-widest mb-0.5">Abono Aplicado</p>
-          <p className="font-black text-[15px] text-emerald-600 tabular-nums tracking-tighter leading-none">${datos.valor.toLocaleString('es-CO')}</p>
-        </div>
-        <div className="text-slate-200 font-light text-2xl pb-1">=</div>
+        <div className="hidden md:block text-slate-200 text-xl">-</div>
         <div className="text-center">
-          <p className="text-[8px] font-black text-rose-500 uppercase tracking-widest mb-0.5">Nuevo Saldo</p>
-          <p className="font-black text-[17px] text-rose-600 tabular-nums tracking-tighter leading-none italic">${Math.max(0, datos.saldoAnterior - datos.valor).toLocaleString('es-CO')}</p>
+          <p className="text-[7px] font-black text-emerald-500 uppercase tracking-widest">Abono</p>
+          <p className="font-black text-sm md:text-base text-emerald-600">${datos.valor.toLocaleString('es-CO')}</p>
+        </div>
+        <div className="hidden md:block text-slate-200 text-xl">=</div>
+        <div className="text-center">
+          <p className="text-[7px] font-black text-rose-500 uppercase tracking-widest">Nuevo Saldo</p>
+          <p className="font-black text-base md:text-lg text-rose-600 italic">${Math.max(0, datos.saldoAnterior - datos.valor).toLocaleString('es-CO')}</p>
         </div>
       </div>
 
-      {/* FIRMAS LEGALES */}
-      <div className="flex justify-between items-end mt-auto gap-24 px-4 pb-2">
-        <div className="flex-1 border-t-2 border-slate-900 pt-1 text-[9px] font-black uppercase text-slate-400 text-center tracking-[0.2em] italic">Elaboró</div>
-        <div className="flex-1 border-t-2 border-slate-900 pt-1 text-[9px] font-black uppercase text-slate-400 text-center tracking-[0.2em] italic">Recibido</div>
-        <div className="w-[100px] text-[7px] font-black uppercase opacity-20 text-center italic rotate-12 border p-1 leading-tight">
-          Sello Administrativo <br /> Flores
-        </div>
-      </div>
-
-      <div className="text-center mt-6">
-        <p className="text-[8px] font-black italic text-emerald-700 bg-emerald-50/50 py-1.5 rounded-lg border border-emerald-100 uppercase tracking-widest">
-          "Su cumplimiento oportuno fortalece el progreso de nuestra Agrupación Residencial"
-        </p>
+      {/* FIRMAS: Más compactas */}
+      <div className="flex justify-between items-end mt-auto gap-4 md:gap-24 px-2 pb-2">
+        <div className="flex-1 border-t border-slate-900 pt-1 text-[8px] font-black uppercase text-slate-300 text-center italic">Elaboró</div>
+        <div className="flex-1 border-t border-slate-900 pt-1 text-[8px] font-black uppercase text-slate-300 text-center italic">Recibido</div>
       </div>
     </div>
   );
@@ -170,7 +161,7 @@ export default function ReciboCaja({ datos, onClose }: ReciboProps) {
   };
 
   return (
-    <div className="fixed inset-0 bg-[#0a0c0e]/95 backdrop-blur-md z-[200] flex flex-col items-center p-0 md:p-8 overflow-y-auto no-scrollbar">
+    <div className="fixed inset-0 bg-[#0a0c0e]/95 backdrop-blur-md z-[300] flex flex-col items-center p-0 md:p-8 overflow-y-auto no-scrollbar">
 
       {/* CSS DE IMPRESIÓN CENTRADA */}
       <style>{`

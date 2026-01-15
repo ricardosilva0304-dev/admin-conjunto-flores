@@ -72,7 +72,7 @@ export default function EstadoCuenta({ residente, deudas, onClose }: any) {
   );
 
   return (
-    <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[100] flex flex-col items-center p-0 md:p-6 overflow-y-auto no-scrollbar">
+    <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[300] flex flex-col items-center p-0 md:p-6 overflow-y-auto no-scrollbar">
       
       <style>{`
         @media print { 

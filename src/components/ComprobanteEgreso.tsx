@@ -8,7 +8,7 @@ export default function ComprobanteEgreso({ datos, onClose }: any) {
     ? (datos.concepto.includes("||") ? datos.concepto.split("||") : [datos.concepto])
     : [`${datos.concepto}|${Number(datos.valor).toLocaleString('es-CO')}`];
   return (
-    <div className="fixed inset-0 bg-[#0a0c0e]/95 backdrop-blur-md z-[150] flex flex-col items-center p-0 md:p-8 overflow-y-auto no-scrollbar">
+    <div className="fixed inset-0 bg-[#0a0c0e]/95 backdrop-blur-md z-[300] flex flex-col items-center p-0 md:p-8 overflow-y-auto no-scrollbar">
 
       {/* CSS DE IMPRESIÓN CENTRADA (IDÉNTICO AL DE CAJA) */}
       <style>{`

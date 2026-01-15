@@ -36,7 +36,7 @@ export default function CuentaCobro({ residente, deudas, onClose }: any) {
   const totalFinalACobrar = deudas.reduce((acc: number, d: any) => acc + calcularValorACobrar(d), 0);
 
   return (
-    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex flex-col items-center p-0 md:p-6 overflow-y-auto no-scrollbar">
+    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[300] flex flex-col items-center p-0 md:p-6 overflow-y-auto no-scrollbar">
 
       {/* MEDIA QUERY PARA IMPRESIÓN (SIN CAMBIOS DE MARGENES EXTRAÑOS) */}
       <style>{`

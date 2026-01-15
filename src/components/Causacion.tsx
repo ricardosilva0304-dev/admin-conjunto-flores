@@ -261,7 +261,7 @@ export default function Causacion() {
 
       {/* 3. MODAL DE AUDITORÍA - REDISEÑO SIMPLE Y FULL MÓVIL */}
       {showDetalles && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex flex-col items-center justify-end md:justify-center">
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[300] flex flex-col items-center justify-end md:justify-center">
           <div className="bg-white w-full max-w-5xl md:h-[80vh] md:rounded-2xl rounded-t-3xl shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-bottom duration-300">
 
             <div className="p-6 border-b border-slate-100 flex items-center justify-between">
