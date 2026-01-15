@@ -35,15 +35,19 @@ const ReciboContenido = ({ datos }: { datos: any }) => {
           <img src="/logo.png" alt="Logo" className="w-full h-auto object-contain" />
         </div>
 
-        <div className="text-center px-0 md:px-4">
-          <h2 className="font-black text-[11px] md:text-[13px] uppercase leading-none mb-1">Agrupación Res. El Parque de las Flores</h2>
-          <p className="font-bold text-[8px] md:text-[9px] text-slate-600">NIT. 832.011.421-3 • DG 9 #4B-90 • Soacha</p>
-          <div className="text-[7.5px] md:text-[8.5px] text-slate-500 flex flex-wrap justify-center gap-1 mt-1">
-            <span>Cel.: 315 340 0657</span>
-            <span className="hidden md:inline">•</span>
-            <span className="font-black">Convenio 15939402</span>
-          </div>
-        </div>
+        <div className="flex-1 text-center px-4">
+              <h2 className="font-black text-[13px] uppercase leading-none mb-1">Agrupación Res. El Parque de las Flores</h2>
+              <p className="font-bold text-[9px] text-slate-600">NIT. 832.011.421-3 • DG 9 #4B-90 • Soacha, Cundinamarca</p>
+              <div className="text-[8.5px] text-slate-500 space-x-2 mt-1">
+                <span>Cel.: 315 340 0657</span>
+                <span>•</span>
+                <span>Convenio 15939402 Torre - Apto</span>
+              </div>
+              <div className="text-[8.5px] text-slate-500 space-x-2 mt-1">
+                <span>Cta. Ahorros 24511819298 Banco Caja Social</span>
+                <span>e-mail: cr.parquedelasflores@gmail.com</span>
+              </div>
+            </div>
 
         <div className="w-full md:w-[160px] border-2 border-slate-900 p-2 text-center rounded-sm bg-slate-50">
           <p className="font-black text-[8px] md:text-[9px] uppercase text-slate-400 mb-0.5 tracking-widest">Recibo de Caja</p>
@@ -56,7 +60,7 @@ const ReciboContenido = ({ datos }: { datos: any }) => {
         <div className="flex flex-col md:flex-row border-b border-slate-900">
           <div className="flex-1 p-2 border-b md:border-b-0 md:border-r border-slate-900 bg-slate-50/30">
             <span className="font-black text-[8px] text-slate-400 mr-2 uppercase">Fecha:</span>
-            <span className="font-bold uppercase text-[11px] md:text-[12.5px]">{datos.fecha}</span>
+            <span className="font-bold uppercase text-[11px] md:text-[12.5px]">SOACHA, {datos.fecha}</span>
           </div>
           <div className="w-full md:w-[180px] p-2 bg-slate-100 flex items-center justify-between">
             <span className="font-bold text-[8px] text-slate-400">VALOR:</span>
