@@ -70,65 +70,24 @@ export default function Sidebar({ activeTab, setActiveTab, onLogout, isOpen, set
         ${isOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"}
       `}>
 
-        {/* REEMPLAZA TODA LA SECCIÓN DEL HEADER DEL SIDEBAR POR ESTA: */}
-        <div className="p-10 mb-6">
-          <div className="flex flex-col gap-6">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                {/* Logo más grande y con efecto premium */}
-                <div className="relative group/logo">
-                  <div className="absolute -inset-2 bg-emerald-500/20 rounded-2xl blur-xl opacity-50 group-hover/logo:opacity-100 transition duration-1000"></div>
-                  <div className="relative w-14 h-14 bg-gradient-to-br from-zinc-800 to-black border border-white/10 rounded-2xl flex items-center justify-center text-emerald-500 shadow-2xl transition-all group-hover/logo:scale-110 group-hover/logo:border-emerald-500/50">
-                    <Building2 size={28} strokeWidth={2.5} />
-                  </div>
-                </div>
+        {/* REEMPLAZA EL HEADER DEL SIDEBAR POR ESTE BLOQUE PEQUEÑO Y SIMPLE */}
+        <div className="flex flex-col items-center py-8 px-6 border-b border-white/[0.04]">
 
-                {/* Texto ADMIN principal con más peso */}
-                <h2 className="text-white font-black text-3xl tracking-tighter italic uppercase group-hover:text-emerald-400 transition-colors">
-                  Admin<span className="text-emerald-500 not-italic">.</span>
-                </h2>
-              </div>
-              <button onClick={() => setIsOpen(false)} className="md:hidden text-zinc-600 hover:text-white p-2">
-                <X size={24} />
-              </button>
-            </div>
-
-            {/* Identidad del Conjunto: Escala mayor y tipografía estructurada */}
-            {/* REEMPLAZA EL HEADER DEL SIDEBAR POR ESTE BLOQUE CENTRADO Y LIMPIO */}
-            <div className="flex flex-col items-center justify-center p-10 pt-12 pb-8 border-b border-white/[0.03]">
-
-              {/* 1. Icono Centrado: Refinado y Sutil */}
-              <div className="relative group mb-6">
-                {/* Brillo de fondo muy suave, casi imperceptible */}
-                <div className="absolute -inset-3 bg-emerald-500/5 rounded-full blur-2xl opacity-0 group-hover:opacity-100 transition duration-1000"></div>
-
-                <div className="relative w-16 h-16 bg-[#0a0a0b] border border-white/[0.08] rounded-[1.5rem] flex items-center justify-center text-emerald-500 shadow-2xl transition-all duration-500 group-hover:border-emerald-500/30">
-                  <Building2 size={30} strokeWidth={1.5} />
-                  {/* Indicador de estado en la esquina del logo */}
-                  <div className="absolute top-0 right-0 w-2.5 h-2.5 bg-emerald-500 rounded-full border-[3px] border-[#090a0c]"></div>
-                </div>
-              </div>
-
-              {/* 2. Bloque de Texto: Tipografía Estructurada */}
-              <div className="text-center space-y-3">
-                <h2 className="text-white font-black text-xl tracking-[0.3em] uppercase italic leading-none">
-                  Admin<span className="text-emerald-500 not-italic">.</span>
-                </h2>
-
-                <div className="flex flex-col items-center gap-1.5">
-                  <span className="text-emerald-500/60 text-[7px] font-black uppercase tracking-[0.5em] leading-none">
-                    Conjunto Residencial
-                  </span>
-                  <p className="text-zinc-400 text-[11px] font-bold uppercase tracking-[0.15em] leading-tight">
-                    Parque de las Flores
-                  </p>
-                </div>
-              </div>
-
-              {/* 3. Separador Minimalista */}
-              <div className="mt-8 w-6 h-[1.5px] bg-gradient-to-r from-transparent via-emerald-500/20 to-transparent rounded-full"></div>
-            </div>
+          {/* 1. Icono pequeño y sobrio */}
+          <div className="w-10 h-10 bg-zinc-900/50 border border-white/10 rounded-xl flex items-center justify-center text-emerald-500 mb-3">
+            <Building2 size={20} strokeWidth={2} />
           </div>
+
+          {/* 2. Identidad mínima */}
+          <div className="text-center">
+            <h2 className="text-white font-bold text-xs tracking-[0.2em] uppercase mb-1">
+              Admin<span className="text-emerald-500">.</span>
+            </h2>
+            <p className="text-zinc-600 text-[9px] font-medium uppercase tracking-widest">
+              Parque de las Flores
+            </p>
+          </div>
+
         </div>
 
         {/* LISTADO CON ACORDEÓN */}

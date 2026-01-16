@@ -75,52 +75,55 @@ export default function EstadoCuenta({ residente, deudas, onClose }: any) {
     <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[300] flex flex-col items-center p-0 md:p-6 overflow-y-auto no-scrollbar">
 
       <style>{`
-        @media print { 
-          /* 1. Resetear el cuerpo para permitir múltiples páginas */
-          html, body { 
-            height: auto !important; 
-            overflow: visible !important; 
-            background: white !important;
-            margin: 0 !important;
-            padding: 0 !important;
+        @media print {
+          /* 1. DESBLOQUEO GLOBAL: Forzamos a todos los padres a ser visibles */
+          html, body, main, div#__next, .flex-1, .overflow-y-auto {
+            height: auto !important;
+            overflow: visible !important;
+            position: static !important;
           }
 
-          /* 2. Ocultar absolutamente todo lo que no sea el área de impresión */
-          body * { 
-            visibility: hidden; 
+          /* 2. OCULTAR TODO LO QUE NO SE IMPRIME */
+          body * {
+            visibility: hidden;
           }
 
-          /* 3. El área de impresión debe ser visible y fluir naturalmente */
-          #print-area, #print-area * { 
-            visibility: visible; 
+          /* 3. EL ÁREA DE IMPRESIÓN (Cambia el ID según el componente) */
+          /* Ejemplo para Estado de Cuenta: #print-area */
+          /* Ejemplo para Cuenta de Cobro: #print-document */
+          /* Ejemplo para Reportes: #report-print */
+          #print-area, #print-area * {
+            visibility: visible;
           }
 
-          /* 4. Posicionamiento crítico para evitar cortes */
-          #print-area { 
-            position: absolute !important; /* Volvemos a relativo/estático para el flujo */
-            left: 0 !important; 
-            top: 0 !important; 
-            width: 100% !important; 
-            margin: 0 !important; 
-            padding: 1.5cm !important; /* Margen físico de la hoja */
-            box-shadow: none !important;
-            border: none !important;
+          #print-area {
+            position: relative !important; /* CAMBIO CLAVE: relative permite saltos de página */
+            top: 0 !important;
+            left: 0 !important;
+            width: 100% !important;
             display: block !important;
+            margin: 0 !important;
+            padding: 1.5cm !important;
+            height: auto !important;
+            min-height: 0 !important;
           }
 
-          /* 5. Forzar saltos de página inteligentes en las tablas */
-          tr { 
-            page-break-inside: avoid !important; 
+          /* 4. CONTROL DE SALTOS DE PÁGINA */
+          tr, div, section {
+            page-break-inside: avoid !important;
           }
           
-          .no-print { 
-            display: none !important; 
+          thead {
+            display: table-header-group; /* Repite encabezados de tabla si hay varias hojas */
           }
 
-          /* Definir tamaño de página */
-          @page { 
-            size: letter; 
-            margin: 0; 
+          .no-print {
+            display: none !important;
+          }
+
+          @page {
+            size: letter;
+            margin: 0; /* El margen real lo da el padding de #print-area */
           }
         }
       `}</style>

@@ -171,9 +171,6 @@ export default function App() {
             </div>
 
             <div className="flex flex-col">
-              <div className="flex items-center gap-2">
-                <div className="h-[1px] w-4 bg-emerald-500/30"></div>
-              </div>
               <h1 className="text-white text-lg md:text-xl font-black tracking-tight uppercase leading-tight">
                 {currentMeta.label}
               </h1>

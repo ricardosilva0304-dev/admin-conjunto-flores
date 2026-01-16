@@ -40,51 +40,55 @@ export default function CuentaCobro({ residente, deudas, onClose }: any) {
 
       {/* MEDIA QUERY PARA IMPRESIÓN (SIN CAMBIOS DE MARGENES EXTRAÑOS) */}
       <style>{`
-        @media print { 
-          /* 1. Resetear el entorno para permitir el flujo entre páginas */
-          html, body { 
-            height: auto !important; 
-            overflow: visible !important; 
-            background: white !important;
-            margin: 0 !important;
-            padding: 0 !important;
+        @media print {
+          /* 1. DESBLOQUEO GLOBAL: Forzamos a todos los padres a ser visibles */
+          html, body, main, div#__next, .flex-1, .overflow-y-auto {
+            height: auto !important;
+            overflow: visible !important;
+            position: static !important;
           }
 
-          /* 2. Ocultar todo el resto de la web */
-          body * { 
-            visibility: hidden; 
+          /* 2. OCULTAR TODO LO QUE NO SE IMPRIME */
+          body * {
+            visibility: hidden;
           }
 
-          /* 3. Mostrar solo el documento de cobro */
-          #print-document, #print-document * { 
-            visibility: visible; 
+          /* 3. EL ÁREA DE IMPRESIÓN (Cambia el ID según el componente) */
+          /* Ejemplo para Estado de Cuenta: ##print-document */
+          /* Ejemplo para Cuenta de Cobro: #print-document */
+          /* Ejemplo para Reportes: #report-print */
+          ##print-document, ##print-document * {
+            visibility: visible;
           }
 
-          /* 4. Posicionamiento para impresión multipágina */
-          #print-document { 
-            position: absolute !important; 
-            left: 0 !important; 
-            top: 0 !important; 
-            width: 100% !important; 
-            margin: 0 !important; 
-            padding: 1.5cm !important; /* Margen de seguridad para la hoja */
-            box-shadow: none !important;
-            border: none !important;
+          ##print-document {
+            position: relative !important; /* CAMBIO CLAVE: relative permite saltos de página */
+            top: 0 !important;
+            left: 0 !important;
+            width: 100% !important;
             display: block !important;
-          } 
-
-          /* 5. Evitar que las filas de la tabla se corten a la mitad */
-          tr { 
-            page-break-inside: avoid !important; 
+            margin: 0 !important;
+            padding: 1.5cm !important;
+            height: auto !important;
+            min-height: 0 !important;
           }
 
-          .no-print { 
-            display: none !important; 
+          /* 4. CONTROL DE SALTOS DE PÁGINA */
+          tr, div, section {
+            page-break-inside: avoid !important;
+          }
+          
+          thead {
+            display: table-header-group; /* Repite encabezados de tabla si hay varias hojas */
           }
 
-          @page { 
-            size: letter; 
-            margin: 0; 
+          .no-print {
+            display: none !important;
+          }
+
+          @page {
+            size: letter;
+            margin: 0; /* El margen real lo da el padding de ##print-document */
           }
         }
       `}</style>
