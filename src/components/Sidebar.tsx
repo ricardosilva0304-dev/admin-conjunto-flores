@@ -1,9 +1,9 @@
 "use client";
 import { useState, useEffect } from "react";
-import { 
-  Building2, PieChart, Wallet, LogOut, 
-  Users, MapPin, Zap, BarChart3, Settings, 
-  UserCircle2, Receipt, History, ChevronRight, X, ChevronDown 
+import {
+  Building2, PieChart, Wallet, LogOut,
+  Users, MapPin, Zap, BarChart3, Settings,
+  UserCircle2, Receipt, History, ChevronRight, X, ChevronDown
 } from "lucide-react";
 
 const menuGroups = [
@@ -69,29 +69,47 @@ export default function Sidebar({ activeTab, setActiveTab, onLogout, isOpen, set
         fixed md:relative inset-y-0 left-0 w-72 bg-[#090a0c] flex flex-col z-[210] transition-all duration-500 border-r border-white/5 shadow-2xl
         ${isOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"}
       `}>
-        
-        <div className="p-8 mb-2">
-          <div className="flex flex-col gap-4">
+
+        {/* REEMPLAZA TODA LA SECCIÓN DEL HEADER DEL SIDEBAR POR ESTA: */}
+        <div className="p-10 mb-6">
+          <div className="flex flex-col gap-6">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-zinc-900 border border-white/10 rounded-xl flex items-center justify-center text-emerald-500 shadow-lg">
-                  <Building2 size={20} strokeWidth={2.5} />
+              <div className="flex items-center gap-4">
+                {/* Logo más grande y con efecto premium */}
+                <div className="relative group/logo">
+                  <div className="absolute -inset-2 bg-emerald-500/20 rounded-2xl blur-xl opacity-50 group-hover/logo:opacity-100 transition duration-1000"></div>
+                  <div className="relative w-14 h-14 bg-gradient-to-br from-zinc-800 to-black border border-white/10 rounded-2xl flex items-center justify-center text-emerald-500 shadow-2xl transition-all group-hover/logo:scale-110 group-hover/logo:border-emerald-500/50">
+                    <Building2 size={28} strokeWidth={2.5} />
+                  </div>
                 </div>
-                <h2 className="text-white font-black text-xl tracking-tighter italic uppercase">
-                  Admin<span className="text-emerald-500">.</span>
+
+                {/* Texto ADMIN principal con más peso */}
+                <h2 className="text-white font-black text-3xl tracking-tighter italic uppercase group-hover:text-emerald-400 transition-colors">
+                  Admin<span className="text-emerald-500 not-italic">.</span>
                 </h2>
               </div>
-              <button onClick={() => setIsOpen(false)} className="md:hidden text-zinc-600"><X size={20}/></button>
+              <button onClick={() => setIsOpen(false)} className="md:hidden text-zinc-600 hover:text-white p-2">
+                <X size={24} />
+              </button>
             </div>
-            
-            <div className="space-y-1">
-              <p className="text-[10px] font-black text-emerald-500 uppercase tracking-[0.3em] leading-none">
-                Conjunto Residencial
+
+            {/* Identidad del Conjunto: Escala mayor y tipografía estructurada */}
+            <div className="space-y-1 mt-2">
+              <div className="flex items-center gap-2">
+                <div className="h-[1px] w-4 bg-emerald-500"></div>
+                <p className="text-[10px] font-black text-emerald-500 uppercase tracking-[0.4em] leading-none">
+                  Conjunto Residencial
+                </p>
+              </div>
+              <p className="text-white text-[15px] font-black uppercase tracking-[0.1em] leading-tight">
+                Parque de las <br />
+                <span className="text-emerald-500/90 text-2xl tracking-tighter italic">Flores</span>
               </p>
-              <p className="text-white text-[11px] font-bold uppercase tracking-widest opacity-80">
-                Parque de las Flores
-              </p>
-              <div className="h-[1px] w-full bg-gradient-to-r from-emerald-500/50 to-transparent mt-2"></div>
+
+              {/* Separador estilizado */}
+              <div className="relative h-[2px] w-full bg-zinc-900 mt-4 overflow-hidden rounded-full">
+                <div className="absolute inset-y-0 left-0 w-1/2 bg-gradient-to-r from-transparent via-emerald-500/50 to-transparent animate-shimmer"></div>
+              </div>
             </div>
           </div>
         </div>
@@ -105,7 +123,7 @@ export default function Sidebar({ activeTab, setActiveTab, onLogout, isOpen, set
             return (
               <div key={idx} className="space-y-1">
                 {/* CABECERA DE CATEGORÍA CLICKEABLE */}
-                <button 
+                <button
                   onClick={() => toggleGroup(group.title)}
                   className={`
                     w-full flex items-center justify-between px-4 py-3 rounded-xl transition-all
@@ -117,7 +135,7 @@ export default function Sidebar({ activeTab, setActiveTab, onLogout, isOpen, set
                   </h3>
                   {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
                 </button>
-                
+
                 {/* ITEMS DESPLEGABLES CON ANIMACIÓN DE ENTRADA */}
                 {isExpanded && (
                   <div className="space-y-1 animate-in slide-in-from-top-2 duration-300">
@@ -126,7 +144,7 @@ export default function Sidebar({ activeTab, setActiveTab, onLogout, isOpen, set
                       return (
                         <button
                           key={item.id}
-                          onClick={() => { setActiveTab(item.id); if(window.innerWidth < 768) setIsOpen(false); }}
+                          onClick={() => { setActiveTab(item.id); if (window.innerWidth < 768) setIsOpen(false); }}
                           className={`
                             w-full group flex items-center justify-between px-4 py-2.5 rounded-xl transition-all
                             ${isActive ? "bg-emerald-500 text-black shadow-lg" : "text-zinc-500 hover:text-white hover:bg-white/[0.03]"}
@@ -154,13 +172,13 @@ export default function Sidebar({ activeTab, setActiveTab, onLogout, isOpen, set
         <div className="p-4 border-t border-white/5 bg-[#050607]">
           <div className="bg-zinc-900/40 border border-white/5 rounded-2xl p-3 flex items-center justify-between group/user">
             <div className="flex items-center gap-3 min-w-0">
-               <div className="w-8 h-8 rounded-lg bg-emerald-500 flex items-center justify-center text-black font-black text-[10px] italic shrink-0">
-                 AD
-               </div>
-               <div className="min-w-0">
-                  <p className="text-white text-[10px] font-black truncate uppercase">{adminName || 'Admin Muñoz'}</p>
-                  <p className="text-emerald-500/40 text-[8px] font-bold tracking-widest uppercase">EN LÍNEA</p>
-               </div>
+              <div className="w-8 h-8 rounded-lg bg-emerald-500 flex items-center justify-center text-black font-black text-[10px] italic shrink-0">
+                AD
+              </div>
+              <div className="min-w-0">
+                <p className="text-white text-[10px] font-black truncate uppercase">{adminName || 'Admin Muñoz'}</p>
+                <p className="text-emerald-500/40 text-[8px] font-bold tracking-widest uppercase">EN LÍNEA</p>
+              </div>
             </div>
             <button onClick={onLogout} className="p-2.5 text-zinc-600 hover:bg-rose-600 hover:text-white rounded-lg transition-all">
               <LogOut size={14} strokeWidth={3} />

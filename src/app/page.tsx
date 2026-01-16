@@ -154,29 +154,22 @@ export default function App() {
 
       <main className="flex-1 overflow-y-auto relative scroll-smooth flex flex-col">
 
-        <header className="sticky top-0 bg-[#020203] border-b border-white/[0.08] px-4 md:px-10 py-4 z-50 flex justify-between items-center shadow-[0_10px_30px_rgba(0,0,0,0.5)]">
-
-          {/* SECCIÓN IZQUIERDA: IDENTIDAD Y MÓDULO */}
+        <header className="sticky top-0 bg-[#020203] border-b border-white/[0.08] px-4 md:px-10 py-4 z-50 flex justify-between items-center">
+          {/* El resto del contenido del header se mantiene igual */}
+          {/* SECCIÓN IZQUIERDA: IDENTIDAD... */}
           <div className="flex items-center gap-6">
-            {/* Botón Menú Móvil con efecto radar */}
-            <button
-              onClick={() => setIsSidebarOpen(true)}
-              className="md:hidden relative p-3 bg-zinc-900/50 text-white rounded-lg border border-white/10 active:scale-95 transition-all"
-            >
+            <button onClick={() => setIsSidebarOpen(true)} className="md:hidden relative p-3 bg-zinc-900/50 text-white rounded-lg border border-white/10 active:scale-95 transition-all">
               <Menu size={18} strokeWidth={2.5} />
             </button>
 
-            {/* Frame del Icono de Sección */}
             <div className="hidden sm:flex relative group">
               <div className="absolute -inset-1 bg-emerald-500/20 rounded-xl blur-md opacity-0 group-hover:opacity-100 transition duration-500"></div>
-              <div className="relative w-12 h-12 bg-black border border-white/10 rounded-xl flex items-center justify-center text-emerald-500 shadow-2xl transition-transform hover:-rotate-3">
+              <div className="relative w-12 h-12 bg-black border border-white/10 rounded-xl flex items-center justify-center text-emerald-500 transition-transform hover:-rotate-3">
                 {currentMeta.icon}
-                {/* Pequeño detalle técnico en la esquina del icono */}
                 <div className="absolute -top-1 -right-1 w-2 h-2 bg-emerald-500 rounded-full border-2 border-black"></div>
               </div>
             </div>
 
-            {/* Textos de Identificación */}
             <div className="flex flex-col">
               <div className="flex items-center gap-2">
                 <span className="text-[10px] font-black text-emerald-500 tracking-[0.3em] uppercase opacity-50">System / Node</span>
@@ -185,7 +178,6 @@ export default function App() {
               <h1 className="text-white text-lg md:text-xl font-black tracking-tight uppercase leading-tight">
                 {currentMeta.label}
               </h1>
-              {/* Badge de Usuario Refinado */}
               <div className="flex items-center gap-2 mt-1">
                 <div className="flex items-center gap-2 bg-zinc-900/80 px-2.5 py-0.5 rounded-full border border-white/5">
                   <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.8)]"></div>
@@ -197,13 +189,9 @@ export default function App() {
             </div>
           </div>
 
-          {/* SECCIÓN DERECHA: RELOJ E INDICADORES TÉCNICOS */}
+          {/* SECCIÓN DERECHA... */}
           <div className="flex items-center gap-8">
-
-            {/* Divisor vertical decorativo (Solo PC) */}
             <div className="hidden lg:block w-[1px] h-10 bg-gradient-to-b from-transparent via-white/10 to-transparent"></div>
-
-            {/* Reloj Pro con segundos diferenciados */}
             <div className="flex flex-col items-end">
               <div className="flex items-baseline gap-1 text-white tabular-nums">
                 <span className="text-2xl md:text-3xl font-black tracking-tighter italic">
@@ -216,8 +204,6 @@ export default function App() {
                   {currentTime.getHours() >= 12 ? 'PM' : 'AM'}
                 </span>
               </div>
-
-              {/* Indicador de Fecha Estructurado */}
               <div className="flex items-center gap-2 mt-1">
                 <div className="px-2 py-0.5 bg-emerald-500/5 border border-emerald-500/20 rounded flex items-center gap-1.5">
                   <Calendar size={10} className="text-emerald-500" />
@@ -225,7 +211,6 @@ export default function App() {
                     {currentTime.toLocaleDateString('es-CO', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' }).toUpperCase()}
                   </span>
                 </div>
-                {/* Status de Red (Decorativo) */}
                 <div className="hidden sm:flex items-center gap-1 px-2 py-0.5 bg-zinc-900 border border-white/5 rounded text-[8px] font-bold text-zinc-500 tracking-tighter">
                   <div className="w-1 h-1 bg-blue-500 rounded-full"></div>
                   LIVE_SYNC
