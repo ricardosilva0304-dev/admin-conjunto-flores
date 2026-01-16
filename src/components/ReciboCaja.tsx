@@ -36,21 +36,17 @@ const ReciboContenido = ({ datos }: { datos: any }) => {
         </div>
 
         <div className="flex-1 text-center px-4">
-              <h2 className="font-black text-[11px] uppercase leading-none mb-1">Agrupación Res. El Parque de las Flores</h2>
-              <h2 className="font-black text-[11px] uppercase leading-none mb-1">NIT. 832.011.421-3 </h2>
-              <p className="font-bold text-[9px] text-slate-600">Diagonal 9 #4B-90 • Soacha, Cundinamarca</p>
-              <div className="text-[9px] text-slate-500 space-x-2 mt-1">
-                <span>Cel.: 315 340 0657</span>
-                <span>•</span>
-                <span>Convenio 15939402 Torre - Apto</span>
-              </div>
-              <div className="text-[9px] text-slate-500 space-x-2 mt-1">
-                <span>Cta. Ahorros 24511819298 Banco Caja Social</span>
-              </div>
-              <div className="text-[9px] text-slate-500 space-x-2 mt-1">
-                <span>e-mail: cr.parquedelasflores@gmail.com</span>
-              </div>
-            </div>
+          <h2 className="font-black text-[11px] uppercase leading-none mb-1">Agrupación Res. El Parque de las Flores</h2>
+          <h2 className="font-black text-[11px] uppercase leading-none mb-1">NIT. 832.011.421-3 </h2>
+          <p className="font-bold text-[9px] text-slate-600">Diagonal 9 #4B-90 • Soacha, Cundinamarca</p>
+          <p className="font-bold text-[9px] text-slate-600">Cta. Ahorros 24511819298 Banco Caja Social</p>
+          <p className="font-bold text-[9px] text-slate-600">Convenio 15939402 Torre - Apto</p>
+          <div className="text-[9px] text-slate-500 space-x-2 mt-1">
+            <span>Cel.: 315 340 0657</span>
+            <span>•</span>
+            <span>e-mail: cr.parquedelasflores@gmail.com</span>
+          </div>
+        </div>
 
         <div className="w-full md:w-[160px] border-2 border-slate-900 p-2 text-center rounded-sm bg-slate-50">
           <p className="font-black text-[8px] md:text-[9px] uppercase text-slate-400 mb-0.5 tracking-widest">Recibo de Caja</p>
