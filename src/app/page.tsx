@@ -155,58 +155,68 @@ export default function App() {
       <main className="flex-1 overflow-y-auto relative scroll-smooth flex flex-col">
 
         {/* HEADER SUPERIOR NIVEL PRO */}
-        <header className="sticky top-0 bg-white/70 backdrop-blur-xl border-b border-slate-100 px-4 md:px-12 py-3 md:py-6 flex justify-between items-center z-40">
+        {/* HEADER SUPERIOR NIVEL PRO - DARK EDITION */}
+        <header className="sticky top-0 bg-[#090a0c]/80 backdrop-blur-xl border-b border-white/[0.05] px-4 md:px-12 py-4 md:py-6 flex justify-between items-center z-50 shadow-2xl">
 
-          {/* LADO IZQUIERDO: MENU Y SECCIÓN */}
-          <div className="flex items-center gap-2 md:gap-8">
+          {/* LADO IZQUIERDO: SECCIÓN Y NAVEGACIÓN */}
+          <div className="flex items-center gap-3 md:gap-8">
 
-            {/* BOTÓN HAMBURGUESA (Móvil) - Rediseñado más táctil */}
+            {/* BOTÓN HAMBURGUESA (Móvil) - Estilo Dark */}
             <button
               onClick={() => setIsSidebarOpen(true)}
-              className="md:hidden p-3 bg-slate-900 text-white rounded-xl shadow-lg active:scale-90 transition-all shrink-0"
+              className="md:hidden p-3 bg-zinc-900 text-white rounded-xl border border-white/10 active:scale-90 transition-all shrink-0"
             >
               <Menu size={20} strokeWidth={3} />
             </button>
 
-            {/* ICONO SECCIÓN (Solo PC) */}
-            <div className="hidden sm:flex w-12 h-12 md:w-14 md:h-14 bg-white border border-slate-100 rounded-2xl items-center justify-center text-emerald-600 shadow-sm border-b-2 border-b-emerald-100 transition-all hover:rotate-3">
+            {/* ICONO SECCIÓN (Solo PC) - Con Glow sutil */}
+            <div className="hidden sm:flex w-12 h-12 md:w-14 md:h-14 bg-zinc-900 border border-white/10 rounded-2xl items-center justify-center text-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.1)] transition-all hover:border-emerald-500/30">
               {currentMeta.icon}
             </div>
 
-            {/* TÍTULO Y SALUDO */}
+            {/* TÍTULO Y USUARIO */}
             <div className="min-w-0">
-              <h1 className="text-slate-900 text-base md:text-2xl font-black tracking-tighter uppercase leading-none truncate max-w-[120px] md:max-w-none">
+              <h1 className="text-white text-base md:text-2xl font-black tracking-tighter uppercase leading-none truncate">
                 {currentMeta.label}
               </h1>
-              <div className="flex items-center gap-1.5 mt-0.5 md:mt-1.5">
-                <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse shadow-[0_0_8px_#10b981]"></div>
-                <p className="text-slate-400 text-[8px] md:text-[10px] font-black uppercase tracking-[0.2em] truncate">{adminName}</p>
+              <div className="flex items-center gap-2 mt-1.5 md:mt-2">
+                <div className="flex items-center gap-1.5 bg-emerald-500/10 px-2 py-0.5 rounded-md border border-emerald-500/20">
+                  <div className="w-1 h-1 bg-emerald-500 rounded-full animate-pulse"></div>
+                  <p className="text-emerald-500 text-[8px] md:text-[9px] font-black uppercase tracking-[0.15em] truncate">
+                    {adminName || 'Sesión Activa'}
+                  </p>
+                </div>
               </div>
             </div>
           </div>
 
-          {/* LADO DERECHO: RELOJ Y FECHA DINÁMICA */}
-          <div className="flex flex-col items-end shrink-0 pl-4 border-l border-slate-100 md:border-none">
-            <div className="text-slate-900 font-black text-lg md:text-3xl tracking-tighter tabular-nums leading-none">
+          {/* LADO DERECHO: RELOJ Y CALENDARIO PREMIUM */}
+          <div className="flex flex-col items-end shrink-0 pl-4 border-l border-white/10 md:border-none">
+            {/* RELOJ DIGITAL */}
+            <div className="text-white font-black text-xl md:text-3xl tracking-tighter tabular-nums leading-none flex items-baseline gap-1">
               {currentTime.toLocaleTimeString('es-CO', {
                 hour: '2-digit',
                 minute: '2-digit',
                 second: '2-digit',
                 hour12: true
-              })}
+              }).split(' ')[0]}
+              <span className="text-[10px] md:text-xs text-zinc-500 font-bold uppercase ml-1">
+                {currentTime.getHours() >= 12 ? 'p.m.' : 'a.m.'}
+              </span>
             </div>
 
-            <div className="hidden md:flex items-center gap-2 mt-2 bg-slate-50 px-3 py-1 rounded-full border border-slate-100">
-              <Calendar size={12} className="text-slate-300" />
-              <p className="text-slate-400 text-[9px] font-black uppercase tracking-widest">
-                {currentTime.toLocaleDateString('es-CO', { weekday: 'long', day: 'numeric', month: 'long' })}
+            {/* FECHA ESTILO CÁPSULA */}
+            <div className="flex items-center gap-2 mt-2 bg-zinc-900/50 px-3 py-1.5 rounded-lg border border-white/5 shadow-inner">
+              <Calendar size={11} className="text-emerald-500" />
+              <p className="text-zinc-400 text-[8px] md:text-[9px] font-black uppercase tracking-[0.1em]">
+                {currentTime.toLocaleDateString('es-CO', {
+                  weekday: 'short',
+                  day: 'numeric',
+                  month: 'short',
+                  year: 'numeric'
+                }).replace('.', '')}
               </p>
             </div>
-
-            {/* Fecha resumida solo para Celular */}
-            <p className="md:hidden text-slate-300 text-[8px] font-black uppercase tracking-widest mt-1">
-              {currentTime.toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit', year: '2-digit' })}
-            </p>
           </div>
         </header>
 

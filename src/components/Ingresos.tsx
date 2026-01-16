@@ -164,7 +164,7 @@ export default function Ingresos() {
       {datosRecibo && <ReciboCaja datos={datosRecibo} onClose={() => setDatosRecibo(null)} />}
 
       {/* 1. BUSCADOR INTELIGENTE */}
-      <section className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm relative z-[300]">
+      <section className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm relative z-[30]">
         <div className="relative">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
           <input
@@ -177,7 +177,7 @@ export default function Ingresos() {
         </div>
 
         {filteredRes.length > 0 && (
-          <div className="absolute top-[105%] left-0 right-0 bg-white border border-slate-200 rounded-xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95">
+          <div className="absolute top-[105%] left-0 right-0 bg-white border border-slate-200 rounded-xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 z-[100]">
             {filteredRes.map(r => (
               <button key={r.id} onClick={() => cargarDeudasResidente(r)} className="w-full p-4 text-left border-b border-slate-50 hover:bg-slate-50 flex items-center justify-between group">
                 <div className="flex items-center gap-3">

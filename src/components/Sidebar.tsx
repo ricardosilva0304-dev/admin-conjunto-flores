@@ -1,11 +1,11 @@
 "use client";
+import { useState, useEffect } from "react";
 import { 
   Building2, PieChart, Wallet, LogOut, 
   Users, MapPin, Zap, BarChart3, Settings, 
-  UserCircle2, Receipt, History, ChevronRight, X 
+  UserCircle2, Receipt, History, ChevronRight, X, ChevronDown 
 } from "lucide-react";
 
-// Agrupamos los ítems por categorías lógicas
 const menuGroups = [
   {
     title: "Administración",
@@ -46,20 +46,30 @@ const menuGroups = [
 ];
 
 export default function Sidebar({ activeTab, setActiveTab, onLogout, isOpen, setIsOpen, adminName }: any) {
+  // Estado para controlar qué categoría está abierta
+  const [expandedGroup, setExpandedGroup] = useState<string | null>("Administración");
+
+  // Efecto para abrir automáticamente la categoría si se cambia de tab desde fuera
+  useEffect(() => {
+    const group = menuGroups.find(g => g.items.some(i => i.id === activeTab));
+    if (group) setExpandedGroup(group.title);
+  }, [activeTab]);
+
+  const toggleGroup = (title: string) => {
+    setExpandedGroup(expandedGroup === title ? null : title);
+  };
+
   return (
     <>
-      {/* MÁSCARA FONDO MÓVIL */}
       {isOpen && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-[200] md:hidden" onClick={() => setIsOpen(false)}></div>
       )}
 
-      {/* CONTENEDOR SIDEBAR */}
       <div className={`
         fixed md:relative inset-y-0 left-0 w-72 bg-[#090a0c] flex flex-col z-[210] transition-all duration-500 border-r border-white/5 shadow-2xl
         ${isOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"}
       `}>
         
-        {/* HEADER: LOGO Y NOMBRE DEL CONJUNTO */}
         <div className="p-8 mb-2">
           <div className="flex flex-col gap-4">
             <div className="flex items-center justify-between">
@@ -74,7 +84,6 @@ export default function Sidebar({ activeTab, setActiveTab, onLogout, isOpen, set
               <button onClick={() => setIsOpen(false)} className="md:hidden text-zinc-600"><X size={20}/></button>
             </div>
             
-            {/* NOMBRE DEL CONJUNTO REFINADO */}
             <div className="space-y-1">
               <p className="text-[10px] font-black text-emerald-500 uppercase tracking-[0.3em] leading-none">
                 Conjunto Residencial
@@ -87,45 +96,61 @@ export default function Sidebar({ activeTab, setActiveTab, onLogout, isOpen, set
           </div>
         </div>
 
-        {/* LISTADO POR CATEGORÍAS */}
-        <nav className="flex-1 px-4 space-y-6 overflow-y-auto no-scrollbar pb-10">
-          {menuGroups.map((group, idx) => (
-            <div key={idx} className="space-y-1">
-              {/* TÍTULO DE CATEGORÍA */}
-              <h3 className="px-4 text-[9px] font-black text-zinc-600 uppercase tracking-[0.2em] mb-2">
-                {group.title}
-              </h3>
-              
-              <div className="space-y-1">
-                {group.items.map((item) => {
-                  const isActive = activeTab === item.id;
-                  return (
-                    <button
-                      key={item.id}
-                      onClick={() => { setActiveTab(item.id); if(window.innerWidth < 768) setIsOpen(false); }}
-                      className={`
-                        w-full group flex items-center justify-between px-4 py-2.5 rounded-xl transition-all duration-300
-                        ${isActive ? "bg-emerald-500 text-black shadow-lg shadow-emerald-500/10" : "text-zinc-500 hover:text-white hover:bg-white/[0.03]"}
-                      `}
-                    >
-                      <div className="flex items-center gap-3">
-                        <span className={`${isActive ? "text-black" : "group-hover:text-emerald-400"}`}>
-                          {item.icon}
-                        </span>
-                        <span className={`text-[10px] font-bold uppercase tracking-wider ${isActive ? "font-black" : ""}`}>
-                          {item.label}
-                        </span>
-                      </div>
-                      {isActive && <ChevronRight size={12} className="opacity-50" />}
-                    </button>
-                  );
-                })}
+        {/* LISTADO CON ACORDEÓN */}
+        <nav className="flex-1 px-4 space-y-2 overflow-y-auto no-scrollbar pb-10">
+          {menuGroups.map((group, idx) => {
+            const isExpanded = expandedGroup === group.title;
+            const hasActiveItem = group.items.some(i => i.id === activeTab);
+
+            return (
+              <div key={idx} className="space-y-1">
+                {/* CABECERA DE CATEGORÍA CLICKEABLE */}
+                <button 
+                  onClick={() => toggleGroup(group.title)}
+                  className={`
+                    w-full flex items-center justify-between px-4 py-3 rounded-xl transition-all
+                    ${isExpanded || hasActiveItem ? "text-emerald-500 bg-white/[0.02]" : "text-zinc-600 hover:text-zinc-400"}
+                  `}
+                >
+                  <h3 className="text-[10px] font-black uppercase tracking-[0.2em]">
+                    {group.title}
+                  </h3>
+                  {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                </button>
+                
+                {/* ITEMS DESPLEGABLES CON ANIMACIÓN DE ENTRADA */}
+                {isExpanded && (
+                  <div className="space-y-1 animate-in slide-in-from-top-2 duration-300">
+                    {group.items.map((item) => {
+                      const isActive = activeTab === item.id;
+                      return (
+                        <button
+                          key={item.id}
+                          onClick={() => { setActiveTab(item.id); if(window.innerWidth < 768) setIsOpen(false); }}
+                          className={`
+                            w-full group flex items-center justify-between px-4 py-2.5 rounded-xl transition-all
+                            ${isActive ? "bg-emerald-500 text-black shadow-lg" : "text-zinc-500 hover:text-white hover:bg-white/[0.03]"}
+                          `}
+                        >
+                          <div className="flex items-center gap-3">
+                            <span className={`${isActive ? "text-black" : "group-hover:text-emerald-400"}`}>
+                              {item.icon}
+                            </span>
+                            <span className={`text-[10px] font-bold uppercase tracking-wider ${isActive ? "font-black" : ""}`}>
+                              {item.label}
+                            </span>
+                          </div>
+                          {isActive && <div className="w-1 h-1 bg-black rounded-full"></div>}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
-            </div>
-          ))}
+            );
+          })}
         </nav>
 
-        {/* FOOTER: USUARIO */}
         <div className="p-4 border-t border-white/5 bg-[#050607]">
           <div className="bg-zinc-900/40 border border-white/5 rounded-2xl p-3 flex items-center justify-between group/user">
             <div className="flex items-center gap-3 min-w-0">
@@ -137,16 +162,11 @@ export default function Sidebar({ activeTab, setActiveTab, onLogout, isOpen, set
                   <p className="text-emerald-500/40 text-[8px] font-bold tracking-widest uppercase">EN LÍNEA</p>
                </div>
             </div>
-            
-            <button 
-              onClick={onLogout}
-              className="p-2.5 text-zinc-600 hover:bg-rose-600 hover:text-white rounded-lg transition-all active:scale-90"
-            >
+            <button onClick={onLogout} className="p-2.5 text-zinc-600 hover:bg-rose-600 hover:text-white rounded-lg transition-all">
               <LogOut size={14} strokeWidth={3} />
             </button>
           </div>
         </div>
-
       </div>
     </>
   );
