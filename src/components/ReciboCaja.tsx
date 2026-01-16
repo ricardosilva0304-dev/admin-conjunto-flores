@@ -41,8 +41,8 @@ const ReciboContenido = ({ datos }: { datos: any }) => {
           <p className="font-bold text-[10px] text-slate-600">Diagonal 9 # 4B-90 • Soacha, Cundinamarca</p>
           <p className="font-bold text-[9px] text-slate-600">Cuenta de Ahorros 24511819298 Banco Caja Social</p>
           <p className="font-bold text-[9px] text-slate-600">Convenio 15939402 Torre - Apto</p>
-          <p className="font-bold text-[8px] text-slate-600">Celular: 315 340 0657</p>
-          <p className="font-bold text-[8px] text-slate-600">e-mail: cr.parquedelasflores@gmail.com</p>
+          <p className="font-bold text-[9px] text-slate-600">Celular: 315 340 0657</p>
+          <p className="font-bold text-[9px] text-slate-600">e-mail: cr.parquedelasflores@gmail.com</p>
         </div>
 
         <div className="w-full md:w-[160px] border-2 border-slate-900 p-2 text-center rounded-sm bg-slate-50">
