@@ -164,7 +164,7 @@ export default function Ingresos() {
       {datosRecibo && <ReciboCaja datos={datosRecibo} onClose={() => setDatosRecibo(null)} />}
 
       {/* 1. BUSCADOR INTELIGENTE */}
-      <section className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm relative z-[100]">
+      <section className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm relative z-[300]">
         <div className="relative">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
           <input
