@@ -154,68 +154,83 @@ export default function App() {
 
       <main className="flex-1 overflow-y-auto relative scroll-smooth flex flex-col">
 
-        {/* HEADER SUPERIOR NIVEL PRO */}
-        {/* HEADER SUPERIOR NIVEL PRO - DARK EDITION */}
-        <header className="sticky top-0 bg-[#090a0c]/80 backdrop-blur-xl border-b border-white/[0.05] px-4 md:px-12 py-4 md:py-6 flex justify-between items-center z-50 shadow-2xl">
+        <header className="sticky top-0 bg-[#020203] border-b border-white/[0.08] px-4 md:px-10 py-4 z-50 flex justify-between items-center shadow-[0_10px_30px_rgba(0,0,0,0.5)]">
 
-          {/* LADO IZQUIERDO: SECCIÓN Y NAVEGACIÓN */}
-          <div className="flex items-center gap-3 md:gap-8">
-
-            {/* BOTÓN HAMBURGUESA (Móvil) - Estilo Dark */}
+          {/* SECCIÓN IZQUIERDA: IDENTIDAD Y MÓDULO */}
+          <div className="flex items-center gap-6">
+            {/* Botón Menú Móvil con efecto radar */}
             <button
               onClick={() => setIsSidebarOpen(true)}
-              className="md:hidden p-3 bg-zinc-900 text-white rounded-xl border border-white/10 active:scale-90 transition-all shrink-0"
+              className="md:hidden relative p-3 bg-zinc-900/50 text-white rounded-lg border border-white/10 active:scale-95 transition-all"
             >
-              <Menu size={20} strokeWidth={3} />
+              <Menu size={18} strokeWidth={2.5} />
             </button>
 
-            {/* ICONO SECCIÓN (Solo PC) - Con Glow sutil */}
-            <div className="hidden sm:flex w-12 h-12 md:w-14 md:h-14 bg-zinc-900 border border-white/10 rounded-2xl items-center justify-center text-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.1)] transition-all hover:border-emerald-500/30">
-              {currentMeta.icon}
+            {/* Frame del Icono de Sección */}
+            <div className="hidden sm:flex relative group">
+              <div className="absolute -inset-1 bg-emerald-500/20 rounded-xl blur-md opacity-0 group-hover:opacity-100 transition duration-500"></div>
+              <div className="relative w-12 h-12 bg-black border border-white/10 rounded-xl flex items-center justify-center text-emerald-500 shadow-2xl transition-transform hover:-rotate-3">
+                {currentMeta.icon}
+                {/* Pequeño detalle técnico en la esquina del icono */}
+                <div className="absolute -top-1 -right-1 w-2 h-2 bg-emerald-500 rounded-full border-2 border-black"></div>
+              </div>
             </div>
 
-            {/* TÍTULO Y USUARIO */}
-            <div className="min-w-0">
-              <h1 className="text-white text-base md:text-2xl font-black tracking-tighter uppercase leading-none truncate">
+            {/* Textos de Identificación */}
+            <div className="flex flex-col">
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-black text-emerald-500 tracking-[0.3em] uppercase opacity-50">System / Node</span>
+                <div className="h-[1px] w-4 bg-emerald-500/30"></div>
+              </div>
+              <h1 className="text-white text-lg md:text-xl font-black tracking-tight uppercase leading-tight">
                 {currentMeta.label}
               </h1>
-              <div className="flex items-center gap-2 mt-1.5 md:mt-2">
-                <div className="flex items-center gap-1.5 bg-emerald-500/10 px-2 py-0.5 rounded-md border border-emerald-500/20">
-                  <div className="w-1 h-1 bg-emerald-500 rounded-full animate-pulse"></div>
-                  <p className="text-emerald-500 text-[8px] md:text-[9px] font-black uppercase tracking-[0.15em] truncate">
-                    {adminName || 'Sesión Activa'}
-                  </p>
+              {/* Badge de Usuario Refinado */}
+              <div className="flex items-center gap-2 mt-1">
+                <div className="flex items-center gap-2 bg-zinc-900/80 px-2.5 py-0.5 rounded-full border border-white/5">
+                  <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.8)]"></div>
+                  <span className="text-zinc-400 text-[9px] font-black uppercase tracking-widest leading-none">
+                    {adminName || 'Root User'}
+                  </span>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* LADO DERECHO: RELOJ Y CALENDARIO PREMIUM */}
-          <div className="flex flex-col items-end shrink-0 pl-4 border-l border-white/10 md:border-none">
-            {/* RELOJ DIGITAL */}
-            <div className="text-white font-black text-xl md:text-3xl tracking-tighter tabular-nums leading-none flex items-baseline gap-1">
-              {currentTime.toLocaleTimeString('es-CO', {
-                hour: '2-digit',
-                minute: '2-digit',
-                second: '2-digit',
-                hour12: true
-              }).split(' ')[0]}
-              <span className="text-[10px] md:text-xs text-zinc-500 font-bold uppercase ml-1">
-                {currentTime.getHours() >= 12 ? 'p.m.' : 'a.m.'}
-              </span>
-            </div>
+          {/* SECCIÓN DERECHA: RELOJ E INDICADORES TÉCNICOS */}
+          <div className="flex items-center gap-8">
 
-            {/* FECHA ESTILO CÁPSULA */}
-            <div className="flex items-center gap-2 mt-2 bg-zinc-900/50 px-3 py-1.5 rounded-lg border border-white/5 shadow-inner">
-              <Calendar size={11} className="text-emerald-500" />
-              <p className="text-zinc-400 text-[8px] md:text-[9px] font-black uppercase tracking-[0.1em]">
-                {currentTime.toLocaleDateString('es-CO', {
-                  weekday: 'short',
-                  day: 'numeric',
-                  month: 'short',
-                  year: 'numeric'
-                }).replace('.', '')}
-              </p>
+            {/* Divisor vertical decorativo (Solo PC) */}
+            <div className="hidden lg:block w-[1px] h-10 bg-gradient-to-b from-transparent via-white/10 to-transparent"></div>
+
+            {/* Reloj Pro con segundos diferenciados */}
+            <div className="flex flex-col items-end">
+              <div className="flex items-baseline gap-1 text-white tabular-nums">
+                <span className="text-2xl md:text-3xl font-black tracking-tighter italic">
+                  {currentTime.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', hour12: false })}
+                </span>
+                <span className="text-sm font-bold text-emerald-500 opacity-80">
+                  :{currentTime.getSeconds().toString().padStart(2, '0')}
+                </span>
+                <span className="ml-2 text-[10px] font-black text-zinc-500 uppercase tracking-tighter">
+                  {currentTime.getHours() >= 12 ? 'PM' : 'AM'}
+                </span>
+              </div>
+
+              {/* Indicador de Fecha Estructurado */}
+              <div className="flex items-center gap-2 mt-1">
+                <div className="px-2 py-0.5 bg-emerald-500/5 border border-emerald-500/20 rounded flex items-center gap-1.5">
+                  <Calendar size={10} className="text-emerald-500" />
+                  <span className="text-zinc-300 text-[9px] font-black uppercase tracking-wider">
+                    {currentTime.toLocaleDateString('es-CO', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' }).toUpperCase()}
+                  </span>
+                </div>
+                {/* Status de Red (Decorativo) */}
+                <div className="hidden sm:flex items-center gap-1 px-2 py-0.5 bg-zinc-900 border border-white/5 rounded text-[8px] font-bold text-zinc-500 tracking-tighter">
+                  <div className="w-1 h-1 bg-blue-500 rounded-full"></div>
+                  LIVE_SYNC
+                </div>
+              </div>
             </div>
           </div>
         </header>
