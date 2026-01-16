@@ -172,7 +172,6 @@ export default function App() {
 
             <div className="flex flex-col">
               <div className="flex items-center gap-2">
-                <span className="text-[10px] font-black text-emerald-500 tracking-[0.3em] uppercase opacity-50">System / Node</span>
                 <div className="h-[1px] w-4 bg-emerald-500/30"></div>
               </div>
               <h1 className="text-white text-lg md:text-xl font-black tracking-tight uppercase leading-tight">

@@ -94,22 +94,39 @@ export default function Sidebar({ activeTab, setActiveTab, onLogout, isOpen, set
             </div>
 
             {/* Identidad del Conjunto: Escala mayor y tipografía estructurada */}
-            <div className="space-y-1 mt-2">
-              <div className="flex items-center gap-2">
-                <div className="h-[1px] w-4 bg-emerald-500"></div>
-                <p className="text-[10px] font-black text-emerald-500 uppercase tracking-[0.4em] leading-none">
-                  Conjunto Residencial
-                </p>
-              </div>
-              <p className="text-white text-[15px] font-black uppercase tracking-[0.1em] leading-tight">
-                Parque de las <br />
-                <span className="text-emerald-500/90 text-2xl tracking-tighter italic">Flores</span>
-              </p>
+            {/* REEMPLAZA EL HEADER DEL SIDEBAR POR ESTE BLOQUE CENTRADO Y LIMPIO */}
+            <div className="flex flex-col items-center justify-center p-10 pt-12 pb-8 border-b border-white/[0.03]">
 
-              {/* Separador estilizado */}
-              <div className="relative h-[2px] w-full bg-zinc-900 mt-4 overflow-hidden rounded-full">
-                <div className="absolute inset-y-0 left-0 w-1/2 bg-gradient-to-r from-transparent via-emerald-500/50 to-transparent animate-shimmer"></div>
+              {/* 1. Icono Centrado: Refinado y Sutil */}
+              <div className="relative group mb-6">
+                {/* Brillo de fondo muy suave, casi imperceptible */}
+                <div className="absolute -inset-3 bg-emerald-500/5 rounded-full blur-2xl opacity-0 group-hover:opacity-100 transition duration-1000"></div>
+
+                <div className="relative w-16 h-16 bg-[#0a0a0b] border border-white/[0.08] rounded-[1.5rem] flex items-center justify-center text-emerald-500 shadow-2xl transition-all duration-500 group-hover:border-emerald-500/30">
+                  <Building2 size={30} strokeWidth={1.5} />
+                  {/* Indicador de estado en la esquina del logo */}
+                  <div className="absolute top-0 right-0 w-2.5 h-2.5 bg-emerald-500 rounded-full border-[3px] border-[#090a0c]"></div>
+                </div>
               </div>
+
+              {/* 2. Bloque de Texto: Tipografía Estructurada */}
+              <div className="text-center space-y-3">
+                <h2 className="text-white font-black text-xl tracking-[0.3em] uppercase italic leading-none">
+                  Admin<span className="text-emerald-500 not-italic">.</span>
+                </h2>
+
+                <div className="flex flex-col items-center gap-1.5">
+                  <span className="text-emerald-500/60 text-[7px] font-black uppercase tracking-[0.5em] leading-none">
+                    Conjunto Residencial
+                  </span>
+                  <p className="text-zinc-400 text-[11px] font-bold uppercase tracking-[0.15em] leading-tight">
+                    Parque de las Flores
+                  </p>
+                </div>
+              </div>
+
+              {/* 3. Separador Minimalista */}
+              <div className="mt-8 w-6 h-[1.5px] bg-gradient-to-r from-transparent via-emerald-500/20 to-transparent rounded-full"></div>
             </div>
           </div>
         </div>

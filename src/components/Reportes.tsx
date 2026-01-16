@@ -122,23 +122,58 @@ export default function Reportes() {
             {/* CSS LOCAL IMPRESION CORREGIDO PARA MÚLTIPLES HOJAS */}
             <style>{`
               @media print { 
-                body { background: white !important; height: auto !important; overflow: visible !important; }
-                body * { visibility: hidden; } 
-                #report-print, #report-print * { visibility: visible; } 
+                /* 1. Reset total del entorno */
+                html, body { 
+                  height: auto !important; 
+                  overflow: visible !important; 
+                  background: white !important;
+                  margin: 0 !important;
+                  padding: 0 !important;
+                }
+
+                /* 2. Ocultar interfaz de la app */
+                body * { 
+                  visibility: hidden; 
+                }
+
+                /* 3. Mostrar área de reporte */
+                #report-print, #report-print * { 
+                  visibility: visible; 
+                }
+
+                /* 4. Control de flujo: Eliminar límites de altura y scroll */
                 #report-print { 
-                  position: relative !important; 
+                  position: absolute !important; 
                   left: 0 !important; 
                   top: 0 !important; 
                   width: 100% !important; 
-                  height: auto !important;
                   margin: 0 !important; 
-                  padding: 0 !important;
+                  padding: 1.2cm !important; /* Margen profesional de reporte */
+                  box-shadow: none !important;
+                  border: none !important;
                   display: block !important;
-                  overflow: visible !important;
+                  height: auto !important;
+                  min-height: 0 !important;
                 } 
-                .no-print { display: none !important; } 
-                tr { page-break-inside: avoid !important; }
-                @page { size: letter; margin: 1.5cm; }
+
+                /* 5. Evitar que las tablas se corten feo entre páginas */
+                tr { 
+                  page-break-inside: avoid !important; 
+                }
+                
+                /* 6. Forzar que los títulos de las tablas se repitan o no se corten */
+                thead { 
+                  display: table-header-group; 
+                }
+
+                .no-print { 
+                  display: none !important; 
+                }
+
+                @page { 
+                  size: letter; 
+                  margin: 0; 
+                }
               }
             `}</style>
 

@@ -41,24 +41,51 @@ export default function CuentaCobro({ residente, deudas, onClose }: any) {
       {/* MEDIA QUERY PARA IMPRESIÓN (SIN CAMBIOS DE MARGENES EXTRAÑOS) */}
       <style>{`
         @media print { 
-          body { background: white !important; height: auto !important; overflow: visible !important; }
-          body * { visibility: hidden; } 
-          #print-document, #print-document * { visibility: visible; } 
+          /* 1. Resetear el entorno para permitir el flujo entre páginas */
+          html, body { 
+            height: auto !important; 
+            overflow: visible !important; 
+            background: white !important;
+            margin: 0 !important;
+            padding: 0 !important;
+          }
+
+          /* 2. Ocultar todo el resto de la web */
+          body * { 
+            visibility: hidden; 
+          }
+
+          /* 3. Mostrar solo el documento de cobro */
+          #print-document, #print-document * { 
+            visibility: visible; 
+          }
+
+          /* 4. Posicionamiento para impresión multipágina */
           #print-document { 
-            position: relative !important; 
+            position: absolute !important; 
             left: 0 !important; 
             top: 0 !important; 
             width: 100% !important; 
             margin: 0 !important; 
-            padding: 0 !important; 
-            border: none !important; 
+            padding: 1.5cm !important; /* Margen de seguridad para la hoja */
             box-shadow: none !important;
+            border: none !important;
             display: block !important;
-            overflow: visible !important;
           } 
-          .no-print { display: none !important; } 
-          tr { page-break-inside: avoid !important; }
-          @page { size: letter; margin: 1.5cm; }
+
+          /* 5. Evitar que las filas de la tabla se corten a la mitad */
+          tr { 
+            page-break-inside: avoid !important; 
+          }
+
+          .no-print { 
+            display: none !important; 
+          }
+
+          @page { 
+            size: letter; 
+            margin: 0; 
+          }
         }
       `}</style>
 
