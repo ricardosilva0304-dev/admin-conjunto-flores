@@ -228,8 +228,7 @@ export default function Ingresos() {
                       const sHoy = calcularSaldoRealHoy(d);
                       return (
                         <tr key={d.id} className="hover:bg-slate-50/50 transition-colors group">
-                          <td className="p-6"><p className="text-slate-800 font-black text-sm">{d.causaciones_globales?.concepto_nombre}</p><p className="text-[10px] text-slate-400 font-bold">{d.causaciones_globales.mes_causado}</p></td>
-                          <td className="p-6 text-right"><span className="text-slate-900 font-black tabular-nums">${sHoy.toLocaleString()}</span></td>
+                          {/* COLUMNA 1: CONCEPTO Y MES (CORREGIDA) */}
                           <td className="p-6">
                             <p className="text-slate-800 font-black text-sm">
                               {d.causaciones_globales?.concepto_nombre || d.concepto_nombre}
@@ -237,6 +236,27 @@ export default function Ingresos() {
                             <p className="text-[10px] text-slate-400 font-bold">
                               {d.causaciones_globales?.mes_causado || "CARGO MANUAL / EXTRA"}
                             </p>
+                          </td>
+
+                          {/* COLUMNA 2: SALDO A HOY */}
+                          <td className="p-6 text-right">
+                            <span className="text-slate-900 font-black tabular-nums">
+                              ${sHoy.toLocaleString()}
+                            </span>
+                          </td>
+
+                          {/* COLUMNA 3: CUADRO PARA ESCRIBIR EL PAGO (ESTA FALTABA EN TU CÓDIGO) */}
+                          <td className="p-6">
+                            <div className="relative w-40 mx-auto">
+                              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-emerald-500 font-black">$</span>
+                              <input
+                                type="number"
+                                className="w-full bg-white border border-slate-200 p-3 pl-8 rounded-xl text-right font-black outline-none focus:border-emerald-500 shadow-sm"
+                                value={abonos[d.id] || ""}
+                                onChange={(e) => setAbonos({ ...abonos, [d.id]: e.target.value })}
+                                placeholder="0"
+                              />
+                            </div>
                           </td>
                         </tr>
                       )
