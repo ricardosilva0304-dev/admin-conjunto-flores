@@ -19,6 +19,7 @@ export default function Deudores() {
   const [busqueda, setBusqueda] = useState("");
   const [filtroTorre, setFiltroTorre] = useState("TODAS");
   const [orden, setOrden] = useState("mayor");
+  const [busquedaManual, setBusquedaManual] = useState("");
 
   const [residenteDetalle, setResidenteDetalle] = useState<any>(null);
   const [cobroResidente, setCobroResidente] = useState<any>(null);
@@ -54,46 +55,60 @@ export default function Deudores() {
     setLoading(true);
     const monto = parseFloat(formManual.valor);
 
+    // Combinamos Concepto + Mes para que aparezca claro: "MULTA (2024-05)"
+    const conceptoFinal = `${formManual.concepto.toUpperCase()} (${formManual.mes})`;
+
     const { error } = await supabase.from("deudas_residentes").insert([{
-      residente_id: formManual.residente_id,
-      concepto_nombre: formManual.concepto.toUpperCase(),
+      residente_id: parseInt(formManual.residente_id),
+      concepto_nombre: conceptoFinal,
       monto_original: monto,
       saldo_pendiente: monto,
-      precio_m1: monto, // En cargos manuales solemos dejar el mismo precio en los 3 tramos
+      precio_m1: monto,
       precio_m2: monto,
-      precio_m3: monto,
-      // Nota: No enviamos causacion_id porque es manual
+      precio_m3: monto
+      // NO enviamos causacion_id para que el sistema sepa que es MANUAL
     }]);
 
     if (!error) {
-      alert("Cargo asignado correctamente");
       setShowManualModal(false);
+      cargarInformacion();
       setFormManual({ residente_id: "", concepto: "", mes: "", valor: "" });
-      cargarInformacion(); // Recargar lista
+      setBusquedaManual("");
     } else {
       alert("Error: " + error.message);
     }
     setLoading(false);
   }
 
-  // --- CÁLCULO DINÁMICO POR TRAMOS ---
   const calcularDeudaReal = (resId: number) => {
     const deudasRes = deudas.filter(d => d.residente_id === resId);
     return deudasRes.reduce((acc, d) => {
+      // 1. SI ES CARGO MANUAL (No tiene causaciones_globales), devolver saldo directo
+      if (!d.causaciones_globales) {
+        return acc + (Number(d.saldo_pendiente) || 0);
+      }
+
+      // 2. SI TIENE CAUSACIÓN (Administración), aplicar lógica de tramos
       const hoy = new Date();
       const dia = hoy.getDate();
       const mesAct = hoy.getMonth() + 1;
       const anioAct = hoy.getFullYear();
-      const [yC, mC] = d.causaciones_globales.mes_causado.split("-").map(Number);
 
-      let precioPlazo = d.precio_m1;
-      if (anioAct > yC || (anioAct === yC && mesAct > mC)) precioPlazo = d.precio_m3;
-      else {
-        if (dia > 10 && dia <= 20) precioPlazo = d.precio_m2;
-        if (dia > 20) precioPlazo = d.precio_m3;
+      // Usamos el encadenamiento opcional ?. para evitar el crash
+      const mesCausado = d.causaciones_globales?.mes_causado;
+      if (!mesCausado) return acc + (Number(d.saldo_pendiente) || 0);
+
+      const [yC, mC] = mesCausado.split("-").map(Number);
+
+      let precioPlazo = d.precio_m1 || 0;
+      if (anioAct > yC || (anioAct === yC && mesAct > mC)) {
+        precioPlazo = d.precio_m3 || 0;
+      } else {
+        if (dia > 10 && dia <= 20) precioPlazo = d.precio_m2 || 0;
+        if (dia > 20) precioPlazo = d.precio_m3 || 0;
       }
-      // Restar lo ya abonado
-      const abonado = (d.monto_original || 0) - (d.saldo_pendiente || 0);
+
+      const abonado = (Number(d.monto_original) || 0) - (Number(d.saldo_pendiente) || 0);
       return acc + Math.max(0, precioPlazo - abonado);
     }, 0);
   };
@@ -239,19 +254,59 @@ export default function Deudores() {
                 <button type="button" onClick={() => setShowManualModal(false)}><X size={20} /></button>
               </div>
 
-              <div>
-                <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Seleccionar Residente</label>
-                <select
-                  className="w-full bg-slate-50 border p-4 rounded-xl font-bold text-sm outline-none appearance-none"
-                  value={formManual.residente_id}
-                  onChange={(e) => setFormManual({ ...formManual, residente_id: e.target.value })}
-                  required
-                >
-                  <option value="">Elegir unidad...</option>
-                  {residentes.map(r => (
-                    <option key={r.id} value={r.id}>T{r.torre.slice(-1)}-{r.apartamento} | {r.nombre}</option>
-                  ))}
-                </select>
+              <div className="relative">
+                <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Buscar Residente (Apto o Nombre)</label>
+                <div className="relative">
+                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={16} />
+                  <input
+                    className="w-full bg-slate-50 border border-slate-100 p-4 pl-12 rounded-xl outline-none font-bold text-sm focus:bg-white transition-all"
+                    placeholder="Ej: 5-101 o Juan..."
+                    value={formManual.residente_id
+                      ? residentes.find(r => r.id === Number(formManual.residente_id))?.nombre + " | " + residentes.find(r => r.id === Number(formManual.residente_id))?.apartamento
+                      : busquedaManual}
+                    onChange={(e) => {
+                      setBusquedaManual(e.target.value);
+                      setFormManual({ ...formManual, residente_id: "" }); // Limpia la selección si escribe de nuevo
+                    }}
+                  />
+                  {formManual.residente_id && (
+                    <button
+                      onClick={() => { setFormManual({ ...formManual, residente_id: "" }); setBusquedaManual(""); }}
+                      className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-rose-500"
+                    >
+                      <X size={16} />
+                    </button>
+                  )}
+                </div>
+
+                {/* Lista de Sugerencias */}
+                {busquedaManual && !formManual.residente_id && (
+                  <div className="absolute top-[105%] left-0 right-0 bg-white border border-slate-200 rounded-xl shadow-2xl z-[100] overflow-hidden max-h-48 overflow-y-auto">
+                    {residentes
+                      .filter(r => {
+                        const term = busquedaManual.toLowerCase();
+                        const unidad = `${r.torre.replace("Torre ", "")}-${r.apartamento}`;
+                        return r.nombre.toLowerCase().includes(term) || unidad.includes(term);
+                      })
+                      .slice(0, 5) // Mostrar solo los primeros 5 resultados
+                      .map(r => (
+                        <button
+                          key={r.id}
+                          type="button"
+                          onClick={() => {
+                            setFormManual({ ...formManual, residente_id: r.id.toString() });
+                            setBusquedaManual("");
+                          }}
+                          className="w-full p-3 text-left hover:bg-slate-50 border-b border-slate-50 flex justify-between items-center"
+                        >
+                          <span className="text-xs font-bold text-slate-700 uppercase">{r.nombre}</span>
+                          <span className="text-[10px] font-black bg-emerald-50 text-emerald-600 px-2 py-1 rounded">
+                            T{r.torre.replace("Torre ", "")}-{r.apartamento}
+                          </span>
+                        </button>
+                      ))}
+                  </div>
+                )}
               </div>
 
               <div>
