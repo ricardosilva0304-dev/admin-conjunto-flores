@@ -71,8 +71,9 @@ export default function Ingresos() {
 
   // --- LÓGICA DE SALDO REAL DINÁMICO (Tramo Fecha - Abonos Anteriores) ---
   const calcularSaldoRealHoy = (deuda: any) => {
-    // Si NO tiene causación global, es un valor fijo (el saldo pendiente actual)
+    // --- AGREGA ESTA LÍNEA AL PRINCIPIO ---
     if (!deuda.causaciones_globales) return deuda.saldo_pendiente || 0;
+
     const hoy = new Date();
     const dia = hoy.getDate();
     const mesAct = hoy.getMonth() + 1;
@@ -107,8 +108,8 @@ export default function Ingresos() {
         .map(d => {
           const montoInd = Number(abonos[d.id]).toLocaleString('es-CO');
 
-          // Si tiene mes causado (Causación Global)
-          if (d.causaciones_globales?.mes_causado) {
+          // Si tiene causación global (ADMINISTRACIÓN)
+          if (d.causaciones_globales) {
             const [anio, mes] = d.causaciones_globales.mes_causado.split("-");
             const mesesNombres = ["ENERO", "FEBRERO", "MARZO", "ABRIL", "MAYO", "JUNIO", "JULIO", "AGOSTO", "SEPTIEMBRE", "OCTUBRE", "NOVIEMBRE", "DICIEMBRE"];
             const mesNombre = mesesNombres[parseInt(mes) - 1];
@@ -116,10 +117,9 @@ export default function Ingresos() {
             return `${nombreC} (${mesNombre} ${anio})|$${montoInd}`;
           }
 
-          // Si es un cargo manual
+          // Si es un CARGO MANUAL
           else {
-            const nombreC = d.concepto_nombre || "CARGO MANUAL";
-            return `${nombreC} (PAGO ÚNICO)|$${montoInd}`;
+            return `${d.concepto_nombre || 'CARGO EXTRA'} (PAGO ÚNICO)|$${montoInd}`;
           }
         })
         .join("||");
@@ -232,11 +232,10 @@ export default function Ingresos() {
                           <td className="p-6 text-right"><span className="text-slate-900 font-black tabular-nums">${sHoy.toLocaleString()}</span></td>
                           <td className="p-6">
                             <p className="text-slate-800 font-black text-sm">
-                              {/* Si tiene causación global usa ese nombre, si no, usa el nombre manual */}
                               {d.causaciones_globales?.concepto_nombre || d.concepto_nombre}
                             </p>
                             <p className="text-[10px] text-slate-400 font-bold">
-                              {d.causaciones_globales?.mes_causado || "CARGO EXTRAORDINARIO"}
+                              {d.causaciones_globales?.mes_causado || "CARGO MANUAL / EXTRA"}
                             </p>
                           </td>
                         </tr>
@@ -254,9 +253,6 @@ export default function Ingresos() {
                       <div>
                         <p className="font-black text-slate-900 text-xs uppercase">
                           {d.causaciones_globales?.concepto_nombre || d.concepto_nombre}
-                        </p>
-                        <p className="text-[10px] font-bold text-slate-400">
-                          {d.causaciones_globales?.mes_causado || "CARGO EXTRAORDINARIO"}
                         </p>
                       </div>
                       <p className="text-right font-black text-slate-700">${calcularSaldoRealHoy(d).toLocaleString()}</p>
