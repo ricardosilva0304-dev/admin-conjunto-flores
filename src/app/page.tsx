@@ -216,25 +216,6 @@ export default function App() {
               </div>
             </div>
 
-            {/* Badge de Usuario / Sesión */}
-            <div className="hidden lg:flex items-center gap-3 pl-2">
-              <div className="text-right">
-                <p className="text-[10px] font-black text-slate-900 uppercase leading-none mb-1">
-                  {adminName || 'Admin Principal'}
-                </p>
-                <div className="flex items-center justify-end gap-1.5">
-                  <div className="w-1 h-1 bg-emerald-500 rounded-full"></div>
-                  <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">
-                    Sincronizado
-                  </span>
-                </div>
-              </div>
-              {/* Avatar minimalista */}
-              <div className="w-10 h-10 rounded-2xl bg-slate-900 flex items-center justify-center text-white font-black text-xs shadow-lg shadow-slate-200">
-                {adminName?.charAt(0).toUpperCase() || 'A'}
-              </div>
-            </div>
-
             {/* Botón Rápido (Opcional: Notificaciones o Acción) */}
             <button className="relative p-2.5 text-slate-400 hover:text-slate-900 hover:bg-slate-50 rounded-xl transition-all">
               <div className="absolute top-2.5 right-2.5 w-2 h-2 bg-rose-500 border-2 border-white rounded-full"></div>

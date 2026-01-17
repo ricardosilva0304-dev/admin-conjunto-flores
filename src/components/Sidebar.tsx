@@ -82,7 +82,7 @@ export default function Sidebar({ activeTab, setActiveTab, onLogout, isOpen, set
                 ADMIN<span className="text-emerald-500">PRO</span>
               </h2>
               <p className="text-zinc-500 text-[9px] font-bold uppercase tracking-[0.2em] mt-1">
-                Flores del Parque
+                Parque de las Flores
               </p>
             </div>
           </div>

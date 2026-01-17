@@ -76,7 +76,7 @@ export default function EstadoCuenta({ residente, deudas, onClose }: any) {
         </div>
       </div>
 
-      <div id="print-area" className="w-full max-w-4xl bg-white p-8 md:p-12 shadow-2xl font-sans">
+      <div id="print-area" className="w-full max-w-4xl bg-white p-8 md:p-12 border border-slate-100 font-sans">
         {/* ENCABEZADO MINIMALISTA */}
         <div className="flex justify-between items-center border-b-2 border-slate-900 pb-3 mb-4">
           <div className="flex items-center gap-4">

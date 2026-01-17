@@ -49,7 +49,7 @@ export default function CuentaCobro({ residente, deudas, onClose }: any) {
         </div>
       </div>
 
-      <div id="print-doc" className="w-full max-w-4xl bg-white p-10 md:p-14 border font-sans">
+      <div id="print-doc" className="w-full max-w-4xl bg-white p-10 md:p-14 border border-slate-100 font-sans">
         {/* HEADER COMPACTO */}
         <div className="flex justify-between items-center border-b-2 border-slate-900 pb-3 mb-6">
           <div className="flex items-center gap-4">
