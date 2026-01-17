@@ -215,12 +215,6 @@ export default function App() {
                 </div>
               </div>
             </div>
-
-            {/* Botón Rápido (Opcional: Notificaciones o Acción) */}
-            <button className="relative p-2.5 text-slate-400 hover:text-slate-900 hover:bg-slate-50 rounded-xl transition-all">
-              <div className="absolute top-2.5 right-2.5 w-2 h-2 bg-rose-500 border-2 border-white rounded-full"></div>
-              <Info size={20} />
-            </button>
           </div>
         </header>
 
