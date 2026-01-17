@@ -22,7 +22,8 @@ export default function EstadoCuenta({ residente, deudas, onClose }: any) {
 
   // --- LÓGICA M1, M2, M3 CORREGIDA ---
   const calcularValorHoy = (d: any) => {
-    if (!d.causaciones_globales?.mes_causado) return d.saldo_pendiente || 0;
+    // Si es un cargo manual (sin causación global) usamos el saldo directo
+    if (!d.causaciones_globales) return d.saldo_pendiente || 0;
 
     const hoy = new Date();
     const dia = hoy.getDate();
@@ -30,23 +31,20 @@ export default function EstadoCuenta({ residente, deudas, onClose }: any) {
     const anioAct = hoy.getFullYear();
     const [yC, mC] = d.causaciones_globales.mes_causado.split("-").map(Number);
 
-    // Mapeo de columnas (Busca ambos nombres por seguridad)
-    const m1 = d.monto_1_10 || d.precio_m1 || 0;
-    const m2 = d.monto_11_20 || d.precio_m2 || m1;
-    const m3 = d.monto_21_adelante || d.precio_m3 || m1;
+    // Mapeo de precios
+    const m1 = d.precio_m1 || d.monto_original || 0;
+    const m2 = d.precio_m2 || m1;
+    const m3 = d.precio_m3 || m1;
 
     let precioAplicable = m1;
 
-    // Si la deuda es de meses pasados -> Mora (M3)
     if (anioAct > yC || (anioAct === yC && mesAct > mC)) {
       precioAplicable = m3;
     } else {
-      // Si es el mes actual -> Tramos por día
       if (dia > 10 && dia <= 20) precioAplicable = m2;
       else if (dia > 20) precioAplicable = m3;
     }
 
-    // Calcular abono previo (M1 original - Saldo en DB)
     const pagadoYa = m1 - (d.saldo_pendiente || 0);
     return Math.max(0, precioAplicable - pagadoYa);
   };
@@ -100,7 +98,7 @@ export default function EstadoCuenta({ residente, deudas, onClose }: any) {
           </div>
           <div className="text-center border-x">
             <p className="text-[8px] font-black text-slate-400 uppercase">Total Recaudado</p>
-            <p className="text-xs font-black text-emerald-600">${pagos.reduce((acc,p)=>acc+Number(p.monto_total || 0),0).toLocaleString()}</p>
+            <p className="text-xs font-black text-emerald-600">${pagos.reduce((acc, p) => acc + Number(p.monto_total || 0), 0).toLocaleString()}</p>
           </div>
           <div className="text-right">
             <p className="text-[8px] font-black text-slate-400 uppercase">Saldo Hoy (Tramos)</p>
@@ -111,7 +109,7 @@ export default function EstadoCuenta({ residente, deudas, onClose }: any) {
         {/* TABLAS */}
         <div className="space-y-8">
           <section>
-            <h3 className="text-[9px] font-black uppercase mb-2 flex items-center gap-2"><Wallet size={10}/> Deudas Pendientes</h3>
+            <h3 className="text-[9px] font-black uppercase mb-2 flex items-center gap-2"><Wallet size={10} /> Deudas Pendientes</h3>
             <table className="w-full text-[10px] text-left">
               <thead className="border-b font-black uppercase text-slate-400">
                 <tr><th className="py-2">Periodo</th><th>Concepto</th><th className="text-right">Valor Hoy</th></tr>
@@ -129,7 +127,7 @@ export default function EstadoCuenta({ residente, deudas, onClose }: any) {
           </section>
 
           <section>
-            <h3 className="text-[9px] font-black uppercase mb-2 flex items-center gap-2"><History size={10}/> Historial de Pagos</h3>
+            <h3 className="text-[9px] font-black uppercase mb-2 flex items-center gap-2"><History size={10} /> Historial de Pagos</h3>
             <table className="w-full text-[10px] text-left border">
               <thead className="bg-slate-50 border-b font-black uppercase text-slate-400">
                 <tr><th className="p-2">Recibo</th><th>Fecha</th><th>Medio</th><th className="p-2 text-right">Monto</th></tr>

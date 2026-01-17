@@ -1,11 +1,11 @@
 "use client";
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
-import { 
-  Search, Users, Printer, FileText, 
-  Loader2, X, CheckCircle2, TrendingUp, 
+import {
+  Search, Users, Printer, FileText,
+  Loader2, X, CheckCircle2, TrendingUp,
   ArrowUpRight, LayoutGrid, Building2, User,
-  Mail, Phone
+  Mail, Phone, Plus
 } from "lucide-react";
 
 // Documentos
@@ -19,9 +19,17 @@ export default function Deudores() {
   const [busqueda, setBusqueda] = useState("");
   const [filtroTorre, setFiltroTorre] = useState("TODAS");
   const [orden, setOrden] = useState("mayor");
-  
-  const [residenteDetalle, setResidenteDetalle] = useState<any>(null); 
+
+  const [residenteDetalle, setResidenteDetalle] = useState<any>(null);
   const [cobroResidente, setCobroResidente] = useState<any>(null);
+
+  const [showManualModal, setShowManualModal] = useState(false);
+  const [formManual, setFormManual] = useState({
+    residente_id: "",
+    concepto: "",
+    mes: new Date().toISOString().split('-').slice(0, 2).join('-'), // "2024-05"
+    valor: ""
+  });
 
   useEffect(() => { cargarInformacion(); }, []);
 
@@ -35,6 +43,36 @@ export default function Deudores() {
 
     if (resData) setResidentes(resData);
     if (deudasData) setDeudas(deudasData);
+    setLoading(false);
+  }
+
+  // --- FUNCIÓN PARA GUARDAR CARGO ---
+  async function guardarCargoManual(e: React.FormEvent) {
+    e.preventDefault();
+    if (!formManual.residente_id || !formManual.valor) return alert("Faltan datos");
+
+    setLoading(true);
+    const monto = parseFloat(formManual.valor);
+
+    const { error } = await supabase.from("deudas_residentes").insert([{
+      residente_id: formManual.residente_id,
+      concepto_nombre: formManual.concepto.toUpperCase(),
+      monto_original: monto,
+      saldo_pendiente: monto,
+      precio_m1: monto, // En cargos manuales solemos dejar el mismo precio en los 3 tramos
+      precio_m2: monto,
+      precio_m3: monto,
+      // Nota: No enviamos causacion_id porque es manual
+    }]);
+
+    if (!error) {
+      alert("Cargo asignado correctamente");
+      setShowManualModal(false);
+      setFormManual({ residente_id: "", concepto: "", mes: "", valor: "" });
+      cargarInformacion(); // Recargar lista
+    } else {
+      alert("Error: " + error.message);
+    }
     setLoading(false);
   }
 
@@ -68,8 +106,8 @@ export default function Deudores() {
     const coincideTorre = filtroTorre === "TODAS" || r.torre === filtroTorre;
     if (!term) return coincideTorre;
     if (term.includes("-")) {
-        const [t, a] = term.split("-");
-        return r.torre.includes(t) && r.apartamento.startsWith(a) && coincideTorre;
+      const [t, a] = term.split("-");
+      return r.torre.includes(t) && r.apartamento.startsWith(a) && coincideTorre;
     }
     return (r.nombre.toLowerCase().includes(term) || r.apartamento.includes(term)) && coincideTorre;
   }).sort((a, b) => orden === "mayor" ? b.saldoReal - a.saldoReal : a.saldoReal - b.saldoReal);
@@ -78,101 +116,107 @@ export default function Deudores() {
 
   return (
     <div className="max-w-6xl mx-auto space-y-6 pb-20 px-2 md:px-0 font-sans text-slate-800">
-      
+
       {/* 1. KPIS SIMPLES Y ELEGANTES */}
       <div className="grid grid-cols-2 md:grid-cols-3 gap-4 md:gap-6">
         <div className="bg-slate-900 p-6 rounded-xl text-white">
-           <p className="text-[10px] font-black uppercase text-slate-400 tracking-wider mb-2">Total en Calle</p>
-           <h3 className="text-2xl md:text-3xl font-black tabular-nums text-emerald-400">
-             ${lista.reduce((acc, r) => acc + r.saldoReal, 0).toLocaleString('es-CO')}
-           </h3>
+          <p className="text-[10px] font-black uppercase text-slate-400 tracking-wider mb-2">Total en Calle</p>
+          <h3 className="text-2xl md:text-3xl font-black tabular-nums text-emerald-400">
+            ${lista.reduce((acc, r) => acc + r.saldoReal, 0).toLocaleString('es-CO')}
+          </h3>
         </div>
         <div className="bg-white p-6 rounded-xl border border-slate-200">
-           <p className="text-[10px] font-black uppercase text-slate-400 tracking-wider mb-2 text-center md:text-left">Unidades con Mora</p>
-           <h3 className="text-2xl md:text-3xl font-black text-rose-500 text-center md:text-left">
-             {lista.filter(r => r.saldoReal > 0).length}
-           </h3>
+          <p className="text-[10px] font-black uppercase text-slate-400 tracking-wider mb-2 text-center md:text-left">Unidades con Mora</p>
+          <h3 className="text-2xl md:text-3xl font-black text-rose-500 text-center md:text-left">
+            {lista.filter(r => r.saldoReal > 0).length}
+          </h3>
         </div>
         <div className="hidden md:flex bg-white p-6 rounded-xl border border-slate-200 items-center justify-between">
-           <div>
-              <p className="text-[10px] font-black uppercase text-slate-400 tracking-wider mb-2">Paz y Salvo</p>
-              <h3 className="text-3xl font-black text-emerald-600">
-                {lista.filter(r => r.saldoReal === 0).length}
-              </h3>
-           </div>
-           <CheckCircle2 className="text-emerald-100" size={36} />
+          <div>
+            <p className="text-[10px] font-black uppercase text-slate-400 tracking-wider mb-2">Paz y Salvo</p>
+            <h3 className="text-3xl font-black text-emerald-600">
+              {lista.filter(r => r.saldoReal === 0).length}
+            </h3>
+          </div>
+          <CheckCircle2 className="text-emerald-100" size={36} />
         </div>
       </div>
 
       {/* 2. BARRA DE HERRAMIENTAS MÓVIL-OPTIMIZADA */}
       <div className="bg-white p-2 rounded-2xl border border-slate-200 shadow-sm flex flex-col md:flex-row gap-2">
         <div className="relative flex-1 group">
-           <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
-           <input 
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
+          <input
             placeholder="Buscar por apto o nombre..."
             className="w-full bg-transparent pl-11 pr-4 py-4 font-bold text-slate-700 outline-none placeholder:text-slate-300"
             onChange={(e) => setBusqueda(e.target.value)}
-           />
+          />
         </div>
-        
+
         <div className="flex gap-2 p-1 overflow-x-auto no-scrollbar md:bg-slate-50 md:rounded-xl">
-           {["TODAS", "1", "5", "6", "7", "8"].map(t => (
-             <button 
-                key={t}
-                onClick={() => setFiltroTorre(t === "TODAS" ? "TODAS" : `Torre ${t}`)}
-                className={`px-5 py-2.5 rounded-lg text-[9px] font-black transition-all ${
-                  (filtroTorre === "TODAS" && t === "TODAS") || filtroTorre === `Torre ${t}` 
-                    ? "bg-slate-900 text-white" 
-                    : "text-slate-400"
+          {["TODAS", "1", "5", "6", "7", "8"].map(t => (
+            <button
+              key={t}
+              onClick={() => setFiltroTorre(t === "TODAS" ? "TODAS" : `Torre ${t}`)}
+              className={`px-5 py-2.5 rounded-lg text-[9px] font-black transition-all ${(filtroTorre === "TODAS" && t === "TODAS") || filtroTorre === `Torre ${t}`
+                ? "bg-slate-900 text-white"
+                : "text-slate-400"
                 }`}
-             >
-               {t === "TODAS" ? "VER TODAS" : `T${t}`}
-             </button>
-           ))}
+            >
+              {t === "TODAS" ? "VER TODAS" : `T${t}`}
+            </button>
+          ))}
         </div>
+
+        <button
+          onClick={() => setShowManualModal(true)}
+          className="bg-emerald-600 text-white px-6 py-4 rounded-xl font-bold text-[10px] uppercase tracking-widest hover:bg-emerald-700 transition-all shadow-lg active:scale-95 flex items-center gap-2"
+        >
+          <Plus size={14} /> Cargo Manual
+        </button>
       </div>
 
       {/* 3. LISTADO EJECUTIVO */}
       <div className="space-y-2 md:space-y-3">
         {lista.map(res => (
           <div key={res.id} className="bg-white border border-slate-100 p-4 md:p-6 rounded-xl md:rounded-2xl flex flex-col md:flex-row md:items-center justify-between transition-all hover:bg-slate-50">
-            
+
             <div className="flex items-center gap-5 md:w-1/3 mb-4 md:mb-0">
               <div className={`w-14 h-12 rounded-lg flex flex-col items-center justify-center font-black ${res.saldoReal > 0 ? "bg-rose-50 text-rose-600 border border-rose-100" : "bg-emerald-50 text-emerald-600 border border-emerald-100"}`}>
-                 <span className="text-[7px] uppercase font-bold mb-0.5">UNIDAD</span>
-                 <span className="text-sm">T{res.torre.replace("Torre ","")}-{res.apartamento}</span>
+                <span className="text-[7px] uppercase font-bold mb-0.5">UNIDAD</span>
+                <span className="text-sm">T{res.torre.replace("Torre ", "")}-{res.apartamento}</span>
               </div>
               <div className="min-w-0">
                 <h4 className="text-slate-800 font-bold text-sm uppercase truncate max-w-[150px]">{res.nombre}</h4>
                 <div className="flex items-center gap-2 mt-1">
-                   <div className={`w-1.5 h-1.5 rounded-full ${res.saldoReal > 0 ? "bg-rose-500 animate-pulse" : "bg-emerald-500"}`}></div>
-                   <p className="text-[9px] font-black uppercase text-slate-400 tracking-wider">
-                     {res.saldoReal > 0 ? "Tiene Pendientes" : "Al día"}
-                   </p>
+                  <div className={`w-1.5 h-1.5 rounded-full ${res.saldoReal > 0 ? "bg-rose-500 animate-pulse" : "bg-emerald-500"}`}></div>
+                  <p className="text-[9px] font-black uppercase text-slate-400 tracking-wider">
+                    {res.saldoReal > 0 ? "Tiene Pendientes" : "Al día"}
+                  </p>
                 </div>
               </div>
             </div>
 
             <div className="text-right flex items-center md:flex-col justify-between md:justify-center border-t md:border-t-0 md:border-x border-slate-100 pt-3 md:pt-0 md:px-10 mb-4 md:mb-0">
-               <p className="text-[9px] font-black text-slate-400 uppercase md:mb-1 tracking-widest">Saldo Real Hoy</p>
-               <span className={`text-xl md:text-2xl font-black tabular-nums tracking-tighter ${res.saldoReal > 0 ? "text-rose-600" : "text-slate-200"}`}>
-                 ${res.saldoReal.toLocaleString('es-CO')}
-               </span>
+              <p className="text-[9px] font-black text-slate-400 uppercase md:mb-1 tracking-widest">Saldo Real Hoy</p>
+              <span className={`text-xl md:text-2xl font-black tabular-nums tracking-tighter ${res.saldoReal > 0 ? "text-rose-600" : "text-slate-200"}`}>
+                ${res.saldoReal.toLocaleString('es-CO')}
+              </span>
             </div>
 
             <div className="flex gap-2">
-               <button 
-                 onClick={() => setResidenteDetalle(res)}
-                 className="flex-1 md:flex-none px-6 py-3 border border-slate-200 text-slate-600 rounded-lg text-[9px] font-black uppercase tracking-widest hover:bg-white hover:text-emerald-600 hover:border-emerald-200 transition-all active:scale-95"
-               >
-                 Estado Cuenta
-               </button>
-               <button 
-                 onClick={() => setCobroResidente(res)}
-                 className={`flex-1 md:flex-none px-6 py-3 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all active:scale-95 ${res.saldoReal > 0 ? "bg-slate-900 text-white" : "bg-slate-50 text-slate-300 pointer-events-none"}`}
-               >
-                 Cuenta Cobro
-               </button>
+              <button
+                onClick={() => setResidenteDetalle(res)}
+                className="flex-1 md:flex-none px-6 py-3 border border-slate-200 text-slate-600 rounded-lg text-[9px] font-black uppercase tracking-widest hover:bg-white hover:text-emerald-600 hover:border-emerald-200 transition-all active:scale-95"
+              >
+                Estado Cuenta
+              </button>
+              <button
+                onClick={() => setCobroResidente(res)}
+                className={`flex-1 md:flex-none px-6 py-3 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all active:scale-95 ${res.saldoReal > 0 ? "bg-slate-900 text-white" : "bg-slate-50 text-slate-300 pointer-events-none"}`}
+              >
+                Cuenta Cobro
+              </button>
             </div>
 
           </div>
@@ -185,6 +229,71 @@ export default function Deudores() {
       )}
       {cobroResidente && (
         <CuentaCobro residente={cobroResidente} deudas={deudas.filter(d => d.residente_id === cobroResidente.id)} onClose={() => setCobroResidente(null)} />
+      )}
+      {showManualModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[500] flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden border">
+            <form onSubmit={guardarCargoManual} className="p-8 space-y-4">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="font-black text-slate-900 uppercase text-sm tracking-tighter">Asignar Cargo Extraordinario</h3>
+                <button type="button" onClick={() => setShowManualModal(false)}><X size={20} /></button>
+              </div>
+
+              <div>
+                <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Seleccionar Residente</label>
+                <select
+                  className="w-full bg-slate-50 border p-4 rounded-xl font-bold text-sm outline-none appearance-none"
+                  value={formManual.residente_id}
+                  onChange={(e) => setFormManual({ ...formManual, residente_id: e.target.value })}
+                  required
+                >
+                  <option value="">Elegir unidad...</option>
+                  {residentes.map(r => (
+                    <option key={r.id} value={r.id}>T{r.torre.slice(-1)}-{r.apartamento} | {r.nombre}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Concepto del Cobro</label>
+                <input
+                  className="w-full bg-slate-50 border p-4 rounded-xl font-bold outline-none"
+                  placeholder="EJ: MULTA POR RUIDO / TAG ACCESO"
+                  value={formManual.concepto}
+                  onChange={(e) => setFormManual({ ...formManual, concepto: e.target.value })}
+                  required
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Mes de Referencia</label>
+                  <input
+                    type="month"
+                    className="w-full bg-slate-50 border p-4 rounded-xl font-bold text-sm outline-none"
+                    value={formManual.mes}
+                    onChange={(e) => setFormManual({ ...formManual, mes: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Valor a Cobrar</label>
+                  <input
+                    type="number"
+                    className="w-full bg-emerald-50 border-emerald-100 p-4 rounded-xl font-black text-emerald-600 outline-none"
+                    placeholder="0.00"
+                    value={formManual.valor}
+                    onChange={(e) => setFormManual({ ...formManual, valor: e.target.value })}
+                    required
+                  />
+                </div>
+              </div>
+
+              <button type="submit" className="w-full bg-slate-900 text-white font-black py-4 rounded-xl uppercase tracking-widest text-[10px] mt-4">
+                Confirmar y Cargar a Cuenta
+              </button>
+            </form>
+          </div>
+        </div>
       )}
     </div>
   );

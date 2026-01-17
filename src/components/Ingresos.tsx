@@ -71,6 +71,7 @@ export default function Ingresos() {
 
   // --- LÓGICA DE SALDO REAL DINÁMICO (Tramo Fecha - Abonos Anteriores) ---
   const calcularSaldoRealHoy = (deuda: any) => {
+    // Si NO tiene causación global, es un valor fijo (el saldo pendiente actual)
     if (!deuda.causaciones_globales) return deuda.saldo_pendiente || 0;
     const hoy = new Date();
     const dia = hoy.getDate();
@@ -104,12 +105,22 @@ export default function Ingresos() {
       const conceptoTextoParaDB = deudas
         .filter(d => Number(abonos[d.id]) > 0)
         .map(d => {
-          const [anio, mes] = d.causaciones_globales.mes_causado.split("-");
-          const mesNombre = mesesNombres[parseInt(mes) - 1];
-          // Aquí formateamos el precio individual
           const montoInd = Number(abonos[d.id]).toLocaleString('es-CO');
-          const nombreC = d.causaciones_globales?.concepto_nombre || "ADMINISTRACIÓN";
-          return `${nombreC} (${mesNombre} ${anio})|$${montoInd}`;
+
+          // Si tiene mes causado (Causación Global)
+          if (d.causaciones_globales?.mes_causado) {
+            const [anio, mes] = d.causaciones_globales.mes_causado.split("-");
+            const mesesNombres = ["ENERO", "FEBRERO", "MARZO", "ABRIL", "MAYO", "JUNIO", "JULIO", "AGOSTO", "SEPTIEMBRE", "OCTUBRE", "NOVIEMBRE", "DICIEMBRE"];
+            const mesNombre = mesesNombres[parseInt(mes) - 1];
+            const nombreC = d.causaciones_globales?.concepto_nombre || "ADMINISTRACIÓN";
+            return `${nombreC} (${mesNombre} ${anio})|$${montoInd}`;
+          }
+
+          // Si es un cargo manual
+          else {
+            const nombreC = d.concepto_nombre || "CARGO MANUAL";
+            return `${nombreC} (PAGO ÚNICO)|$${montoInd}`;
+          }
         })
         .join("||");
 
@@ -220,10 +231,13 @@ export default function Ingresos() {
                           <td className="p-6"><p className="text-slate-800 font-black text-sm">{d.causaciones_globales?.concepto_nombre}</p><p className="text-[10px] text-slate-400 font-bold">{d.causaciones_globales.mes_causado}</p></td>
                           <td className="p-6 text-right"><span className="text-slate-900 font-black tabular-nums">${sHoy.toLocaleString()}</span></td>
                           <td className="p-6">
-                            <div className="relative w-40 mx-auto">
-                              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-emerald-500 font-black">$</span>
-                              <input type="number" className="w-full bg-white border border-slate-200 p-3 pl-8 rounded-xl text-right font-black outline-none focus:border-emerald-500 shadow-sm" value={abonos[d.id] || ""} onChange={(e) => setAbonos({ ...abonos, [d.id]: e.target.value })} />
-                            </div>
+                            <p className="text-slate-800 font-black text-sm">
+                              {/* Si tiene causación global usa ese nombre, si no, usa el nombre manual */}
+                              {d.causaciones_globales?.concepto_nombre || d.concepto_nombre}
+                            </p>
+                            <p className="text-[10px] text-slate-400 font-bold">
+                              {d.causaciones_globales?.mes_causado || "CARGO EXTRAORDINARIO"}
+                            </p>
                           </td>
                         </tr>
                       )
@@ -237,7 +251,14 @@ export default function Ingresos() {
                 {deudas.map(d => (
                   <div key={d.id} className="p-5 flex flex-col gap-4">
                     <div className="flex justify-between items-start">
-                      <div><p className="font-black text-slate-900 text-xs uppercase">{d.causaciones_globales?.concepto_nombre}</p><p className="text-[10px] font-bold text-slate-400">{d.causaciones_globales.mes_causado}</p></div>
+                      <div>
+                        <p className="font-black text-slate-900 text-xs uppercase">
+                          {d.causaciones_globales?.concepto_nombre || d.concepto_nombre}
+                        </p>
+                        <p className="text-[10px] font-bold text-slate-400">
+                          {d.causaciones_globales?.mes_causado || "CARGO EXTRAORDINARIO"}
+                        </p>
+                      </div>
                       <p className="text-right font-black text-slate-700">${calcularSaldoRealHoy(d).toLocaleString()}</p>
                     </div>
                     <div className="relative">
