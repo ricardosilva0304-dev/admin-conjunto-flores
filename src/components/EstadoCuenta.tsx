@@ -50,41 +50,38 @@ export default function EstadoCuenta({ residente, deudas, onClose }: any) {
 
       <div id="print-area" className="w-full max-w-5xl bg-white p-12 md:p-20 border font-sans shadow-2xl print:shadow-none print:border-0">
 
-        {/* Header */}
-        <div className="flex justify-between items-end border-b-4 border-slate-900 pb-10 mb-12">
-          <div className="space-y-4">
-            <img src="/logo.png" alt="Logo" className="w-48" />
+        {/* Fila 1: Logo e Identificación de Unidad */}
+        <div className="flex justify-between items-center border-b-2 border-slate-900 pb-3 mb-4">
+          <div className="flex items-center gap-4">
+            <img src="/logo.png" alt="Logo" className="w-24 h-auto" />
             <div>
-              <h1 className="text-2xl font-black uppercase text-slate-900">Estado de Cuenta</h1>
-              <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Resumen General de Obligaciones y Pagos</p>
+              <h1 className="text-sm font-black uppercase tracking-tighter">Estado de Cuenta Detallado</h1>
+              <p className="text-[9px] font-bold text-slate-400 uppercase">Agrupación Res. Parque de las Flores</p>
             </div>
           </div>
           <div className="text-right">
-            <h2 className="text-4xl font-black text-slate-900">T{residente.torre.slice(-1)}-{residente.apartamento}</h2>
-            <p className="text-[10px] font-bold text-slate-400 uppercase mt-2">Corte: {new Date().toLocaleDateString('es-CO')}</p>
+            <h2 className="text-2xl font-black italic tabular-nums leading-none">T{residente.torre.slice(-1)}-{residente.apartamento}</h2>
+            <p className="text-[8px] font-black text-slate-400 uppercase">Corte: {new Date().toLocaleDateString('es-CO')}</p>
           </div>
         </div>
 
-        {/* Grid de Resumen */}
-        <div className="grid grid-cols-2 gap-10 mb-16">
-          <div className="p-8 bg-slate-50 rounded-2xl border border-slate-100">
-            <p className="text-[10px] font-black text-slate-400 uppercase mb-2">Titular de la Unidad:</p>
-            <p className="text-xl font-black uppercase">{residente.nombre}</p>
-            <p className="text-xs font-bold text-emerald-600 mt-1">{residente.email || 'Sin registro de correo'}</p>
+        {/* Fila 2: Barra de Datos (Nombre, Pagado, Pendiente) */}
+        <div className="grid grid-cols-3 gap-2 border-b border-slate-100 pb-3 mb-6 bg-slate-50/50 p-2 rounded-lg">
+          <div className="pl-2">
+            <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Propietario / Residente</p>
+            <p className="text-xs font-black uppercase truncate">{residente.nombre}</p>
           </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="p-6 border rounded-2xl text-center">
-              <p className="text-[8px] font-black text-slate-400 uppercase mb-1">Total Pagado</p>
-              <p className="text-lg font-black text-emerald-600">
-                ${pagos.reduce((acc: number, p: any) => acc + Number(p.monto_total || 0), 0).toLocaleString()}
-              </p>
-            </div>
-            <div className="p-6 border rounded-2xl bg-rose-50 border-rose-100 text-center">
-              <p className="text-[8px] font-black text-rose-400 uppercase mb-1">Saldo Pendiente</p>
-              <p className="text-lg font-black text-rose-600">
-                ${deudas.reduce((acc: number, d: any) => acc + Number(d.saldo_pendiente || 0), 0).toLocaleString()}
-              </p>
-            </div>
+          <div className="text-center border-x border-slate-200">
+            <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Total Recaudado</p>
+            <p className="text-xs font-black text-emerald-600">
+              ${pagos.reduce((acc: number, p: any) => acc + Number(p.monto_total || 0), 0).toLocaleString()}
+            </p>
+          </div>
+          <div className="text-right pr-2">
+            <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Saldo Pendiente</p>
+            <p className="text-xs font-black text-rose-600">
+              ${deudas.reduce((acc: number, d: any) => acc + Number(d.saldo_pendiente || 0), 0).toLocaleString()}
+            </p>
           </div>
         </div>
 

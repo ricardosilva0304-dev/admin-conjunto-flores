@@ -58,34 +58,32 @@ export default function CuentaCobro({ residente, deudas, onClose }: any) {
       </div>
 
       {/* Documento */}
-      <div id="print-area" className="w-full max-w-4xl bg-white p-10 md:p-16 border shadow-2xl font-sans text-slate-800">
+      <div id="print-document" className="w-full max-w-4xl bg-white p-8 md:p-12 font-sans text-slate-800">
 
-        {/* Cabezote */}
-        <div className="flex justify-between items-start border-b-2 border-slate-900 pb-8 mb-8">
-          <div>
-            <img src="/logo.png" alt="Logo" className="w-40 mb-4" />
-            <h2 className="text-lg font-black uppercase">Agrupación Res. Parque de las Flores</h2>
-            <p className="text-[10px] font-bold text-slate-500">NIT. 832.011.421-3 • Soacha, Cundinamarca</p>
+        <div className="flex justify-between items-start border-b-2 border-slate-900 pb-4 mb-4">
+          <div className="flex gap-4 items-center">
+            <img src="/logo.png" alt="Logo" className="w-24" />
+            <div>
+              <h2 className="text-xs font-black uppercase">Cuenta de Cobro Mensual</h2>
+              <p className="text-[9px] font-bold text-slate-400">NIT. 832.011.421-3</p>
+            </div>
           </div>
           <div className="text-right">
-            <div className="bg-slate-900 text-white p-4 rounded-lg mb-2">
-              <p className="text-[9px] font-bold uppercase tracking-widest opacity-60">Cuenta de Cobro</p>
-              <p className="text-xl font-black italic">No. {residente.apartamento}-{new Date().getMonth() + 1}</p>
+            <div className="bg-slate-900 text-white px-3 py-1 rounded mb-1 inline-block">
+              <p className="text-sm font-black italic">Ref: {residente.apartamento}-{new Date().getMonth() + 1}</p>
             </div>
-            <p className="text-[10px] font-bold">Fecha: {new Date().toLocaleDateString('es-CO')}</p>
+            <p className="text-[8px] font-bold text-slate-400 uppercase">Emisión: {new Date().toLocaleDateString('es-CO')}</p>
           </div>
         </div>
 
-        {/* Info Cliente */}
-        <div className="grid grid-cols-2 gap-8 mb-10 p-6 bg-slate-50 rounded-xl border border-slate-100">
-          <div>
-            <p className="text-[9px] font-black text-slate-400 uppercase mb-1">Obligado al pago:</p>
-            <p className="text-lg font-black uppercase">{residente.nombre}</p>
-            <p className="text-sm font-bold text-slate-600">Unidad: {residente.torre} - Apto {residente.apartamento}</p>
+        {/* Línea de Información del Residente (Minimalista) */}
+        <div className="flex justify-between items-center mb-6 py-2 px-4 border border-slate-100 rounded-md bg-slate-50/30">
+          <div className="flex gap-4">
+            <span className="text-[9px] font-black text-slate-400 uppercase">Unidad: <span className="text-slate-900 ml-1">T{residente.torre.slice(-1)}-{residente.apartamento}</span></span>
+            <span className="text-[9px] font-black text-slate-400 uppercase">Señor(a): <span className="text-slate-900 ml-1">{residente.nombre}</span></span>
           </div>
-          <div className="text-right">
-            <p className="text-[9px] font-black text-slate-400 uppercase mb-1">Estado:</p>
-            <p className="text-rose-600 font-black text-lg uppercase">Pendiente de Pago</p>
+          <div className="text-[9px] font-black text-slate-400 uppercase">
+            Destino: <span className="text-slate-900 ml-1">SOACHA, CUNDINAMARCA</span>
           </div>
         </div>
 
