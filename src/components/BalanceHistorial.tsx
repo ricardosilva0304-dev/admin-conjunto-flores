@@ -16,45 +16,45 @@ export default function BalanceHistorial() {
     if (!periodo) return;
     setLoading(true);
 
-    // Obtener primer y último día de forma segura para cualquier mes (Feb, Abr, etc)
     const [anio, mesNum] = periodo.split("-").map(Number);
     const primerDia = `${periodo}-01`;
-    const ultimoDiaDate = new Date(anio, mesNum, 0); // El día 0 del mes siguiente es el último del actual
-    const ultimoDia = `${periodo}-${ultimoDiaDate.getDate().toString().padStart(2, '0')}`;
+    const ultimoDia = `${periodo}-${new Date(anio, mesNum, 0).getDate().toString().padStart(2, '0')}`;
 
     try {
       const [causado, recaudado, egresos] = await Promise.all([
-        // Corregido el filtro de relación con !inner
-        supabase.from("deudas_residentes")
-          .select("monto_original, causaciones_globales!inner(mes_causado)")
-          .eq("causaciones_globales.mes_causado", periodo),
-
-        supabase.from("pagos")
-          .select("monto_total, metodo_pago")
-          .gte("fecha_pago", primerDia)
-          .lte("fecha_pago", ultimoDia),
-
-        supabase.from("egresos")
-          .select("monto")
-          .gte("fecha", primerDia)
-          .lte("fecha", ultimoDia)
+        supabase.from("deudas_residentes").select("monto_original, causaciones_globales!inner(mes_causado)").eq("causaciones_globales.mes_causado", periodo),
+        supabase.from("pagos").select("monto_total, metodo_pago").gte("fecha_pago", primerDia).lte("fecha_pago", ultimoDia),
+        supabase.from("egresos").select("monto").gte("fecha", primerDia).lte("fecha", ultimoDia)
       ]);
 
-      const sumaEsperado = causado.data?.reduce((acc, d) => acc + Number(d.monto_original), 0) || 0;
-      const sumaRecaudado = recaudado.data?.reduce((acc, p) => acc + Number(p.monto_total), 0) || 0;
-      const sumaGastos = egresos.data?.reduce((acc, e) => acc + Number(e.monto), 0) || 0;
+      const sumaEsperado = causado.data?.reduce((acc, d) => acc + Number(d.monto_original || 0), 0) || 0;
+
+      // Simplificamos el proceso de pagos
+      let sumaRecaudado = 0;
+      let banco = 0;
+      let efectivo = 0;
+
+      recaudado.data?.forEach(p => {
+        const monto = Number(p.monto_total || 0);
+        sumaRecaudado += monto;
+        if (p.metodo_pago === 'Transferencia') banco += monto;
+        if (p.metodo_pago === 'Efectivo') efectivo += monto;
+      });
+
+      const sumaGastos = egresos.data?.reduce((acc, e) => acc + Number(e.monto || 0), 0) || 0;
 
       setResumen({
         esperado: sumaEsperado,
         recaudado: sumaRecaudado,
         gastos: sumaGastos,
         excedente: sumaRecaudado - sumaGastos,
-        banco: recaudado.data?.filter(p => p.metodo_pago === 'Transferencia').reduce((acc, p) => acc + Number(p.monto_total), 0) || 0,
-        efectivo: recaudado.data?.filter(p => p.metodo_pago === 'Efectivo').reduce((acc, p) => acc + Number(p.monto_total), 0) || 0,
+        banco,
+        efectivo,
         efectividad: sumaEsperado > 0 ? (sumaRecaudado / sumaEsperado) * 100 : 100
       });
     } catch (error) {
       console.error("Error en balance:", error);
+      alert("Hubo un error al auditar el mes.");
     } finally {
       setLoading(false);
     }

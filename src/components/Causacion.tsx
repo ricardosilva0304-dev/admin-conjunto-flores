@@ -95,26 +95,20 @@ export default function Causacion() {
 
       if (errLote) throw errLote;
 
-      // 2. Mapear residentes a deudas con LOGS de depuración
+      // 2. Mapear residentes a deudas
       const deudas = residentesAfectados.map(res => {
         let factor = 1;
-
-        // Forzamos el nombre a mayúsculas para evitar errores de escritura
         const nombreConcepto = concepto.nombre.toUpperCase();
 
-        // SOLO si el concepto está configurado como VARIABLE (cobro_por_vehiculo === true)
-        if (concepto.cobro_por_vehiculo === true) {
-          if (nombreConcepto.includes("CARRO")) {
-            factor = Number(res.carros) || 0;
-          } else if (nombreConcepto.includes("MOTO")) {
-            factor = Number(res.motos) || 0;
-          } else if (nombreConcepto.includes("BICI")) {
-            factor = Number(res.bicis) || 0;
-          }
+        if (concepto.cobro_por_vehiculo) {
+          if (nombreConcepto.includes("CARRO")) factor = Number(res.carros) || 0;
+          else if (nombreConcepto.includes("MOTO")) factor = Number(res.motos) || 0;
+          else if (nombreConcepto.includes("BICI")) factor = Number(res.bicis) || 0;
+          else factor = 1;
         }
 
-        // --- LOG PARA DEPURACIÓN (Míralo en la consola F12) ---
-        console.log(`Unidad: ${res.apartamento} | Concepto: ${nombreConcepto} | Cantidad Vehículos: ${factor}`);
+        // Si el factor es 0 (ej: no tiene carro), devolvemos null para filtrar después
+        if (factor === 0) return null;
 
         const montoBase = (Number(concepto.monto_1_10) || 0) * factor;
 
@@ -130,7 +124,7 @@ export default function Causacion() {
           saldo_pendiente: montoBase,
           fecha_vencimiento: fechaLimite
         };
-      }).filter(d => d.monto_original > 0);
+      }).filter(d => d !== null && d.monto_original > 0); // Filtramos nulos y ceros
 
       if (deudas.length > 0) {
         const { error: errIns } = await supabase.from("deudas_residentes").insert(deudas);

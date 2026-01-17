@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
+import dynamic from 'next/dynamic';
 
 // --- IMPORTACIÓN DE COMPONENTES ---
 import Sidebar from "@/components/Sidebar";
@@ -154,65 +155,91 @@ export default function App() {
 
       <main className="flex-1 overflow-y-auto relative scroll-smooth flex flex-col">
 
-        <header className="sticky top-0 bg-[#020203] border-b border-white/[0.08] px-4 md:px-10 py-4 z-50 flex justify-between items-center">
-          {/* El resto del contenido del header se mantiene igual */}
-          {/* SECCIÓN IZQUIERDA: IDENTIDAD... */}
+        <header className="sticky top-0 bg-white/80 backdrop-blur-md border-b border-slate-100 px-4 md:px-10 py-4 z-50 flex justify-between items-center transition-all">
+
+          {/* SECCIÓN IZQUIERDA: IDENTIDAD Y CONTEXTO */}
           <div className="flex items-center gap-6">
-            <button onClick={() => setIsSidebarOpen(true)} className="md:hidden relative p-3 bg-zinc-900/50 text-white rounded-lg border border-white/10 active:scale-95 transition-all">
-              <Menu size={18} strokeWidth={2.5} />
+            {/* Botón Menú Móvil (Solo visible en móviles) */}
+            <button
+              onClick={() => setIsSidebarOpen(true)}
+              className="md:hidden p-2.5 bg-slate-50 text-slate-600 rounded-xl hover:bg-slate-100 active:scale-95 transition-all"
+            >
+              <Menu size={20} strokeWidth={2.5} />
             </button>
 
-            <div className="hidden sm:flex relative group">
-              <div className="absolute -inset-1 bg-emerald-500/20 rounded-xl blur-md opacity-0 group-hover:opacity-100 transition duration-500"></div>
-              <div className="relative w-12 h-12 bg-black border border-white/10 rounded-xl flex items-center justify-center text-emerald-500 transition-transform hover:-rotate-3">
+            <div className="flex items-center gap-4">
+              {/* Icono de la Sección Actual */}
+              <div className="hidden sm:flex w-11 h-11 bg-emerald-50 text-emerald-600 rounded-2xl items-center justify-center shadow-sm shadow-emerald-500/10">
                 {currentMeta.icon}
-                <div className="absolute -top-1 -right-1 w-2 h-2 bg-emerald-500 rounded-full border-2 border-black"></div>
               </div>
-            </div>
 
-            <div className="flex flex-col">
-              <h1 className="text-white text-lg md:text-xl font-black tracking-tight uppercase leading-tight">
-                {currentMeta.label}
-              </h1>
-              <div className="flex items-center gap-2 mt-1">
-                <div className="flex items-center gap-2 bg-zinc-900/80 px-2.5 py-0.5 rounded-full border border-white/5">
-                  <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.8)]"></div>
-                  <span className="text-zinc-400 text-[9px] font-black uppercase tracking-widest leading-none">
-                    {adminName || 'Root User'}
-                  </span>
-                </div>
+              <div className="flex flex-col">
+                {/* Breadcrumb pequeño */}
+                <span className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] leading-none mb-1">
+                  Plataforma de Gestión
+                </span>
+                {/* Título Dinámico */}
+                <h1 className="text-slate-900 text-lg md:text-xl font-black tracking-tight flex items-center gap-2">
+                  {currentMeta.label}
+                  <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></div>
+                </h1>
               </div>
             </div>
           </div>
 
-          {/* SECCIÓN DERECHA... */}
-          <div className="flex items-center gap-8">
-            <div className="hidden lg:block w-[1px] h-10 bg-gradient-to-b from-transparent via-white/10 to-transparent"></div>
-            <div className="flex flex-col items-end">
-              <div className="flex items-baseline gap-1 text-white tabular-nums">
-                <span className="text-2xl md:text-3xl font-black tracking-tighter italic">
-                  {currentTime.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', hour12: false })}
+          {/* SECCIÓN DERECHA: RELOJ Y ESTADO */}
+          <div className="flex items-center gap-4 md:gap-8">
+
+            {/* Reloj Ejecutivo */}
+            <div className="flex flex-col items-end border-r border-slate-100 pr-4 md:pr-8">
+              <div className="flex items-baseline gap-1.5 text-slate-900">
+                <span className="text-xl md:text-2xl font-black tabular-nums tracking-tighter">
+                  {currentTime.toLocaleTimeString('es-CO', {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    hour12: false
+                  })}
                 </span>
-                <span className="text-sm font-bold text-emerald-500 opacity-80">
-                  :{currentTime.getSeconds().toString().padStart(2, '0')}
-                </span>
-                <span className="ml-2 text-[10px] font-black text-zinc-500 uppercase tracking-tighter">
-                  {currentTime.getHours() >= 12 ? 'PM' : 'AM'}
+                <span className="text-xs font-bold text-emerald-500 opacity-80 tabular-nums">
+                  {currentTime.getSeconds().toString().padStart(2, '0')}
                 </span>
               </div>
-              <div className="flex items-center gap-2 mt-1">
-                <div className="px-2 py-0.5 bg-emerald-500/5 border border-emerald-500/20 rounded flex items-center gap-1.5">
-                  <Calendar size={10} className="text-emerald-500" />
-                  <span className="text-zinc-300 text-[9px] font-black uppercase tracking-wider">
-                    {currentTime.toLocaleDateString('es-CO', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' }).toUpperCase()}
-                  </span>
-                </div>
-                <div className="hidden sm:flex items-center gap-1 px-2 py-0.5 bg-zinc-900 border border-white/5 rounded text-[8px] font-bold text-zinc-500 tracking-tighter">
-                  <div className="w-1 h-1 bg-blue-500 rounded-full"></div>
-                  LIVE_SYNC
+              <div className="flex items-center gap-2 mt-0.5">
+                <div className="px-2 py-0.5 bg-slate-50 border border-slate-100 rounded text-[9px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+                  <Calendar size={10} className="text-slate-400" />
+                  {currentTime.toLocaleDateString('es-CO', {
+                    weekday: 'short',
+                    day: '2-digit',
+                    month: 'short'
+                  }).toUpperCase()}
                 </div>
               </div>
             </div>
+
+            {/* Badge de Usuario / Sesión */}
+            <div className="hidden lg:flex items-center gap-3 pl-2">
+              <div className="text-right">
+                <p className="text-[10px] font-black text-slate-900 uppercase leading-none mb-1">
+                  {adminName || 'Admin Principal'}
+                </p>
+                <div className="flex items-center justify-end gap-1.5">
+                  <div className="w-1 h-1 bg-emerald-500 rounded-full"></div>
+                  <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">
+                    Sincronizado
+                  </span>
+                </div>
+              </div>
+              {/* Avatar minimalista */}
+              <div className="w-10 h-10 rounded-2xl bg-slate-900 flex items-center justify-center text-white font-black text-xs shadow-lg shadow-slate-200">
+                {adminName?.charAt(0).toUpperCase() || 'A'}
+              </div>
+            </div>
+
+            {/* Botón Rápido (Opcional: Notificaciones o Acción) */}
+            <button className="relative p-2.5 text-slate-400 hover:text-slate-900 hover:bg-slate-50 rounded-xl transition-all">
+              <div className="absolute top-2.5 right-2.5 w-2 h-2 bg-rose-500 border-2 border-white rounded-full"></div>
+              <Info size={20} />
+            </button>
           </div>
         </header>
 
