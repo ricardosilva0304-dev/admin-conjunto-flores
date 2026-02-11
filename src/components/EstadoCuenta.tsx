@@ -66,34 +66,34 @@ export default function EstadoCuenta({ residente, deudas, onClose }: any) {
           /* Configuración de página */
           @page {
             size: letter;
-            margin: 1cm;
+            margin: 1.5cm;
           }
           
-          /* Resetear completamente el body y html */
-          html, body {
-            width: 100%;
-            height: auto;
-            margin: 0;
-            padding: 0;
-            overflow: visible;
-            background: white;
+          /* Ocultar todo el sitio web EXCEPTO el modal */
+          body > *:not(.print-modal) {
+            display: none !important;
           }
           
-          /* Ocultar el overlay de fondo */
-          body > div:first-child {
+          /* El modal debe mostrarse como contenido normal */
+          .print-modal {
+            display: block !important;
             position: static !important;
             background: white !important;
             backdrop-filter: none !important;
             padding: 0 !important;
             margin: 0 !important;
+            z-index: 1 !important;
+            width: 100% !important;
+            height: auto !important;
+            overflow: visible !important;
           }
           
-          /* Ocultar botones y controles */
+          /* Ocultar botones */
           .no-print {
             display: none !important;
           }
           
-          /* El área de impresión debe ser estática y fluir naturalmente */
+          /* El contenido principal */
           #print-area {
             position: static !important;
             width: 100% !important;
@@ -101,11 +101,19 @@ export default function EstadoCuenta({ residente, deudas, onClose }: any) {
             box-shadow: none !important;
             border: none !important;
             margin: 0 !important;
-            padding: 0 !important;
+            padding: 20px !important;
             background: white !important;
           }
           
-          /* Control de saltos de página - permitir que fluya */
+          /* Permitir múltiples páginas */
+          html, body {
+            width: 100%;
+            height: auto;
+            overflow: visible;
+            background: white;
+          }
+          
+          /* Control de saltos de página */
           table {
             page-break-inside: auto;
           }
@@ -119,25 +127,20 @@ export default function EstadoCuenta({ residente, deudas, onClose }: any) {
             page-break-after: auto;
           }
           
+          section {
+            page-break-inside: auto;
+          }
+          
           /* Asegurar que los colores se impriman */
           * {
             -webkit-print-color-adjust: exact !important;
             print-color-adjust: exact !important;
             color-adjust: exact !important;
           }
-          
-          /* Asegurar que todo el contenedor padre sea visible */
-          .fixed {
-            position: static !important;
-          }
-          
-          .inset-0 {
-            position: static !important;
-          }
         }
       `}</style>
 
-      <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[300] flex flex-col items-center p-0 md:p-6 overflow-y-auto print:static print:bg-white print:p-0">
+      <div className="print-modal fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[300] flex flex-col items-center p-0 md:p-6 overflow-y-auto">
         {/* Botones de control - NO SE IMPRIMEN */}
         <div className="no-print w-full max-w-4xl bg-white p-4 mb-4 flex justify-between items-center rounded-xl shadow-lg border">
           <span className="text-[10px] font-black uppercase text-slate-400">Auditoría: {residente.apartamento}</span>
@@ -158,7 +161,7 @@ export default function EstadoCuenta({ residente, deudas, onClose }: any) {
         </div>
 
         {/* CONTENIDO A IMPRIMIR */}
-        <div id="print-area" className="w-full max-w-4xl bg-white p-8 md:p-12 border border-slate-100 font-sans shadow-2xl print:max-w-full print:shadow-none print:border-0 print:p-0">
+        <div id="print-area" className="w-full max-w-4xl bg-white p-8 md:p-12 border border-slate-100 font-sans shadow-2xl">
           {/* ENCABEZADO */}
           <div className="flex justify-between items-center border-b-2 border-slate-900 pb-3 mb-4">
             <div className="flex items-center gap-4">
