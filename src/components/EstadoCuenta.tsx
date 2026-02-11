@@ -66,53 +66,57 @@ export default function EstadoCuenta({ residente, deudas, onClose }: any) {
           /* Configuración de página */
           @page {
             size: letter;
-            margin: 1.5cm;
+            margin: 1cm;
           }
           
-          /* Ocultar todo excepto el contenido a imprimir */
-          body * {
-            visibility: hidden;
-          }
-          
-          #print-area, #print-area * {
-            visibility: visible;
-          }
-          
-          /* Posicionar el área de impresión */
-          #print-area {
-            position: absolute;
-            left: 0;
-            top: 0;
-            width: 100%;
-            max-width: 100%;
-            background: white;
-            box-shadow: none !important;
-            border: none !important;
-            margin: 0;
-            padding: 20px;
-          }
-          
-          /* Permitir que el contenido fluya en múltiples páginas */
+          /* Resetear completamente el body y html */
           html, body {
-            height: auto !important;
-            overflow: visible !important;
+            width: 100%;
+            height: auto;
             margin: 0;
             padding: 0;
+            overflow: visible;
+            background: white;
           }
           
-          /* Ocultar elementos que no deben imprimirse */
+          /* Ocultar el overlay de fondo */
+          body > div:first-child {
+            position: static !important;
+            background: white !important;
+            backdrop-filter: none !important;
+            padding: 0 !important;
+            margin: 0 !important;
+          }
+          
+          /* Ocultar botones y controles */
           .no-print {
             display: none !important;
           }
           
-          /* Control de saltos de página */
-          tr {
-            page-break-inside: avoid;
-            break-inside: avoid;
+          /* El área de impresión debe ser estática y fluir naturalmente */
+          #print-area {
+            position: static !important;
+            width: 100% !important;
+            max-width: 100% !important;
+            box-shadow: none !important;
+            border: none !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            background: white !important;
           }
           
+          /* Control de saltos de página - permitir que fluya */
           table {
             page-break-inside: auto;
+          }
+          
+          thead {
+            display: table-header-group;
+          }
+          
+          tr {
+            page-break-inside: avoid;
+            page-break-after: auto;
           }
           
           /* Asegurar que los colores se impriman */
@@ -122,19 +126,18 @@ export default function EstadoCuenta({ residente, deudas, onClose }: any) {
             color-adjust: exact !important;
           }
           
-          /* Asegurar que las tablas no se corten */
-          thead {
-            display: table-header-group;
+          /* Asegurar que todo el contenedor padre sea visible */
+          .fixed {
+            position: static !important;
           }
           
-          /* Mejorar legibilidad */
-          body {
-            font-size: 10pt;
+          .inset-0 {
+            position: static !important;
           }
         }
       `}</style>
 
-      <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[300] flex flex-col items-center p-0 md:p-6 overflow-y-auto">
+      <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[300] flex flex-col items-center p-0 md:p-6 overflow-y-auto print:static print:bg-white print:p-0">
         {/* Botones de control - NO SE IMPRIMEN */}
         <div className="no-print w-full max-w-4xl bg-white p-4 mb-4 flex justify-between items-center rounded-xl shadow-lg border">
           <span className="text-[10px] font-black uppercase text-slate-400">Auditoría: {residente.apartamento}</span>
@@ -155,7 +158,7 @@ export default function EstadoCuenta({ residente, deudas, onClose }: any) {
         </div>
 
         {/* CONTENIDO A IMPRIMIR */}
-        <div id="print-area" className="w-full max-w-4xl bg-white p-8 md:p-12 border border-slate-100 font-sans shadow-2xl">
+        <div id="print-area" className="w-full max-w-4xl bg-white p-8 md:p-12 border border-slate-100 font-sans shadow-2xl print:max-w-full print:shadow-none print:border-0 print:p-0">
           {/* ENCABEZADO */}
           <div className="flex justify-between items-center border-b-2 border-slate-900 pb-3 mb-4">
             <div className="flex items-center gap-4">
