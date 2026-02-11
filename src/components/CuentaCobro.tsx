@@ -1,12 +1,31 @@
 "use client";
-import React from "react";
+import React, { useMemo } from "react";
 import { Printer, X, Landmark } from "lucide-react";
 import { numeroALetras } from "@/lib/utils";
 
 export default function CuentaCobro({ residente, deudas, onClose }: any) {
 
+  // --- FUNCIÓN PARA FORMATEAR EL PERIODO (Ej: 2025-02 -> Febrero 2025) ---
+  const formatPeriodo = (mesCausado: string) => {
+    if (!mesCausado) return "N/A";
+    const [year, month] = mesCausado.split("-");
+    const meses = [
+      "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+      "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
+    ];
+    return `${meses[parseInt(month) - 1]} ${year}`;
+  };
+
+  // --- LÓGICA DE ORDENAMIENTO (De más antiguo a más reciente) ---
+  const deudasOrdenadas = useMemo(() => {
+    return [...deudas].sort((a, b) => {
+      const fechaA = a.causaciones_globales?.mes_causado || "";
+      const fechaB = b.causaciones_globales?.mes_causado || "";
+      return fechaA.localeCompare(fechaB);
+    });
+  }, [deudas]);
+
   const calcularValorHoy = (d: any) => {
-    // Si es un cargo manual (sin causación global) usamos el saldo directo
     if (!d.causaciones_globales) return d.saldo_pendiente || 0;
 
     const hoy = new Date();
@@ -15,7 +34,6 @@ export default function CuentaCobro({ residente, deudas, onClose }: any) {
     const anioAct = hoy.getFullYear();
     const [yC, mC] = d.causaciones_globales.mes_causado.split("-").map(Number);
 
-    // Mapeo de precios
     const m1 = d.precio_m1 || d.monto_original || 0;
     const m2 = d.precio_m2 || m1;
     const m3 = d.precio_m3 || m1;
@@ -33,31 +51,53 @@ export default function CuentaCobro({ residente, deudas, onClose }: any) {
     return Math.max(0, precioAplicable - pagadoYa);
   };
 
-
   const total = deudas.reduce((acc: number, d: any) => acc + calcularValorHoy(d), 0);
 
   return (
     <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[300] flex flex-col items-center p-0 md:p-6 overflow-y-auto">
       <style>{`
         @media print {
-          @page { size: letter; margin: 1cm; }
+          @page { 
+            size: letter; 
+            margin: 1.5cm; 
+          }
+          body { 
+            background: white !important; 
+          }
           body * { visibility: hidden; }
           #print-doc, #print-doc * { visibility: visible; }
-          #print-doc { position: absolute; left: 0; top: 0; width: 100%; }
+          
+          #print-doc { 
+            position: absolute; 
+            left: 0; 
+            top: 0; 
+            width: 100%; 
+            border: none !important;
+          }
           .no-print { display: none !important; }
+          
+          /* Evita que las filas se corten entre páginas */
+          tr { page-break-inside: avoid; }
+          /* Permite que el documento fluya naturalmente en varias hojas */
+          #print-doc { height: auto; overflow: visible; }
+          
+          /* Forzar colores */
+          * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
         }
       `}</style>
 
       <div className="no-print w-full max-w-4xl bg-white p-4 mb-4 flex justify-between items-center rounded-xl shadow-lg border">
         <span className="text-xs font-black text-slate-400">DOCUMENTO DE COBRO</span>
         <div className="flex gap-2">
-          <button onClick={() => window.print()} className="bg-slate-900 text-white px-8 py-2 rounded-lg text-xs font-bold">IMPRIMIR</button>
-          <button onClick={onClose} className="p-2 text-slate-300"><X /></button>
+          <button onClick={() => window.print()} className="bg-slate-900 text-white px-8 py-2 rounded-lg text-xs font-bold flex items-center gap-2">
+            <Printer size={14} /> IMPRIMIR
+          </button>
+          <button onClick={onClose} className="p-2 text-slate-300 hover:text-rose-500 transition-colors"><X /></button>
         </div>
       </div>
 
-      <div id="print-doc" className="w-full max-w-4xl bg-white p-10 md:p-14 border border-slate-100 font-sans">
-        {/* HEADER COMPACTO */}
+      <div id="print-doc" className="w-full max-w-4xl bg-white p-10 md:p-14 border border-slate-100 font-sans shadow-2xl">
+        {/* HEADER */}
         <div className="flex justify-between items-center border-b-2 border-slate-900 pb-3 mb-6">
           <div className="flex items-center gap-4">
             <img src="/logo.png" alt="Logo" className="w-20" />
@@ -74,7 +114,7 @@ export default function CuentaCobro({ residente, deudas, onClose }: any) {
           </div>
         </div>
 
-        {/* INFO RESIDENTE LINEAL */}
+        {/* INFO RESIDENTE */}
         <div className="flex justify-between items-center mb-6 py-2 px-4 border bg-slate-50/50 rounded text-[10px] font-black uppercase">
           <span>Unidad: <span className="text-slate-500 ml-1">T{residente.torre.slice(-1)}-{residente.apartamento}</span></span>
           <span>Residente: <span className="text-slate-500 ml-1">{residente.nombre}</span></span>
@@ -84,13 +124,16 @@ export default function CuentaCobro({ residente, deudas, onClose }: any) {
         <table className="w-full text-left text-xs mb-8">
           <thead className="border-b-2 border-slate-900">
             <tr className="font-black uppercase text-[9px]">
-              <th className="py-2">Periodo</th><th>Concepto</th><th className="text-right">Vr. Actualizado</th>
+              <th className="py-2">Periodo</th>
+              <th>Concepto</th>
+              <th className="text-right">Vr. Actualizado</th>
             </tr>
           </thead>
           <tbody className="divide-y">
-            {deudas.map((d: any) => (
+            {deudasOrdenadas.map((d: any) => (
               <tr key={d.id}>
-                <td className="py-3 font-bold">{d.causaciones_globales?.mes_causado}</td>
+                {/* Formateamos el periodo igual que en el Estado de Cuenta */}
+                <td className="py-3 font-bold">{formatPeriodo(d.causaciones_globales?.mes_causado)}</td>
                 <td className="py-3 uppercase text-slate-500">{d.concepto_nombre}</td>
                 <td className="py-3 text-right font-black">${calcularValorHoy(d).toLocaleString()}</td>
               </tr>
@@ -115,7 +158,7 @@ export default function CuentaCobro({ residente, deudas, onClose }: any) {
           </div>
           <div className="flex flex-col justify-end items-center">
             <div className="w-full border-t border-slate-900 mb-1"></div>
-            <p className="text-[9px] font-black uppercase text-slate-300 italic">Tesorería / Administración</p>
+            <p className="text-[9px] font-black uppercase text-slate-400 italic">Tesorería / Administración</p>
           </div>
         </div>
       </div>
