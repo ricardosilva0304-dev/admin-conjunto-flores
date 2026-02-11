@@ -61,9 +61,21 @@ export default function CuentaCobro({ residente, deudas, onClose }: any) {
             size: letter; 
             margin: 1.5cm; 
           }
-          body { 
-            background: white !important; 
+
+          html, body {
+            height: auto !important;
+            overflow: visible !important;
           }
+
+          /* Anular el posicionamiento fijo para que el scroll de impresión funcione */
+          .fixed.inset-0 {
+            position: static !important;
+            height: auto !important;
+            overflow: visible !important;
+            background: white !important;
+            display: block !important;
+          }
+
           body * { visibility: hidden; }
           #print-doc, #print-doc * { visibility: visible; }
           
@@ -72,16 +84,18 @@ export default function CuentaCobro({ residente, deudas, onClose }: any) {
             left: 0; 
             top: 0; 
             width: 100%; 
+            margin: 0 !important;
+            padding: 0 !important;
             border: none !important;
+            box-shadow: none !important;
           }
+
           .no-print { display: none !important; }
-          
-          /* Evita que las filas se corten entre páginas */
+
+          /* Control de saltos de página para facturas */
           tr { page-break-inside: avoid; }
-          /* Permite que el documento fluya naturalmente en varias hojas */
-          #print-doc { height: auto; overflow: visible; }
-          
-          /* Forzar colores */
+          tfoot { display: table-footer-group; }
+
           * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
         }
       `}</style>

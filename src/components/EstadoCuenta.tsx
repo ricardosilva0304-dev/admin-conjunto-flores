@@ -71,35 +71,49 @@ export default function EstadoCuenta({ residente, deudas, onClose }: any) {
     <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[300] flex flex-col items-center p-0 md:p-6 overflow-y-auto">
       <style>{`
         @media print {
+          /* 1. Definir tamaño de página y márgenes */
           @page { 
             size: letter; 
             margin: 1.5cm; 
           }
-          body { 
-            background: white !important; 
+
+          /* 2. Forzar que el cuerpo y los contenedores dejen fluir el contenido */
+          html, body {
+            height: auto !important;
+            overflow: visible !important;
           }
-          /* Ocultamos todo lo que no sea el área de impresión */
+
+          /* 3. ¡IMPORTANTE! Anulamos el 'fixed' del contenedor principal */
+          .fixed.inset-0 {
+            position: static !important;
+            height: auto !important;
+            overflow: visible !important;
+            background: white !important;
+            display: block !important;
+          }
+
+          /* 4. Visibilidad de elementos */
           body * { visibility: hidden; }
           #print-area, #print-area * { visibility: visible; }
           
-          /* Ajustes de posición para la impresión */
+          /* 5. Ajustes del área de impresión */
           #print-area { 
             position: absolute; 
             left: 0; 
             top: 0; 
             width: 100%; 
-            margin: 0;
-            padding: 0;
+            margin: 0 !important;
+            padding: 0 !important;
             border: none !important;
             box-shadow: none !important;
           }
-          .no-print { display: none !important; }
-          
-          /* Control de saltos de página */
+
+          /* 6. Evitar cortes feos en tablas */
           tr { page-break-inside: avoid; }
-          section { page-break-inside: auto; margin-bottom: 20px; }
-          
-          /* Forzar colores en impresión */
+          section { page-break-inside: auto; }
+          thead { display: table-header-group; } /* Repite el encabezado en cada hoja si la tabla es muy larga */
+
+          .no-print { display: none !important; }
           * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
         }
       `}</style>
