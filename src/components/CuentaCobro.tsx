@@ -5,97 +5,63 @@ import { numeroALetras } from "@/lib/utils";
 
 export default function CuentaCobro({ residente, deudas, onClose }: any) {
 
-  // --- FUNCIÓN PARA FORMATEAR EL PERIODO (Ej: 2025-02 -> Febrero 2025) ---
   const formatPeriodo = (mesCausado: string) => {
-    if (!mesCausado) return "N/A";
+    if (!mesCausado) return "-";
     const [year, month] = mesCausado.split("-");
-    const meses = [
-      "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
-      "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
-    ];
+    const meses = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
     return `${meses[parseInt(month) - 1]} ${year}`;
   };
 
-  // --- LÓGICA DE ORDENAMIENTO (De más antiguo a más reciente) ---
   const deudasOrdenadas = useMemo(() => {
     return [...deudas].sort((a, b) => {
-      const fechaA = a.causaciones_globales?.mes_causado || "";
-      const fechaB = b.causaciones_globales?.mes_causado || "";
-      return fechaA.localeCompare(fechaB);
+      const fA = a.causaciones_globales?.mes_causado || "";
+      const fB = b.causaciones_globales?.mes_causado || "";
+      return fA.localeCompare(fB);
     });
   }, [deudas]);
 
   const calcularValorHoy = (d: any) => {
     if (!d.causaciones_globales) return d.saldo_pendiente || 0;
-
     const hoy = new Date();
     const dia = hoy.getDate();
-    const mesAct = hoy.getMonth() + 1;
-    const anioAct = hoy.getFullYear();
     const [yC, mC] = d.causaciones_globales.mes_causado.split("-").map(Number);
-
     const m1 = d.precio_m1 || d.monto_original || 0;
     const m2 = d.precio_m2 || m1;
     const m3 = d.precio_m3 || m1;
-
-    let precioAplicable = m1;
-
-    if (anioAct > yC || (anioAct === yC && mesAct > mC)) {
-      precioAplicable = m3;
+    let precio = m1;
+    if (hoy.getFullYear() > yC || (hoy.getFullYear() === yC && (hoy.getMonth() + 1) > mC)) {
+      precio = m3;
     } else {
-      if (dia > 10 && dia <= 20) precioAplicable = m2;
-      else if (dia > 20) precioAplicable = m3;
+      if (dia > 10 && dia <= 20) precio = m2;
+      else if (dia > 20) precio = m3;
     }
-
-    const pagadoYa = m1 - (d.saldo_pendiente || 0);
-    return Math.max(0, precioAplicable - pagadoYa);
+    return Math.max(0, precio - (m1 - (d.saldo_pendiente || 0)));
   };
 
   const total = deudas.reduce((acc: number, d: any) => acc + calcularValorHoy(d), 0);
 
   return (
-    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[300] flex flex-col items-center p-0 md:p-6 overflow-y-auto">
+    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[300] flex flex-col items-center p-0 md:p-6 overflow-y-auto print-container">
       <style>{`
         @media print {
-          @page { 
-            size: letter; 
-            margin: 1.5cm; 
-          }
-
-          html, body {
-            height: auto !important;
-            overflow: visible !important;
-          }
-
-          /* Anular el posicionamiento fijo para que el scroll de impresión funcione */
-          .fixed.inset-0 {
-            position: static !important;
-            height: auto !important;
-            overflow: visible !important;
-            background: white !important;
-            display: block !important;
-          }
-
-          body * { visibility: hidden; }
-          #print-doc, #print-doc * { visibility: visible; }
+          @page { size: letter; margin: 1.5cm; }
+          html, body { height: auto !important; overflow: visible !important; }
           
+          body > * { display: none !important; }
+          body > .print-container { display: block !important; position: static !important; background: white !important; }
+
           #print-doc { 
-            position: absolute; 
-            left: 0; 
-            top: 0; 
-            width: 100%; 
-            margin: 0 !important;
-            padding: 0 !important;
+            display: block !important; 
+            position: static !important; 
+            width: 100% !important; 
+            box-shadow: none !important; 
             border: none !important;
-            box-shadow: none !important;
+            padding: 0 !important;
           }
 
+          .print-container { background: white !important; backdrop-filter: none !important; }
           .no-print { display: none !important; }
-
-          /* Control de saltos de página para facturas */
           tr { page-break-inside: avoid; }
-          tfoot { display: table-footer-group; }
-
           * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
         }
       `}</style>
@@ -111,7 +77,6 @@ export default function CuentaCobro({ residente, deudas, onClose }: any) {
       </div>
 
       <div id="print-doc" className="w-full max-w-4xl bg-white p-10 md:p-14 border border-slate-100 font-sans shadow-2xl">
-        {/* HEADER */}
         <div className="flex justify-between items-center border-b-2 border-slate-900 pb-3 mb-6">
           <div className="flex items-center gap-4">
             <img src="/logo.png" alt="Logo" className="w-20" />
@@ -128,25 +93,20 @@ export default function CuentaCobro({ residente, deudas, onClose }: any) {
           </div>
         </div>
 
-        {/* INFO RESIDENTE */}
         <div className="flex justify-between items-center mb-6 py-2 px-4 border bg-slate-50/50 rounded text-[10px] font-black uppercase">
           <span>Unidad: <span className="text-slate-500 ml-1">T{residente.torre.slice(-1)}-{residente.apartamento}</span></span>
           <span>Residente: <span className="text-slate-500 ml-1">{residente.nombre}</span></span>
         </div>
 
-        {/* DETALLE */}
         <table className="w-full text-left text-xs mb-8">
           <thead className="border-b-2 border-slate-900">
             <tr className="font-black uppercase text-[9px]">
-              <th className="py-2">Periodo</th>
-              <th>Concepto</th>
-              <th className="text-right">Vr. Actualizado</th>
+              <th className="py-2">Periodo</th><th>Concepto</th><th className="text-right">Vr. Actualizado</th>
             </tr>
           </thead>
           <tbody className="divide-y">
             {deudasOrdenadas.map((d: any) => (
               <tr key={d.id}>
-                {/* Formateamos el periodo igual que en el Estado de Cuenta */}
                 <td className="py-3 font-bold">{formatPeriodo(d.causaciones_globales?.mes_causado)}</td>
                 <td className="py-3 uppercase text-slate-500">{d.concepto_nombre}</td>
                 <td className="py-3 text-right font-black">${calcularValorHoy(d).toLocaleString()}</td>
@@ -163,7 +123,6 @@ export default function CuentaCobro({ residente, deudas, onClose }: any) {
 
         <p className="text-[10px] italic text-slate-500 mb-10">Son: {numeroALetras(total)} pesos m/cte.</p>
 
-        {/* PAGO Y FIRMA */}
         <div className="grid grid-cols-2 gap-10 border-t pt-8">
           <div className="p-4 border rounded-lg bg-slate-50/30">
             <p className="text-[9px] font-black uppercase mb-1 flex items-center gap-2"><Landmark size={12} /> Datos de Pago</p>
