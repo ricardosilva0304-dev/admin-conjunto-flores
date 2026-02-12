@@ -77,7 +77,7 @@ export default function EstadoCuenta({ residente, deudas, onClose }: Props) {
     const [year, month] = fechaStr.split("-");
     const meses = ["ENE", "FEB", "MAR", "ABR", "MAY", "JUN", "JUL", "AGO", "SEP", "OCT", "NOV", "DIC"];
     const mesIndex = parseInt(month) - 1;
-    
+
     if (isNaN(mesIndex) || mesIndex < 0 || mesIndex > 11) return "CARGO EXTRA";
     return `${meses[mesIndex]} ${year}`;
   };
@@ -226,6 +226,29 @@ export default function EstadoCuenta({ residente, deudas, onClose }: Props) {
                 <tbody className="divide-y divide-slate-100">
                   {chunk.map((d: any) => {
                     const periodoTexto = formatPeriodo(d);
+
+                    // CALCULAMOS LOS DOS VALORES PARA QUE SEAN COHERENTES
+                    const m1 = d.precio_m1 || d.monto_original || 0;
+                    const m2 = d.precio_m2 || m1;
+                    const m3 = d.precio_m3 || m1;
+
+                    // Determinar qué tarifa base mostrar en la columna izquierda
+                    const modo = d.causaciones_globales?.tipo_cobro || 'NORMAL';
+                    let tarifaBase = m1;
+
+                    if (modo === 'M1') tarifaBase = m1;
+                    else if (modo === 'M2') tarifaBase = m2;
+                    else if (modo === 'M3') tarifaBase = m3;
+                    else {
+                      // Si es NORMAL (AUTO), mostramos la tarifa que aplicaría hoy según calendario
+                      const hoy = new Date();
+                      const dia = hoy.getDate();
+                      const [yC, mC] = (d.causaciones_globales?.mes_causado || "0-0").split("-").map(Number);
+                      if (hoy.getFullYear() > yC || (hoy.getFullYear() === yC && hoy.getMonth() + 1 > mC)) tarifaBase = m3;
+                      else if (dia > 10 && dia <= 20) tarifaBase = m2;
+                      else if (dia > 20) tarifaBase = m3;
+                    }
+
                     return (
                       <tr key={d.id} className="hover:bg-slate-50">
                         <td className="py-2">
@@ -238,9 +261,13 @@ export default function EstadoCuenta({ residente, deudas, onClose }: Props) {
                         <td className="py-2 text-slate-600 uppercase pr-2 leading-tight break-words">
                           {d.concepto_nombre || d.causaciones_globales?.concepto_nombre}
                         </td>
+
+                        {/* COLUMNA IZQUIERDA: Ahora muestra la tarifa del tramo seleccionado */}
                         <td className="py-2 text-right text-slate-400 tabular-nums">
-                          ${(d.monto_original || 0).toLocaleString()}
+                          ${tarifaBase.toLocaleString()}
                         </td>
+
+                        {/* COLUMNA DERECHA: Muestra el saldo real (Tarifa - Pagos) */}
                         <td className="py-2 text-right font-black text-rose-600 tabular-nums">
                           ${calcularValorHoy(d).toLocaleString()}
                         </td>
@@ -255,9 +282,9 @@ export default function EstadoCuenta({ residente, deudas, onClose }: Props) {
             <div className="mt-auto border-t-2 border-slate-800 pt-4">
               <div className="grid grid-cols-2 gap-8">
                 <div className="text-[9px] text-slate-500">
-                   <p className="font-bold text-slate-800 mb-1 uppercase">Información de Pago</p>
-                   <p>Banco Caja Social • Ahorros • No. 24511819298</p>
-                   <p>Convenio: 15939402 • Ref: {residente.apartamento}</p>
+                  <p className="font-bold text-slate-800 mb-1 uppercase">Información de Pago</p>
+                  <p>Banco Caja Social • Ahorros • No. 24511819298</p>
+                  <p>Convenio: 15939402 • Ref: {residente.apartamento}</p>
                 </div>
                 <div className="text-right text-[8px] text-slate-300">
                   Generado automáticamente por AdminPro Flores

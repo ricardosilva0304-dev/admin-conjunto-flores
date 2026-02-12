@@ -106,7 +106,7 @@ export default function CuentaCobro({ residente, deudas, onClose }: any) {
 
   return (
     <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[300] flex flex-col items-center p-4 md:p-8 overflow-y-auto">
-      
+
       {/* TOOLBAR */}
       <div className="no-print sticky top-0 w-full max-w-[816px] bg-white p-4 mb-6 flex justify-between items-center rounded-xl shadow-xl border border-slate-100 z-50">
         <div className="flex items-center gap-3">
@@ -130,7 +130,7 @@ export default function CuentaCobro({ residente, deudas, onClose }: any) {
 
       {/* DOCUMENTO */}
       <div ref={printRef} className="w-[816px] min-h-[1056px] bg-white p-16 shadow-2xl text-slate-800 relative">
-        
+
         {/* ENCABEZADO */}
         <div className="flex justify-between items-start mb-10 pb-6 border-b-2 border-slate-900">
           <div className="flex gap-5">
@@ -139,8 +139,8 @@ export default function CuentaCobro({ residente, deudas, onClose }: any) {
               <h1 className="text-lg font-black text-slate-900 uppercase leading-none">Agrupación Res. El Parque de las Flores</h1>
               <p className="text-[10px] font-bold text-slate-500 tracking-widest">NIT. 832.011.421-3</p>
               <div className="pt-1 space-y-0.5">
-                <p className="text-[9px] text-slate-500 flex items-center gap-1"><MapPin size={10}/> Diagonal 9 # 4B-90 • Soacha, Cundinamarca</p>
-                <p className="text-[9px] text-slate-500 flex items-center gap-1"><Phone size={10}/> 315 340 0657</p>
+                <p className="text-[9px] text-slate-500 flex items-center gap-1"><MapPin size={10} /> Diagonal 9 # 4B-90 • Soacha, Cundinamarca</p>
+                <p className="text-[9px] text-slate-500 flex items-center gap-1"><Phone size={10} /> 315 340 0657</p>
               </div>
             </div>
           </div>
@@ -148,7 +148,7 @@ export default function CuentaCobro({ residente, deudas, onClose }: any) {
             <div className="bg-slate-900 text-white px-4 py-1.5 rounded mb-2 inline-block">
               <span className="text-sm font-black italic uppercase text-white">CUENTA DE COBRO</span>
             </div>
-            <p className="text-xl font-black text-slate-900">No. {new Date().getFullYear()}{String(new Date().getMonth()+1).padStart(2,'0')}-{residente.apartamento}</p>
+            <p className="text-xl font-black text-slate-900">No. {new Date().getFullYear()}{String(new Date().getMonth() + 1).padStart(2, '0')}-{residente.apartamento}</p>
             <p className="text-[9px] font-bold text-slate-400 uppercase mt-1">Fecha: {new Date().toLocaleDateString('es-CO')}</p>
           </div>
         </div>
@@ -178,20 +178,42 @@ export default function CuentaCobro({ residente, deudas, onClose }: any) {
           <tbody className="divide-y divide-slate-100">
             {deudasOrdenadas.map((d: any) => {
               const textoPeriodo = formatPeriodo(d);
+
+              // CALCULAMOS EL PRECIO DE LA TARIFA SELECCIONADA
+              const m1 = d.precio_m1 || d.monto_original || 0;
+              const m2 = d.precio_m2 || m1;
+              const m3 = d.precio_m3 || m1;
+              const modo = d.causaciones_globales?.tipo_cobro || 'NORMAL';
+
+              let tarifaBase = m1;
+              if (modo === 'M1') tarifaBase = m1;
+              else if (modo === 'M2') tarifaBase = m2;
+              else if (modo === 'M3') tarifaBase = m3;
+              else {
+                const hoy = new Date();
+                const dia = hoy.getDate();
+                const [yC, mC] = (d.causaciones_globales?.mes_causado || "0-0").split("-").map(Number);
+                if (hoy.getFullYear() > yC || (hoy.getFullYear() === yC && hoy.getMonth() + 1 > mC)) tarifaBase = m3;
+                else if (dia > 10 && dia <= 20) tarifaBase = m2;
+                else if (dia > 20) tarifaBase = m3;
+              }
+
               return (
                 <tr key={d.id}>
-                  <td className="py-3">
+                  <td className="py-3 align-top">
                     {textoPeriodo === "CARGO EXTRA" ? (
-                      <span className="text-[8px] font-bold bg-slate-100 text-slate-500 px-2 py-0.5 rounded border border-slate-200">CARGO EXTRA</span>
+                      <span className="text-[8px] font-bold bg-slate-100 text-slate-500 px-2 py-0.5 rounded border border-slate-200 uppercase">Cargo Extra</span>
                     ) : (
                       <span className="font-bold text-slate-800 text-xs">{textoPeriodo}</span>
                     )}
                   </td>
-                  <td className="text-xs text-slate-600 uppercase py-3 break-words pr-4">
+                  <td className="text-xs text-slate-600 uppercase py-3 align-top leading-tight pr-4 break-words">
                     {d.concepto_nombre || d.causaciones_globales?.concepto_nombre}
                   </td>
-                  <td className="text-right font-bold text-slate-900 text-xs py-3 tabular-nums">
-                    ${calcularValorHoy(d).toLocaleString()}
+
+                  {/* Aquí mostramos la tarifa base que calculamos arriba */}
+                  <td className="text-right font-bold text-slate-900 text-xs py-3 align-top tabular-nums">
+                    ${tarifaBase.toLocaleString()}
                   </td>
                 </tr>
               );
