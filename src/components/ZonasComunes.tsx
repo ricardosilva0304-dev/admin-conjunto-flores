@@ -2,9 +2,9 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import { 
-  Calendar as CalendarIcon, User, ChevronLeft, ChevronRight, 
-  X, Loader2, Sun, Moon, Flame, Search, CheckCircle2, 
-  Trash2, Filter, Info
+  Calendar as CalendarIcon, ChevronLeft, ChevronRight, 
+  X, Loader2, Sun, Moon, Flame, Search, 
+  Trash2, Info, DollarSign, BarChart3, TrendingUp
 } from "lucide-react";
 import { 
   format, addMonths, subMonths, startOfMonth, endOfMonth, 
@@ -25,6 +25,7 @@ export default function ZonasComunes() {
   const [zona, setZona] = useState("Salón Comunal");
   const [jornada, setJornada] = useState("Día");
   const [fecha, setFecha] = useState("");
+  const [costo, setCosto] = useState(""); // NUEVO CAMPO
 
   useEffect(() => { cargarDatos(); }, [currentMonth]);
 
@@ -51,23 +52,39 @@ export default function ZonasComunes() {
     e.preventDefault();
     if (!resSeleccionado || !fecha) return alert("Faltan datos obligatorios.");
 
+    // Validar conflicto (Opcional pero recomendado)
+    const conflicto = reservas.find(r => 
+      r.fecha === fecha && 
+      r.zona === zona && 
+      (r.jornada === jornada || r.jornada === "Día Completo")
+    );
+
+    if (conflicto) return alert("⚠️ Ya existe una reserva para este espacio y horario.");
+
     setGuardando(true);
     const { error } = await supabase.from("reservas").insert([{
       residente_nombre: resSeleccionado.nombre,
       residente_unidad: `${resSeleccionado.torre.replace("Torre ", "T")}-${resSeleccionado.apartamento}`,
       zona,
       fecha,
-      jornada: zona === "Salón Comunal" ? jornada : "Día Completo"
+      jornada: zona === "Salón Comunal" ? jornada : "Día Completo",
+      costo: parseFloat(costo) || 0 // GUARDAMOS EL COBRO
     }]);
 
     if (!error) {
-      setResSeleccionado(null); setSearchRes(""); setFecha("");
+      setResSeleccionado(null); setSearchRes(""); setFecha(""); setCosto("");
       cargarDatos();
+    } else {
+      alert("Error al guardar");
     }
     setGuardando(false);
   }
 
-  // --- COMPONENTES VISUALES ---
+  // --- CÁLCULOS DEL REPORTE MENSUAL ---
+  const reservasDelMes = reservas.filter(r => isSameMonth(parseISO(r.fecha), currentMonth));
+  const totalRecaudado = reservasDelMes.reduce((acc, r) => acc + (Number(r.costo) || 0), 0);
+  const countSalon = reservasDelMes.filter(r => r.zona === 'Salón Comunal').length;
+  const countBBQ = reservasDelMes.filter(r => r.zona === 'BBQ').length;
 
   const renderCells = () => {
     const monthStart = startOfMonth(currentMonth);
@@ -97,9 +114,12 @@ export default function ZonasComunes() {
                      <span>{r.residente_unidad}</span>
                      {r.jornada === 'Día' ? <Sun size={8}/> : r.jornada === 'Noche' ? <Moon size={8}/> : <Flame size={8}/>}
                    </div>
-                   <p className="truncate mt-0.5 opacity-80">{r.residente_nombre}</p>
-                   {/* Boton para borrar rapido desde el calendario */}
-                   <button onClick={async()=> {if(confirm("¿Eliminar reserva?")){await supabase.from("reservas").delete().eq("id", r.id); cargarDatos();}}} className="absolute inset-0 bg-rose-500 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity rounded-lg">
+                   <div className="flex justify-between items-end mt-1">
+                      <p className="truncate opacity-80 max-w-[60px]">{r.residente_nombre.split(' ')[0]}</p>
+                      {r.costo > 0 && <span className="text-[7px] bg-white/50 px-1 rounded text-emerald-600 font-bold">${(r.costo/1000).toFixed(0)}k</span>}
+                   </div>
+                   
+                   <button onClick={async()=> {if(confirm("¿Eliminar reserva?")){await supabase.from("reservas").delete().eq("id", r.id); cargarDatos();}}} className="absolute inset-0 bg-rose-500 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity rounded-lg z-10">
                       <Trash2 size={12}/>
                    </button>
                 </div>
@@ -118,11 +138,11 @@ export default function ZonasComunes() {
   return (
     <div className="max-w-7xl mx-auto space-y-6 pb-20 px-2 md:px-0 font-sans text-slate-800">
       
-      {/* 1. BARRA DE COMANDOS TIPO "AUDITOR" (PARA COMPUTADOR Y MÓVIL) */}
+      {/* 1. BARRA DE COMANDOS */}
       <section className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
         <form onSubmit={manejarReserva} className="flex flex-col xl:flex-row items-center gap-4">
           
-          {/* BUSCADOR 5-101 */}
+          {/* BUSCADOR */}
           <div className="flex-1 w-full relative group">
              <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-1 block">Apto Responsable</label>
              <div className="relative">
@@ -136,7 +156,6 @@ export default function ZonasComunes() {
                 {resSeleccionado && <button type="button" onClick={()=>{setResSeleccionado(null); setSearchRes("");}} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-rose-500 transition-colors"><X size={16}/></button>}
              </div>
              
-             {/* SUGERENCIAS */}
              {sugerencias.length > 0 && (
                <div className="absolute top-[105%] left-0 right-0 bg-white border border-slate-200 rounded-xl shadow-2xl z-[150] overflow-hidden">
                   {sugerencias.map(r => (
@@ -149,22 +168,22 @@ export default function ZonasComunes() {
              )}
           </div>
 
-          <div className="w-full xl:w-56 space-y-1">
+          <div className="w-full xl:w-48 space-y-1">
              <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1 block">Ubicación</label>
              <div className="flex bg-slate-50 p-1 rounded-xl border border-slate-100">
                {['Salón Comunal', 'BBQ'].map(z => (
                  <button key={z} type="button" onClick={()=>setZona(z)} className={`flex-1 py-2 rounded-lg text-[9px] font-black transition-all ${zona === z ? "bg-white text-slate-900 shadow-sm border border-slate-100" : "text-slate-400 uppercase"}`}>
-                   {z === 'Salón Comunal' ? 'SALÓN' : 'ZONA BBQ'}
+                   {z === 'Salón Comunal' ? 'SALÓN' : 'BBQ'}
                  </button>
                ))}
              </div>
           </div>
 
           {zona === "Salón Comunal" && (
-            <div className="w-full xl:w-40 space-y-1 animate-in zoom-in-95">
-               <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1 block">Tramo Horario</label>
+            <div className="w-full xl:w-32 space-y-1 animate-in zoom-in-95">
+               <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1 block">Horario</label>
                <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-100">
-                 {['Dia', 'Noche'].map(j => (
+                 {['Día', 'Noche'].map(j => (
                    <button key={j} type="button" onClick={()=>setJornada(j)} className={`flex-1 py-2 rounded-lg text-[9px] font-black transition-all ${jornada === j ? "bg-white text-slate-900 shadow-sm border border-slate-100" : "text-slate-400 uppercase"}`}>
                       {j}
                    </button>
@@ -173,24 +192,37 @@ export default function ZonasComunes() {
             </div>
           )}
 
-          <div className="w-full xl:w-48 space-y-1">
-             <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1 block">Agenda</label>
+          <div className="w-full xl:w-40 space-y-1">
+             <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1 block">Fecha</label>
              <input type="date" className="w-full bg-slate-50 border border-slate-100 p-3.5 rounded-xl font-bold text-sm outline-none" value={fecha} onChange={(e)=>setFecha(e.target.value)} required />
+          </div>
+
+          {/* NUEVO CAMPO DE COBRO */}
+          <div className="w-full xl:w-36 space-y-1 relative">
+             <label className="text-[9px] font-black text-emerald-600 uppercase tracking-widest ml-1 block">Costo Reserva</label>
+             <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-emerald-500 font-bold">$</span>
+                <input 
+                  type="number" 
+                  placeholder="0" 
+                  className="w-full bg-emerald-50 border border-emerald-100 p-3.5 pl-7 rounded-xl font-black text-emerald-700 outline-none placeholder:text-emerald-300" 
+                  value={costo} 
+                  onChange={(e)=>setCosto(e.target.value)} 
+                />
+             </div>
           </div>
 
           <button 
             type="submit" disabled={guardando} 
-            className="w-full xl:w-auto mt-5 md:mt-0 px-8 py-4 bg-slate-900 text-white rounded-xl font-black text-[10px] tracking-widest uppercase hover:bg-black active:scale-95 disabled:opacity-20 shadow-lg shadow-slate-900/10"
+            className="w-full xl:w-auto mt-5 md:mt-0 px-6 py-4 bg-slate-900 text-white rounded-xl font-black text-[10px] tracking-widest uppercase hover:bg-black active:scale-95 disabled:opacity-20 shadow-lg shadow-slate-900/10"
           >
-             {guardando ? <Loader2 className="animate-spin" size={14} /> : "CREAR RESERVA"}
+             {guardando ? <Loader2 className="animate-spin" size={14} /> : "AGENDAR"}
           </button>
         </form>
       </section>
 
-      {/* 2. CALENDARIO CORPORATIVO (GRAN TAMAÑO) */}
-      <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm flex flex-col min-h-[700px]">
-        
-        {/* BARRA DE NAVEGACIÓN MES */}
+      {/* 2. CALENDARIO */}
+      <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm flex flex-col min-h-[600px]">
         <div className="p-6 md:p-10 border-b border-slate-100 flex items-center justify-between">
            <div className="flex items-center gap-4">
               <div className="w-12 h-12 bg-slate-100 rounded-xl flex items-center justify-center text-slate-400">
@@ -200,10 +232,9 @@ export default function ZonasComunes() {
                  <h2 className="text-2xl font-black text-slate-900 uppercase tracking-tighter">
                    {format(currentMonth, "MMMM yyyy", { locale: es })}
                  </h2>
-                 <div className="flex gap-4 text-[9px] font-black text-slate-400 uppercase mt-1">
-                   <span className="flex items-center gap-1.5"><div className="w-1.5 h-1.5 bg-blue-500 rounded-full"></div> {reservas.filter(r => r.zona === 'Salón Comunal').length} Salones</span>
-                   <span className="flex items-center gap-1.5"><div className="w-1.5 h-1.5 bg-amber-500 rounded-full"></div> {reservas.filter(r => r.zona === 'BBQ').length} BBQ</span>
-                 </div>
+                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                   Agenda de zonas comunes
+                 </p>
               </div>
            </div>
 
@@ -214,7 +245,6 @@ export default function ZonasComunes() {
            </div>
         </div>
 
-        {/* DIAS SEMANA HEADER */}
         <div className="grid grid-cols-7 border-b border-slate-100 bg-slate-50/40">
           {["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"].map(d => (
             <div key={d} className="py-4 text-center text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">{d}</div>
@@ -224,14 +254,47 @@ export default function ZonasComunes() {
         {loading ? (
           <div className="flex-1 flex items-center justify-center opacity-30 italic"><Loader2 className="animate-spin text-slate-900" size={32}/></div>
         ) : renderCells()}
-
-        {/* PIE DE NOTA INFO */}
-        <div className="p-4 bg-slate-50/50 flex justify-center items-center gap-6">
-           <p className="text-[9px] font-black text-slate-300 uppercase tracking-widest flex items-center gap-2">
-              <Info size={14} className="text-slate-200" /> Pase el ratón o mantenga presionado un evento para gestionarlo
-           </p>
-        </div>
       </div>
+
+      {/* 3. NUEVO REPORTE FINANCIERO MENSUAL */}
+      <section className="grid grid-cols-1 md:grid-cols-3 gap-6 animate-in slide-in-from-bottom-4">
+         <div className="bg-emerald-600 p-6 rounded-2xl shadow-lg shadow-emerald-200 flex items-center justify-between text-white">
+            <div>
+               <p className="text-[10px] font-black uppercase tracking-widest opacity-80 mb-1">Recaudo Total {format(currentMonth, "MMM", {locale: es})}</p>
+               <h3 className="text-3xl font-black tabular-nums">${totalRecaudado.toLocaleString()}</h3>
+            </div>
+            <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center">
+               <DollarSign size={24} />
+            </div>
+         </div>
+
+         <div className="bg-white border border-slate-200 p-6 rounded-2xl shadow-sm flex flex-col justify-between">
+            <div className="flex justify-between items-start mb-4">
+               <div>
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Ocupación Salón</p>
+                  <h3 className="text-2xl font-black text-slate-800">{countSalon} <span className="text-sm text-slate-400 font-bold">Eventos</span></h3>
+               </div>
+               <BarChart3 className="text-blue-500" size={20} />
+            </div>
+            <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
+               <div className="h-full bg-blue-500" style={{width: `${Math.min(100, countSalon * 5)}%`}}></div>
+            </div>
+         </div>
+
+         <div className="bg-white border border-slate-200 p-6 rounded-2xl shadow-sm flex flex-col justify-between">
+            <div className="flex justify-between items-start mb-4">
+               <div>
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Ocupación BBQ</p>
+                  <h3 className="text-2xl font-black text-slate-800">{countBBQ} <span className="text-sm text-slate-400 font-bold">Reservas</span></h3>
+               </div>
+               <Flame className="text-amber-500" size={20} />
+            </div>
+            <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
+               <div className="h-full bg-amber-500" style={{width: `${Math.min(100, countBBQ * 5)}%`}}></div>
+            </div>
+         </div>
+      </section>
+
     </div>
   );
 }

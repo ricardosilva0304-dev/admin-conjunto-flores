@@ -39,7 +39,7 @@ export default function Deudores() {
     const { data: resData } = await supabase.from("residentes").select("*");
     const { data: deudasData } = await supabase
       .from("deudas_residentes")
-      .select(`*, causaciones_globales(mes_causado)`)
+      .select("*, causaciones_globales(mes_causado, cobro_mora_activo)")
       .gt("saldo_pendiente", 0);
 
     if (resData) setResidentes(resData);

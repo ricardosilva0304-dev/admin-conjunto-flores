@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import {
   Zap, History, Trash2, Eye, X, Loader2, Search,
-  CheckCircle2, PieChart, RefreshCw, Filter, ChevronRight
+  CheckCircle2, PieChart, RefreshCw, Filter, ToggleLeft, ToggleRight
 } from "lucide-react";
 
 export default function Causacion() {
@@ -36,6 +36,7 @@ export default function Causacion() {
     setLoading(true);
     const { data: cData } = await supabase.from("conceptos_pago").select("*");
     const { data: rData } = await supabase.from("residentes").select("*").neq("torre", "Torre 1");
+    // Traemos la columna cobro_mora_activo
     const { data: hData } = await supabase.from("causaciones_globales").select("*").order('created_at', { ascending: false });
 
     if (cData) setConceptos(cData);
@@ -44,7 +45,32 @@ export default function Causacion() {
     setLoading(false);
   }
 
+  // --- NUEVA FUNCIÓN: INTERRUPTOR DE MORA ---
+  async function toggleMora(id: number, estadoActual: boolean) {
+    // Optimistic UI update (cambio visual inmediato)
+    const nuevoEstado = !estadoActual;
+    setHistorial(prev => prev.map(h => h.id === id ? { ...h, cobro_mora_activo: nuevoEstado } : h));
+
+    const { error } = await supabase
+      .from("causaciones_globales")
+      .update({ cobro_mora_activo: nuevoEstado })
+      .eq("id", id);
+
+    if (error) {
+      alert("Error al actualizar");
+      cargarDatos(); // Revertir si falló
+    }
+  }
+
   const calcularPrecioActual = (deuda: any) => {
+    // Si la causación tiene la mora APAGADA, devolvemos precio base (M1)
+    if (causacionActiva && causacionActiva.cobro_mora_activo === false) {
+       const m1 = deuda.monto_original || 0;
+       const pagado = m1 - (deuda.saldo_pendiente || 0);
+       return Math.max(0, m1 - pagado);
+    }
+
+    // Lógica normal M1-M2-M3
     if (!deuda) return 0;
     if (deuda.saldo_pendiente === 0) return deuda.monto_original || 0;
     const mesCausadoStr = deuda.causaciones_globales?.mes_causado;
@@ -85,17 +111,16 @@ export default function Causacion() {
 
     setGenerando(true);
     try {
-      // 1. Crear el lote principal
       const { data: lote, error: errLote } = await supabase.from("causaciones_globales").insert([{
         mes_causado: mesDeuda,
         concepto_nombre: concepto.nombre,
         total_residentes: residentesAfectados.length,
-        fecha_limite: fechaLimite
+        fecha_limite: fechaLimite,
+        cobro_mora_activo: true // Por defecto nace activado (cobro normal)
       }]).select().single();
 
       if (errLote) throw errLote;
 
-      // 2. Mapear residentes a deudas
       const deudas = residentesAfectados.map(res => {
         let factor = 1;
         const nombreConcepto = concepto.nombre.toUpperCase();
@@ -107,7 +132,6 @@ export default function Causacion() {
           else factor = 1;
         }
 
-        // Si el factor es 0 (ej: no tiene carro), devolvemos null para filtrar después
         if (factor === 0) return null;
 
         const montoBase = (Number(concepto.monto_1_10) || 0) * factor;
@@ -124,7 +148,7 @@ export default function Causacion() {
           saldo_pendiente: montoBase,
           fecha_vencimiento: fechaLimite
         };
-      }).filter(d => d !== null && d.monto_original > 0); // Filtramos nulos y ceros
+      }).filter(d => d !== null && d.monto_original > 0);
 
       if (deudas.length > 0) {
         const { error: errIns } = await supabase.from("deudas_residentes").insert(deudas);
@@ -133,7 +157,7 @@ export default function Causacion() {
 
       await cargarDatos();
       setConceptoId("");
-      alert("¡Causación generada! Revisa el historial.");
+      alert("¡Causación generada correctamente!");
     } catch (err: any) {
       console.error(err);
       alert("Error: " + err.message);
@@ -168,18 +192,18 @@ export default function Causacion() {
   return (
     <div className="max-w-6xl mx-auto space-y-8 pb-20 px-2 md:px-0">
 
-      {/* 1. MÓDULO DE ACCIÓN - SENCILLO PERO POTENTE */}
+      {/* 1. MÓDULO DE ACCIÓN */}
       <section className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
         <div className="bg-slate-50 px-6 py-4 border-b border-slate-200 flex justify-between items-center">
           <h2 className="text-slate-800 font-bold text-sm uppercase tracking-widest flex items-center gap-2">
             <Zap size={14} className="text-emerald-500" /> Nuevo Proceso de Cobro
           </h2>
           <span className="bg-white px-3 py-1 rounded-lg border border-slate-200 text-[10px] font-bold text-slate-500 uppercase">
-            Meta: {residentesAfectados.length} Unidades (Torres 5-8)
+            Meta: {residentesAfectados.length} Unidades
           </span>
         </div>
 
-        <div className="p-6 grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="p-6 grid grid-cols-1 md:grid-cols-4 gap-4 items-center">
           <select className="bg-slate-50 border border-slate-200 p-3 rounded-lg text-sm font-medium focus:border-emerald-500 outline-none" value={conceptoId} onChange={(e) => setConceptoId(e.target.value)}>
             <option value="">Elegir Concepto...</option>
             {conceptos.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
@@ -190,7 +214,7 @@ export default function Causacion() {
           <button
             onClick={generarCausacion}
             disabled={generando || !conceptoId}
-            className="bg-slate-900 text-white p-3 rounded-lg font-bold text-xs uppercase tracking-widest hover:bg-black transition-all flex items-center justify-center gap-2"
+            className="h-full bg-slate-900 text-white p-3 rounded-lg font-bold text-xs uppercase tracking-widest hover:bg-black transition-all flex items-center justify-center gap-2"
           >
             {generando ? <Loader2 className="animate-spin" size={14} /> : <><CheckCircle2 size={14} /> Procesar</>}
           </button>
@@ -205,7 +229,7 @@ export default function Causacion() {
         </div>
       </section>
 
-      {/* 2. HISTORIAL INTEGRADO */}
+      {/* 2. HISTORIAL CON INTERRUPTOR DE MORA */}
       <section className="space-y-4">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
@@ -214,10 +238,6 @@ export default function Causacion() {
           </div>
 
           <div className="flex gap-2">
-            <div className="relative group">
-              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-300" />
-              <input placeholder="Buscar..." className="bg-white border border-slate-200 pl-9 pr-4 py-2 rounded-lg text-xs font-bold w-40" onChange={(e) => setBusquedaHistorial(e.target.value)} />
-            </div>
             <select className="bg-white border border-slate-200 px-2 py-2 rounded-lg text-[9px] font-black uppercase outline-none" value={filtroAnio} onChange={(e) => setFiltroAnio(e.target.value)}>
               <option value="TODOS">Año</option>
               {aniosUnicos.map(a => <option key={a} value={a}>{a}</option>)}
@@ -233,6 +253,7 @@ export default function Causacion() {
                 <th className="px-6 py-4">Mes Periodo</th>
                 <th className="px-6 py-4">Concepto</th>
                 <th className="px-6 py-4 text-center">Unidades</th>
+                <th className="px-6 py-4 text-center">Control Mora</th>
                 <th className="px-6 py-4 text-right">Acciones</th>
               </tr>
             </thead>
@@ -242,9 +263,29 @@ export default function Causacion() {
                   <td className="px-6 py-4 font-black text-slate-900">{h.mes_causado}</td>
                   <td className="px-6 py-4 uppercase text-xs text-slate-500">{h.concepto_nombre}</td>
                   <td className="px-6 py-4 text-center text-slate-400 font-medium">{h.total_residentes} Apts</td>
-                  <td className="px-6 py-4 flex justify-end gap-3">
-                    <button onClick={() => verDetalles(h)} className="p-2 bg-slate-50 border border-slate-100 rounded-lg text-slate-400 hover:text-emerald-500"><Eye size={18} /></button>
-                    <button onClick={async () => { if (confirm("¿Eliminar lote?")) { await supabase.from("causaciones_globales").delete().eq("id", h.id); cargarDatos(); } }} className="p-2 bg-slate-50 border border-slate-100 rounded-lg text-slate-400 hover:text-rose-500"><Trash2 size={18} /></button>
+                  
+                  {/* --- INTERRUPTOR DE MORA --- */}
+                  <td className="px-6 py-4 text-center flex justify-center">
+                    <button 
+                        onClick={() => toggleMora(h.id, h.cobro_mora_activo)}
+                        className={`flex items-center gap-2 px-3 py-1.5 rounded-full border transition-all ${
+                            h.cobro_mora_activo 
+                            ? "bg-slate-900 text-white border-slate-900" 
+                            : "bg-slate-100 text-slate-400 border-slate-200"
+                        }`}
+                    >
+                        {h.cobro_mora_activo ? <ToggleRight size={18}/> : <ToggleLeft size={18}/>}
+                        <span className="text-[9px] font-black uppercase">
+                            {h.cobro_mora_activo ? "Mora Activa" : "Tarifa Fija"}
+                        </span>
+                    </button>
+                  </td>
+
+                  <td className="px-6 py-4 text-right">
+                    <div className="flex justify-end gap-3">
+                        <button onClick={() => verDetalles(h)} className="p-2 bg-slate-50 border border-slate-100 rounded-lg text-slate-400 hover:text-emerald-500"><Eye size={18} /></button>
+                        <button onClick={async () => { if (confirm("¿Eliminar lote?")) { await supabase.from("causaciones_globales").delete().eq("id", h.id); cargarDatos(); } }} className="p-2 bg-slate-50 border border-slate-100 rounded-lg text-slate-400 hover:text-rose-500"><Trash2 size={18} /></button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -253,19 +294,29 @@ export default function Causacion() {
         </div>
       </section>
 
-      {/* 3. MODAL DE AUDITORÍA - REDISEÑO SIMPLE Y FULL MÓVIL */}
+      {/* 3. MODAL DETALLES... (El resto sigue igual) */}
       {showDetalles && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[300] flex flex-col items-center justify-end md:justify-center">
+          {/* ... (El mismo contenido del modal que ya tenías) ... */}
+          {/* Asegúrate de que el modal también se actualice si tienes el código ahí */}
           <div className="bg-white w-full max-w-5xl md:h-[80vh] md:rounded-2xl rounded-t-3xl shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-bottom duration-300">
-
             <div className="p-6 border-b border-slate-100 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-emerald-100 text-emerald-600 rounded-xl flex items-center justify-center"><PieChart size={20} /></div>
-                <div><h3 className="font-black text-slate-900 text-lg uppercase tracking-tighter">Detalle de Cobros</h3><p className="text-[10px] text-slate-400 uppercase font-bold tracking-widest">{causacionActiva?.mes_causado}</p></div>
-              </div>
-              <button onClick={() => setShowDetalles(false)} className="p-3 bg-slate-100 text-slate-400 rounded-xl hover:text-slate-600"><X /></button>
+                <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-emerald-100 text-emerald-600 rounded-xl flex items-center justify-center"><PieChart size={20} /></div>
+                    <div>
+                        <h3 className="font-black text-slate-900 text-lg uppercase tracking-tighter">Detalle de Cobros</h3>
+                        <p className="text-[10px] text-slate-400 uppercase font-bold tracking-widest flex items-center gap-2">
+                            {causacionActiva?.mes_causado}
+                            {/* Indicador visual dentro del modal */}
+                            {causacionActiva?.cobro_mora_activo === false && (
+                                <span className="text-amber-500 bg-amber-50 px-2 rounded ml-2">TARIFA PLANA ACTIVADA</span>
+                            )}
+                        </p>
+                    </div>
+                </div>
+                <button onClick={() => setShowDetalles(false)} className="p-3 bg-slate-100 text-slate-400 rounded-xl hover:text-slate-600"><X /></button>
             </div>
-
+            {/* ... Resto del modal (Buscador, Totales, Lista) ... */}
             <div className="p-4 bg-slate-50/50 flex gap-4 overflow-x-auto no-scrollbar border-b border-slate-100">
               <div className="bg-white p-3 rounded-xl border border-slate-200 flex-1 min-w-[120px]">
                 <p className="text-[8px] font-bold text-slate-400 uppercase">Recaudado</p>

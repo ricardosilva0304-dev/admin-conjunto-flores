@@ -56,7 +56,7 @@ export default function Ingresos() {
     setBusqueda("");
     const { data } = await supabase
       .from("deudas_residentes")
-      .select(`*, causaciones_globales(mes_causado, concepto_nombre)`)
+      .select("*, causaciones_globales(mes_causado, cobro_mora_activo)")
       .eq("residente_id", res.id)
       .gt("saldo_pendiente", 0);
 
@@ -73,6 +73,12 @@ export default function Ingresos() {
   const calcularSaldoRealHoy = (deuda: any) => {
     // --- AGREGA ESTA LÍNEA AL PRINCIPIO ---
     if (!deuda.causaciones_globales) return deuda.saldo_pendiente || 0;
+
+    if (deuda.causaciones_globales.cobro_mora_activo === false) {
+      const m1 = deuda.monto_original || 0;
+      const pagado = m1 - (deuda.saldo_pendiente || 0);
+      return Math.max(0, m1 - pagado);
+    }
 
     const hoy = new Date();
     const dia = hoy.getDate();
