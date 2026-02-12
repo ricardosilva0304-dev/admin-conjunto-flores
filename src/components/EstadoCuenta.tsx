@@ -135,27 +135,31 @@ export default function EstadoCuenta({
             margin: 1.5cm;
           }
 
-          body > *:not(.print-modal) {
-            display: none !important;
+          html, body {
+            margin: 0;
+            padding: 0;
+            background: white;
           }
 
-          .print-modal {
-            display: block !important;
-            position: static !important;
-            background: white !important;
-            padding: 0 !important;
-            margin: 0 !important;
-          }
-
+          /* Ocultar botones */
           .no-print {
             display: none !important;
           }
 
+          /* Quitar overlay oscuro */
+          .print-modal {
+            position: static !important;
+            background: white !important;
+            backdrop-filter: none !important;
+            overflow: visible !important;
+          }
+
+          /* Hojas */
           .print-page {
-            box-shadow: none;
-            margin: 0;
-            width: 100%;
-            min-height: auto;
+            box-shadow: none !important;
+            margin: 0 !important;
+            width: 100% !important;
+            min-height: auto !important;
             page-break-after: always;
           }
 
