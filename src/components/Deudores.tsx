@@ -2,10 +2,8 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import {
-  Search, Users, Printer, FileText,
-  Loader2, X, CheckCircle2, TrendingUp,
-  ArrowUpRight, LayoutGrid, Building2, User,
-  Mail, Phone, Plus
+  Search, Loader2, X, CheckCircle2,
+  Plus
 } from "lucide-react";
 
 // Documentos
@@ -18,7 +16,9 @@ export default function Deudores() {
   const [loading, setLoading] = useState(true);
   const [busqueda, setBusqueda] = useState("");
   const [filtroTorre, setFiltroTorre] = useState("TODAS");
-  const [orden, setOrden] = useState("mayor");
+  // Eliminamos el estado 'orden' porque ahora será siempre por ubicación
+  
+  // Buscador manual para el modal
   const [busquedaManual, setBusquedaManual] = useState("");
 
   const [residenteDetalle, setResidenteDetalle] = useState<any>(null);
@@ -28,7 +28,7 @@ export default function Deudores() {
   const [formManual, setFormManual] = useState({
     residente_id: "",
     concepto: "",
-    mes: new Date().toISOString().split('-').slice(0, 2).join('-'), // "2024-05"
+    mes: new Date().toISOString().split('-').slice(0, 2).join('-'),
     valor: ""
   });
 
@@ -54,8 +54,6 @@ export default function Deudores() {
 
     setLoading(true);
     const monto = parseFloat(formManual.valor);
-
-    // Combinamos Concepto + Mes para que aparezca claro: "MULTA (2024-05)"
     const conceptoFinal = `${formManual.concepto.toUpperCase()} (${formManual.mes})`;
 
     const { error } = await supabase.from("deudas_residentes").insert([{
@@ -83,21 +81,18 @@ export default function Deudores() {
   const calcularDeudaReal = (resId: number) => {
     const deudasRes = deudas.filter(d => d.residente_id === resId);
     return deudasRes.reduce((acc, d) => {
-      // 1. SI ES CARGO MANUAL (No tiene causaciones_globales), devolver saldo directo
+      // 1. Cargo Manual
       if (!d.causaciones_globales) {
         return acc + (Number(d.saldo_pendiente) || 0);
       }
+      // 2. Causación
+      const mesCausado = d.causaciones_globales?.mes_causado;
+      if (!mesCausado) return acc + (Number(d.saldo_pendiente) || 0);
 
-      // 2. SI TIENE CAUSACIÓN (Administración), aplicar lógica de tramos
       const hoy = new Date();
       const dia = hoy.getDate();
       const mesAct = hoy.getMonth() + 1;
       const anioAct = hoy.getFullYear();
-
-      // Usamos el encadenamiento opcional ?. para evitar el crash
-      const mesCausado = d.causaciones_globales?.mes_causado;
-      if (!mesCausado) return acc + (Number(d.saldo_pendiente) || 0);
-
       const [yC, mC] = mesCausado.split("-").map(Number);
 
       let precioPlazo = d.precio_m1 || 0;
@@ -113,6 +108,7 @@ export default function Deudores() {
     }, 0);
   };
 
+  // --- LÓGICA DE LISTADO Y ORDENAMIENTO POR UBICACIÓN ---
   const lista = residentes.map(r => ({
     ...r,
     saldoReal: calcularDeudaReal(r.id)
@@ -125,14 +121,23 @@ export default function Deudores() {
       return r.torre.includes(t) && r.apartamento.startsWith(a) && coincideTorre;
     }
     return (r.nombre.toLowerCase().includes(term) || r.apartamento.includes(term)) && coincideTorre;
-  }).sort((a, b) => orden === "mayor" ? b.saldoReal - a.saldoReal : a.saldoReal - b.saldoReal);
+  })
+  .sort((a, b) => {
+    // 1. Comparar Torres (Alfabéticamente para que "Torre 1" vaya antes de "Torre 5")
+    if (a.torre < b.torre) return -1;
+    if (a.torre > b.torre) return 1;
+    
+    // 2. Si es la misma torre, comparar Apartamentos (Numéricamente)
+    // Usamos parseInt para que el 101 vaya antes del 1001, etc.
+    return parseInt(a.apartamento) - parseInt(b.apartamento);
+  });
 
   if (loading) return <div className="flex h-screen items-center justify-center"><Loader2 className="animate-spin text-slate-300" size={30} /></div>;
 
   return (
     <div className="max-w-6xl mx-auto space-y-6 pb-20 px-2 md:px-0 font-sans text-slate-800">
 
-      {/* 1. KPIS SIMPLES Y ELEGANTES */}
+      {/* 1. KPIS */}
       <div className="grid grid-cols-2 md:grid-cols-3 gap-4 md:gap-6">
         <div className="bg-slate-900 p-6 rounded-xl text-white">
           <p className="text-[10px] font-black uppercase text-slate-400 tracking-wider mb-2">Total en Calle</p>
@@ -157,7 +162,7 @@ export default function Deudores() {
         </div>
       </div>
 
-      {/* 2. BARRA DE HERRAMIENTAS MÓVIL-OPTIMIZADA */}
+      {/* 2. BARRA DE HERRAMIENTAS */}
       <div className="bg-white p-2 rounded-2xl border border-slate-200 shadow-sm flex flex-col md:flex-row gap-2">
         <div className="relative flex-1 group">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
@@ -191,7 +196,7 @@ export default function Deudores() {
         </button>
       </div>
 
-      {/* 3. LISTADO EJECUTIVO */}
+      {/* 3. LISTADO (ORGANIZADO POR UBICACIÓN) */}
       <div className="space-y-2 md:space-y-3">
         {lista.map(res => (
           <div key={res.id} className="bg-white border border-slate-100 p-4 md:p-6 rounded-xl md:rounded-2xl flex flex-col md:flex-row md:items-center justify-between transition-all hover:bg-slate-50">
@@ -238,13 +243,14 @@ export default function Deudores() {
         ))}
       </div>
 
-      {/* MODALES TÁCTILES */}
+      {/* MODALES */}
       {residenteDetalle && (
         <EstadoCuenta residente={residenteDetalle} deudas={deudas.filter(d => d.residente_id === residenteDetalle.id)} onClose={() => setResidenteDetalle(null)} />
       )}
       {cobroResidente && (
         <CuentaCobro residente={cobroResidente} deudas={deudas.filter(d => d.residente_id === cobroResidente.id)} onClose={() => setCobroResidente(null)} />
       )}
+      
       {showManualModal && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[500] flex items-center justify-center p-4">
           <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden border">
@@ -266,7 +272,7 @@ export default function Deudores() {
                       : busquedaManual}
                     onChange={(e) => {
                       setBusquedaManual(e.target.value);
-                      setFormManual({ ...formManual, residente_id: "" }); // Limpia la selección si escribe de nuevo
+                      setFormManual({ ...formManual, residente_id: "" });
                     }}
                   />
                   {formManual.residente_id && (
@@ -288,7 +294,7 @@ export default function Deudores() {
                         const unidad = `${r.torre.replace("Torre ", "")}-${r.apartamento}`;
                         return r.nombre.toLowerCase().includes(term) || unidad.includes(term);
                       })
-                      .slice(0, 5) // Mostrar solo los primeros 5 resultados
+                      .slice(0, 5)
                       .map(r => (
                         <button
                           key={r.id}

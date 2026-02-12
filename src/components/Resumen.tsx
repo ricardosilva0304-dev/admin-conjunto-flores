@@ -3,8 +3,8 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import {
     TrendingUp, TrendingDown, Wallet, AlertTriangle,
-    ArrowUpRight, Landmark, Banknote,
-    Calendar, ChevronRight, Loader2, CheckCircle2, LayoutGrid
+    LayoutGrid, Calendar, ChevronRight, Loader2,
+    CheckCircle2, User, Trophy, Medal
 } from "lucide-react";
 
 interface ResumenProps {
@@ -26,37 +26,44 @@ export default function Resumen({ adminName, goToDeudores }: ResumenProps) {
 
     useEffect(() => { cargarDatosDashboard(); }, []);
 
-    // --- LÓGICA DE PRECIO DINÁMICO (Sincronizada con Causación e Ingresos) ---
+    // --- LÓGICA DE PRECIO DINÁMICO (M1, M2, M3) ---
     const calcularPrecioActual = (deuda: any) => {
-        if (!deuda || deuda.saldo_pendiente === 0) return 0;
-        
+        // Si es cargo manual, devolver saldo directo
+        if (!deuda.causaciones_globales) return deuda.saldo_pendiente || 0;
+
         const hoy = new Date();
-        const diaMes = hoy.getDate();
+        const diaMes = hoy.getDate(); // <--- Aquí la llamamos diaMes
         const mesActual = hoy.getMonth() + 1;
         const anioActual = hoy.getFullYear();
 
         const mesCausadoStr = deuda.causaciones_globales?.mes_causado;
-        if (!mesCausadoStr) return deuda.precio_m1 || 0;
+        if (!mesCausadoStr) return deuda.saldo_pendiente || 0;
 
         const partes = mesCausadoStr.split("-");
-        if (partes.length < 2) return deuda.precio_m1 || 0;
-        
+        if (partes.length < 2) return deuda.saldo_pendiente || 0;
+
         const yearC = parseInt(partes[0]);
         const monthC = parseInt(partes[1]);
-        
-        let precioTramo = deuda.precio_m1 || 0;
+
+        // Mapeo de columnas
+        const m1 = deuda.precio_m1 || deuda.monto_original || 0;
+        const m2 = deuda.precio_m2 || m1;
+        const m3 = deuda.precio_m3 || m1;
+
+        let precioTramo = m1;
 
         // Si ya pasó el mes de la deuda
         if (anioActual > yearC || (anioActual === yearC && mesActual > monthC)) {
-            precioTramo = deuda.precio_m3 || 0;
+            precioTramo = m3;
         } else {
             // Si estamos en el mismo mes
-            if (diaMes > 10 && diaMes <= 20) precioTramo = deuda.precio_m2 || 0;
-            if (diaMes > 20) precioTramo = deuda.precio_m3 || 0;
+            // CORRECCIÓN: Usar 'diaMes' en lugar de 'dia'
+            if (diaMes > 10 && diaMes <= 20) precioTramo = m2;
+            if (diaMes > 20) precioTramo = m3;
         }
 
-        // Restar lo que ya pagó anteriormente (Abono real)
-        const yaPagado = (deuda.precio_m1 || 0) - (deuda.saldo_pendiente || 0);
+        // Restar lo que ya pagó anteriormente
+        const yaPagado = m1 - (deuda.saldo_pendiente || 0);
         return Math.max(0, precioTramo - yaPagado);
     };
 
@@ -69,7 +76,7 @@ export default function Resumen({ adminName, goToDeudores }: ResumenProps) {
             const [pagosRes, egresosRes, deudasRes] = await Promise.all([
                 supabase.from("pagos").select("monto_total, metodo_pago").gte("fecha_pago", primerDiaMes),
                 supabase.from("egresos").select("monto").gte("fecha", primerDiaMes),
-                supabase.from("deudas_residentes").select(`*, residentes(nombre), causaciones_globales(mes_causado)`).gt("saldo_pendiente", 0)
+                supabase.from("deudas_residentes").select(`*, residentes(id, nombre, torre, apartamento), causaciones_globales(mes_causado)`).gt("saldo_pendiente", 0)
             ]);
 
             // Procesar ingresos y egresos
@@ -78,17 +85,33 @@ export default function Resumen({ adminName, goToDeudores }: ResumenProps) {
             const porBanco = pagosRes.data?.filter(p => p.metodo_pago === 'Transferencia').reduce((acc, p) => acc + Number(p.monto_total), 0) || 0;
             const porEfectivo = pagosRes.data?.filter(p => p.metodo_pago === 'Efectivo').reduce((acc, p) => acc + Number(p.monto_total), 0) || 0;
 
-            // --- PROCESAR CARTERA PENDIENTE DINÁMICAMENTE ---
+            // --- PROCESAR CARTERA AGRUPADA POR RESIDENTE ---
             let sumaCarteraReal = 0;
-            const listaCalculada = (deudasRes.data || []).map(d => {
+            const deudaPorResidente: Record<string, any> = {};
+
+            (deudasRes.data || []).forEach(d => {
                 const valorHoy = calcularPrecioActual(d);
                 sumaCarteraReal += valorHoy;
-                return { ...d, deudaHoy: valorHoy };
+
+                // Agrupamos por ID de residente para sumar todas sus deudas
+                const rId = d.residentes?.id;
+                if (rId) {
+                    if (!deudaPorResidente[rId]) {
+                        deudaPorResidente[rId] = {
+                            nombre: d.residentes.nombre,
+                            unidad: `T${d.residentes.torre.replace("Torre ", "")}-${d.residentes.apartamento}`,
+                            totalDeuda: 0,
+                            cantidadRecibos: 0
+                        };
+                    }
+                    deudaPorResidente[rId].totalDeuda += valorHoy;
+                    deudaPorResidente[rId].cantidadRecibos += 1;
+                }
             });
 
-            // Ordenar por deuda y tomar top 5 para el widget
-            const topMorosos = [...listaCalculada]
-                .sort((a, b) => b.deudaHoy - a.deudaHoy)
+            // Convertir objeto a array, ordenar y tomar top 5
+            const topMorosos = Object.values(deudaPorResidente)
+                .sort((a: any, b: any) => b.totalDeuda - a.totalDeuda)
                 .slice(0, 5);
 
             setStats({
@@ -115,10 +138,18 @@ export default function Resumen({ adminName, goToDeudores }: ResumenProps) {
         return "Buenas noches";
     };
 
+    // Función auxiliar para iconos de ranking
+    const renderRankIcon = (index: number) => {
+        if (index === 0) return <Trophy size={16} className="text-amber-500 fill-amber-500" />;
+        if (index === 1) return <Medal size={16} className="text-slate-400 fill-slate-400" />;
+        if (index === 2) return <Medal size={16} className="text-orange-400 fill-orange-400" />;
+        return <span className="text-xs font-black text-slate-300">#{index + 1}</span>;
+    };
+
     if (loading) return (
         <div className="flex flex-col h-screen items-center justify-center gap-4">
             <Loader2 className="animate-spin text-slate-300" size={30} />
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Actualizando métricas a fecha de hoy...</p>
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Calculando métricas en tiempo real...</p>
         </div>
     );
 
@@ -144,24 +175,31 @@ export default function Resumen({ adminName, goToDeudores }: ResumenProps) {
                 </div>
             </div>
 
-            {/* KPI GRID (FLEXIBLE) */}
+            {/* KPI GRID */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 {[
-                    { label: 'Ingresos', val: stats.ingresosMes, icon: <TrendingUp size={20}/>, c: 'emerald' },
-                    { label: 'Gastos', val: stats.egresosMes, icon: <TrendingDown size={20}/>, c: 'rose' },
-                    { label: 'Balance', val: stats.balanceMes, icon: <Wallet size={20}/>, c: 'blue' },
-                    { label: 'Cartera Pend.', val: stats.carteraPendiente, icon: <AlertTriangle size={20}/>, c: 'rose' },
-                ].map((item, i) => (
-                    <div key={i} className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-                        <div className={`w-10 h-10 bg-${item.c === 'rose' ? 'rose' : item.c}-50 text-${item.c === 'rose' ? 'rose' : item.c}-600 rounded-xl flex items-center justify-center mb-4`}>
-                            {item.icon}
+                    { label: 'Ingresos', val: stats.ingresosMes, icon: <TrendingUp size={20} />, c: 'emerald' },
+                    { label: 'Gastos', val: stats.egresosMes, icon: <TrendingDown size={20} />, c: 'rose' },
+                    { label: 'Balance', val: stats.balanceMes, icon: <Wallet size={20} />, c: 'blue' },
+                    { label: 'Cartera Pend.', val: stats.carteraPendiente, icon: <AlertTriangle size={20} />, c: 'rose' },
+                ].map((item, i) => {
+                    const colorClasses: any = {
+                        emerald: "bg-emerald-50 text-emerald-600",
+                        rose: "bg-rose-50 text-rose-600",
+                        blue: "bg-blue-50 text-blue-600"
+                    };
+                    return (
+                        <div key={i} className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-4 ${colorClasses[item.c]}`}>
+                                {item.icon}
+                            </div>
+                            <p className="text-slate-400 text-[9px] font-black uppercase tracking-widest mb-1">{item.label}</p>
+                            <h3 className={`text-2xl font-black tabular-nums ${item.label === 'Cartera Pend.' ? 'text-rose-600' : 'text-slate-800'}`}>
+                                ${item.val.toLocaleString('es-CO')}
+                            </h3>
                         </div>
-                        <p className="text-slate-400 text-[9px] font-black uppercase tracking-widest mb-1">{item.label}</p>
-                        <h3 className={`text-2xl font-black tabular-nums ${item.label === 'Cartera Pend.' ? 'text-rose-600' : 'text-slate-800'}`}>
-                            ${item.val.toLocaleString('es-CO')}
-                        </h3>
-                    </div>
-                ))}
+                    );
+                })}
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
@@ -183,54 +221,81 @@ export default function Resumen({ adminName, goToDeudores }: ResumenProps) {
                         </div>
                     </div>
                     <div className="bg-slate-50 p-6 rounded-2xl text-center border border-slate-100">
-                        <p className="text-[9px] font-black text-emerald-600 uppercase tracking-widest mb-3">Tasa Recaudación Mensual</p>
+                        <p className="text-[9px] font-black text-emerald-600 uppercase tracking-widest mb-3">Eficiencia Recaudo</p>
                         <div className="text-3xl font-black text-slate-800 tabular-nums leading-none">
-                            {Math.round((stats.ingresosMes / (stats.ingresosMes + stats.carteraPendiente + 1)) * 100)}%
+                            {stats.ingresosMes + stats.carteraPendiente > 0
+                                ? Math.round((stats.ingresosMes / (stats.ingresosMes + stats.carteraPendiente)) * 100)
+                                : 0}%
                         </div>
                     </div>
                 </div>
 
-                {/* Deudores Críticos */}
-                <div className="lg:col-span-8 bg-white border border-slate-200 rounded-[2rem] p-8 flex flex-col shadow-sm">
-                    <div className="flex items-center justify-between mb-8">
+                {/* --- SECCIÓN DEUDORES CRÍTICOS MEJORADA --- */}
+                <div className="lg:col-span-8 bg-white border border-slate-200 rounded-[2rem] p-8 flex flex-col shadow-sm relative overflow-hidden">
+                    {/* Decoración de fondo */}
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-rose-50 rounded-bl-full -mr-10 -mt-10 opacity-50"></div>
+
+                    <div className="flex items-center justify-between mb-8 relative z-10">
                         <h3 className="text-slate-800 font-bold text-sm uppercase tracking-widest flex items-center gap-2">
-                            <div className="w-2 h-6 bg-rose-500 rounded-full"></div> Unidades con mayor mora
+                            <div className="w-1.5 h-6 bg-rose-600 rounded-full"></div> Unidades con Mayor Mora
                         </h3>
+                        <span className="text-[9px] font-black bg-rose-50 text-rose-600 px-3 py-1 rounded-full uppercase tracking-wide">
+                            Top 5 Crítico
+                        </span>
                     </div>
 
-                    <div className="space-y-2 flex-1">
+                    <div className="space-y-3 flex-1 relative z-10">
                         {morosos.length === 0 ? (
                             <div className="py-20 text-center opacity-40">
-                                <CheckCircle2 className="mx-auto mb-3" size={32}/>
-                                <p className="text-xs font-black uppercase tracking-widest">Sin deudores pendientes</p>
+                                <CheckCircle2 className="mx-auto mb-3 text-emerald-500" size={40} />
+                                <p className="text-xs font-black uppercase tracking-widest text-slate-400">Excelente: Cartera al día</p>
                             </div>
                         ) : (
                             morosos.map((m, i) => (
-                                <div key={i} className="flex items-center justify-between p-4 bg-slate-50/50 hover:bg-slate-50 border border-slate-100 rounded-xl transition-all">
-                                    <div className="flex items-center gap-4">
-                                        <div className="w-10 h-10 bg-slate-900 text-white rounded-lg flex items-center justify-center font-black text-xs">
-                                            {m.unidad}
+                                <div key={i} className="group flex items-center justify-between p-4 bg-white border border-slate-100 rounded-2xl hover:border-rose-200 hover:shadow-lg hover:shadow-rose-100/50 transition-all duration-300">
+
+                                    <div className="flex items-center gap-5">
+                                        {/* Rank Badge */}
+                                        <div className="w-8 flex justify-center">
+                                            {renderRankIcon(i)}
                                         </div>
-                                        <div>
-                                            <p className="text-xs font-black text-slate-800 uppercase truncate max-w-[120px] md:max-w-none">{m.residentes?.nombre}</p>
-                                            <p className="text-[8px] font-black text-rose-500 uppercase tracking-[0.2em]">Cálculo Tramo 11-20</p>
+
+                                        {/* Avatar & Info */}
+                                        <div className="flex items-center gap-4">
+                                            <div className="w-10 h-10 bg-slate-900 text-white rounded-xl flex items-center justify-center font-black text-[10px] shadow-md group-hover:scale-110 transition-transform">
+                                                {m.unidad}
+                                            </div>
+                                            <div>
+                                                <p className="text-xs font-black text-slate-800 uppercase truncate max-w-[150px]">{m.nombre}</p>
+                                                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wide flex items-center gap-1">
+                                                    <User size={10} /> {m.cantidadRecibos} Conceptos vencidos
+                                                </p>
+                                            </div>
                                         </div>
                                     </div>
+
+                                    {/* Monto */}
                                     <div className="text-right">
                                         <p className="text-sm font-black text-rose-600 tabular-nums">
-                                            ${Number(m.deudaHoy).toLocaleString('es-CO')}
+                                            ${Number(m.totalDeuda).toLocaleString('es-CO')}
                                         </p>
+                                        <div className="w-full bg-slate-100 h-1 rounded-full mt-1 overflow-hidden">
+                                            <div
+                                                className="h-full bg-rose-500 rounded-full"
+                                                style={{ width: `${Math.min(100, (m.totalDeuda / morosos[0].totalDeuda) * 100)}%` }}
+                                            ></div>
+                                        </div>
                                     </div>
                                 </div>
                             ))
                         )}
                     </div>
 
-                    <button 
+                    <button
                         onClick={goToDeudores}
-                        className="w-full mt-6 py-4 bg-slate-50 border border-slate-100 text-slate-400 font-black text-[10px] uppercase tracking-[0.4em] rounded-xl hover:bg-slate-900 hover:text-white transition-all flex items-center justify-center gap-2"
+                        className="w-full mt-8 py-4 bg-slate-50 border border-slate-200 text-slate-500 font-black text-[10px] uppercase tracking-[0.3em] rounded-xl hover:bg-slate-900 hover:text-white hover:border-slate-900 transition-all flex items-center justify-center gap-2"
                     >
-                        Gestión Detallada <ChevronRight size={14}/>
+                        Ver Cartera Completa <ChevronRight size={14} />
                     </button>
                 </div>
             </div>
