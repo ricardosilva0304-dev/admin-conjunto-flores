@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import {
   Zap, History, Trash2, Eye, X, Loader2, Search,
-  CheckCircle2, PieChart, RefreshCw, Filter, ToggleLeft, ToggleRight
+  CheckCircle2, PieChart, RefreshCw, Filter, Settings2
 } from "lucide-react";
 
 export default function Causacion() {
@@ -36,7 +36,7 @@ export default function Causacion() {
     setLoading(true);
     const { data: cData } = await supabase.from("conceptos_pago").select("*");
     const { data: rData } = await supabase.from("residentes").select("*").neq("torre", "Torre 1");
-    // Traemos la columna cobro_mora_activo
+    // Traemos la nueva columna tipo_cobro
     const { data: hData } = await supabase.from("causaciones_globales").select("*").order('created_at', { ascending: false });
 
     if (cData) setConceptos(cData);
@@ -45,50 +45,52 @@ export default function Causacion() {
     setLoading(false);
   }
 
-  // --- NUEVA FUNCIÓN: INTERRUPTOR DE MORA ---
-  async function toggleMora(id: number, estadoActual: boolean) {
-    // Optimistic UI update (cambio visual inmediato)
-    const nuevoEstado = !estadoActual;
-    setHistorial(prev => prev.map(h => h.id === id ? { ...h, cobro_mora_activo: nuevoEstado } : h));
+  // --- NUEVA FUNCIÓN: CAMBIAR TIPO DE COBRO ---
+  async function cambiarModo(id: number, nuevoModo: string) {
+    // Actualización optimista (Visual inmediata)
+    setHistorial(prev => prev.map(h => h.id === id ? { ...h, tipo_cobro: nuevoModo } : h));
 
     const { error } = await supabase
       .from("causaciones_globales")
-      .update({ cobro_mora_activo: nuevoEstado })
+      .update({ tipo_cobro: nuevoModo })
       .eq("id", id);
 
     if (error) {
       alert("Error al actualizar");
-      cargarDatos(); // Revertir si falló
+      cargarDatos();
     }
   }
 
   const calcularPrecioActual = (deuda: any) => {
-    // Si la causación tiene la mora APAGADA, devolvemos precio base (M1)
-    if (causacionActiva && causacionActiva.cobro_mora_activo === false) {
-       const m1 = deuda.monto_original || 0;
-       const pagado = m1 - (deuda.saldo_pendiente || 0);
-       return Math.max(0, m1 - pagado);
-    }
+    const modo = causacionActiva?.tipo_cobro || 'NORMAL';
+    
+    // Mapeo de precios
+    const m1 = deuda.monto_original || 0; // Asumimos monto_original como M1 base
+    const m2 = deuda.precio_m2 || m1;
+    const m3 = deuda.precio_m3 || m1;
+    const pagado = m1 - (deuda.saldo_pendiente || 0); // Lo que ya abonó
 
-    // Lógica normal M1-M2-M3
-    if (!deuda) return 0;
-    if (deuda.saldo_pendiente === 0) return deuda.monto_original || 0;
-    const mesCausadoStr = deuda.causaciones_globales?.mes_causado;
-    if (!mesCausadoStr) return deuda.precio_m1 || 0;
-    const partes = mesCausadoStr.split("-");
-    if (partes.length < 2) return deuda.precio_m1 || 0;
+    // LÓGICA DE MODOS FORZADOS
+    if (modo === 'M1') return Math.max(0, m1 - pagado);
+    if (modo === 'M2') return Math.max(0, m2 - pagado);
+    if (modo === 'M3') return Math.max(0, m3 - pagado);
 
-    const yearC = parseInt(partes[0]);
-    const monthC = parseInt(partes[1]);
+    // LÓGICA NORMAL (AUTO)
+    if (!deuda.causaciones_globales?.mes_causado) return deuda.saldo_pendiente || 0;
+    
+    const [yC, mC] = deuda.causaciones_globales.mes_causado.split("-").map(Number);
     const hoy = new Date();
     const dia = hoy.getDate();
-    const mesActual = hoy.getMonth() + 1;
-    const anioActual = hoy.getFullYear();
+    const mesAct = hoy.getMonth() + 1;
+    const anioAct = hoy.getFullYear();
 
-    if (anioActual > yearC || (anioActual === yearC && mesActual > monthC)) return deuda.precio_m3 || 0;
-    if (dia <= 10) return deuda.precio_m1 || 0;
-    if (dia <= 20) return deuda.precio_m2 || 0;
-    return deuda.precio_m3 || 0;
+    let precio = m1;
+    if (anioAct > yC || (anioAct === yC && mesAct > mC)) precio = m3;
+    else {
+        if (dia > 10 && dia <= 20) precio = m2;
+        if (dia > 20) precio = m3;
+    }
+    return Math.max(0, precio - pagado);
   };
 
   async function verDetalles(causacion: any) {
@@ -97,7 +99,7 @@ export default function Causacion() {
     setLoadingDetalle(true);
     const { data } = await supabase
       .from("deudas_residentes")
-      .select(`*, residentes(nombre), causaciones_globales(mes_causado)`)
+      .select(`*, residentes(nombre), causaciones_globales(mes_causado, tipo_cobro)`)
       .eq("causacion_id", causacion.id)
       .order('unidad', { ascending: true });
     if (data) setDeudasDetalle(data);
@@ -116,7 +118,7 @@ export default function Causacion() {
         concepto_nombre: concepto.nombre,
         total_residentes: residentesAfectados.length,
         fecha_limite: fechaLimite,
-        cobro_mora_activo: true // Por defecto nace activado (cobro normal)
+        tipo_cobro: 'NORMAL' // Por defecto nace en modo Automático
       }]).select().single();
 
       if (errLote) throw errLote;
@@ -229,7 +231,7 @@ export default function Causacion() {
         </div>
       </section>
 
-      {/* 2. HISTORIAL CON INTERRUPTOR DE MORA */}
+      {/* 2. HISTORIAL CON BOTONES DE MODO */}
       <section className="space-y-4">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
@@ -253,32 +255,39 @@ export default function Causacion() {
                 <th className="px-6 py-4">Mes Periodo</th>
                 <th className="px-6 py-4">Concepto</th>
                 <th className="px-6 py-4 text-center">Unidades</th>
-                <th className="px-6 py-4 text-center">Control Mora</th>
+                <th className="px-6 py-4 text-center">Regla de Cobro (Tarifa)</th>
                 <th className="px-6 py-4 text-right">Acciones</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {historialFiltrado.map(h => (
-                <tr key={h.id} className="hover:bg-slate-50 transition-colors">
+                <tr key={h.id} className="hover:bg-slate-50 transition-colors group">
                   <td className="px-6 py-4 font-black text-slate-900">{h.mes_causado}</td>
                   <td className="px-6 py-4 uppercase text-xs text-slate-500">{h.concepto_nombre}</td>
-                  <td className="px-6 py-4 text-center text-slate-400 font-medium">{h.total_residentes} Apts</td>
+                  <td className="px-6 py-4 text-center text-slate-400 font-medium">{h.total_residentes}</td>
                   
-                  {/* --- INTERRUPTOR DE MORA --- */}
-                  <td className="px-6 py-4 text-center flex justify-center">
-                    <button 
-                        onClick={() => toggleMora(h.id, h.cobro_mora_activo)}
-                        className={`flex items-center gap-2 px-3 py-1.5 rounded-full border transition-all ${
-                            h.cobro_mora_activo 
-                            ? "bg-slate-900 text-white border-slate-900" 
-                            : "bg-slate-100 text-slate-400 border-slate-200"
-                        }`}
-                    >
-                        {h.cobro_mora_activo ? <ToggleRight size={18}/> : <ToggleLeft size={18}/>}
-                        <span className="text-[9px] font-black uppercase">
-                            {h.cobro_mora_activo ? "Mora Activa" : "Tarifa Fija"}
-                        </span>
-                    </button>
+                  {/* --- BOTONES DE CONTROL DE PRECIO --- */}
+                  <td className="px-6 py-4">
+                    <div className="flex justify-center gap-1 bg-slate-100 p-1 rounded-lg w-fit mx-auto">
+                        {['M1', 'M2', 'M3', 'NORMAL'].map((m) => {
+                            const active = (h.tipo_cobro || 'NORMAL') === m;
+                            return (
+                                <button
+                                    key={m}
+                                    onClick={() => cambiarModo(h.id, m)}
+                                    className={`
+                                        px-3 py-1 rounded-md text-[8px] font-black transition-all
+                                        ${active 
+                                            ? (m === 'NORMAL' ? "bg-slate-800 text-white" : m === 'M1' ? "bg-emerald-500 text-white" : m === 'M2' ? "bg-blue-500 text-white" : "bg-rose-500 text-white")
+                                            : "text-slate-400 hover:bg-white"
+                                        }
+                                    `}
+                                >
+                                    {m === 'NORMAL' ? 'AUTO' : m}
+                                </button>
+                            );
+                        })}
+                    </div>
                   </td>
 
                   <td className="px-6 py-4 text-right">
@@ -294,29 +303,23 @@ export default function Causacion() {
         </div>
       </section>
 
-      {/* 3. MODAL DETALLES... (El resto sigue igual) */}
+      {/* MODAL DETALLES... (El mismo de antes) */}
       {showDetalles && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[300] flex flex-col items-center justify-end md:justify-center">
-          {/* ... (El mismo contenido del modal que ya tenías) ... */}
-          {/* Asegúrate de que el modal también se actualice si tienes el código ahí */}
           <div className="bg-white w-full max-w-5xl md:h-[80vh] md:rounded-2xl rounded-t-3xl shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-bottom duration-300">
             <div className="p-6 border-b border-slate-100 flex items-center justify-between">
                 <div className="flex items-center gap-3">
                     <div className="w-10 h-10 bg-emerald-100 text-emerald-600 rounded-xl flex items-center justify-center"><PieChart size={20} /></div>
                     <div>
-                        <h3 className="font-black text-slate-900 text-lg uppercase tracking-tighter">Detalle de Cobros</h3>
+                        <h3 className="font-black text-slate-900 text-lg uppercase tracking-tighter">Auditoría en Tiempo Real</h3>
                         <p className="text-[10px] text-slate-400 uppercase font-bold tracking-widest flex items-center gap-2">
-                            {causacionActiva?.mes_causado}
-                            {/* Indicador visual dentro del modal */}
-                            {causacionActiva?.cobro_mora_activo === false && (
-                                <span className="text-amber-500 bg-amber-50 px-2 rounded ml-2">TARIFA PLANA ACTIVADA</span>
-                            )}
+                            {causacionActiva?.mes_causado} • MODO: {causacionActiva?.tipo_cobro || 'NORMAL'}
                         </p>
                     </div>
                 </div>
                 <button onClick={() => setShowDetalles(false)} className="p-3 bg-slate-100 text-slate-400 rounded-xl hover:text-slate-600"><X /></button>
             </div>
-            {/* ... Resto del modal (Buscador, Totales, Lista) ... */}
+            {/* ... Resto del modal sigue igual ... */}
             <div className="p-4 bg-slate-50/50 flex gap-4 overflow-x-auto no-scrollbar border-b border-slate-100">
               <div className="bg-white p-3 rounded-xl border border-slate-200 flex-1 min-w-[120px]">
                 <p className="text-[8px] font-bold text-slate-400 uppercase">Recaudado</p>

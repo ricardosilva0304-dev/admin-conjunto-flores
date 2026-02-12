@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import {
   Search, Loader2, X, CheckCircle2,
-  Plus
+  Plus, User, Wallet
 } from "lucide-react";
 
 // Documentos
@@ -16,9 +16,6 @@ export default function Deudores() {
   const [loading, setLoading] = useState(true);
   const [busqueda, setBusqueda] = useState("");
   const [filtroTorre, setFiltroTorre] = useState("TODAS");
-  // Eliminamos el estado 'orden' porque ahora será siempre por ubicación
-  
-  // Buscador manual para el modal
   const [busquedaManual, setBusquedaManual] = useState("");
 
   const [residenteDetalle, setResidenteDetalle] = useState<any>(null);
@@ -39,7 +36,7 @@ export default function Deudores() {
     const { data: resData } = await supabase.from("residentes").select("*");
     const { data: deudasData } = await supabase
       .from("deudas_residentes")
-      .select("*, causaciones_globales(mes_causado, cobro_mora_activo)")
+      .select("*, causaciones_globales(mes_causado, tipo_cobro)")
       .gt("saldo_pendiente", 0);
 
     if (resData) setResidentes(resData);
@@ -47,7 +44,7 @@ export default function Deudores() {
     setLoading(false);
   }
 
-  // --- FUNCIÓN PARA GUARDAR CARGO ---
+  // --- FUNCIÓN PARA GUARDAR CARGO MANUAL ---
   async function guardarCargoManual(e: React.FormEvent) {
     e.preventDefault();
     if (!formManual.residente_id || !formManual.valor) return alert("Faltan datos");
@@ -64,13 +61,13 @@ export default function Deudores() {
       precio_m1: monto,
       precio_m2: monto,
       precio_m3: monto,
-      fecha_vencimiento: `${formManual.mes}-01` 
+      fecha_vencimiento: `${formManual.mes}-01`
     }]);
 
     if (!error) {
       setShowManualModal(false);
       cargarInformacion();
-      setFormManual({ residente_id: "", concepto: "", mes: "", valor: "" });
+      setFormManual({ residente_id: "", concepto: "", mes: formManual.mes, valor: "" });
       setBusquedaManual("");
     } else {
       alert("Error: " + error.message);
@@ -78,33 +75,43 @@ export default function Deudores() {
     setLoading(false);
   }
 
+  // --- LÓGICA DE CÁLCULO DE DEUDA REAL (PROTEGIDA) ---
   const calcularDeudaReal = (resId: number) => {
     const deudasRes = deudas.filter(d => d.residente_id === resId);
     return deudasRes.reduce((acc, d) => {
-      // 1. Cargo Manual
-      if (!d.causaciones_globales) {
-        return acc + (Number(d.saldo_pendiente) || 0);
+      // 1. Si es cargo manual (sin causación global)
+      if (!d.causaciones_globales) return acc + (Number(d.saldo_pendiente) || 0);
+
+      // Valores Base
+      const m1 = d.precio_m1 || d.monto_original || 0;
+      const m2 = d.precio_m2 || m1;
+      const m3 = d.precio_m3 || m1;
+      const pagado = m1 - (d.saldo_pendiente || 0);
+
+      // 2. Revisar si hay un modo de tarifa forzado (M1, M2, M3)
+      const modo = d.causaciones_globales.tipo_cobro || 'NORMAL';
+      let precioFinal = m1;
+
+      if (modo === 'M1') precioFinal = m1;
+      else if (modo === 'M2') precioFinal = m2;
+      else if (modo === 'M3') precioFinal = m3;
+      else {
+        // 3. Modo NORMAL (Cálculo automático por fecha)
+        const hoy = new Date();
+        const dia = hoy.getDate();
+        const mesAct = hoy.getMonth() + 1;
+        const anioAct = hoy.getFullYear();
+        const [yC, mC] = d.causaciones_globales.mes_causado.split("-").map(Number);
+
+        if (anioAct > yC || (anioAct === yC && mesAct > mC)) {
+          precioFinal = m3;
+        } else {
+          if (dia > 10 && dia <= 20) precioFinal = m2;
+          if (dia > 20) precioFinal = m3;
+        }
       }
-      // 2. Causación
-      const mesCausado = d.causaciones_globales?.mes_causado;
-      if (!mesCausado) return acc + (Number(d.saldo_pendiente) || 0);
 
-      const hoy = new Date();
-      const dia = hoy.getDate();
-      const mesAct = hoy.getMonth() + 1;
-      const anioAct = hoy.getFullYear();
-      const [yC, mC] = mesCausado.split("-").map(Number);
-
-      let precioPlazo = d.precio_m1 || 0;
-      if (anioAct > yC || (anioAct === yC && mesAct > mC)) {
-        precioPlazo = d.precio_m3 || 0;
-      } else {
-        if (dia > 10 && dia <= 20) precioPlazo = d.precio_m2 || 0;
-        if (dia > 20) precioPlazo = d.precio_m3 || 0;
-      }
-
-      const abonado = (Number(d.monto_original) || 0) - (Number(d.saldo_pendiente) || 0);
-      return acc + Math.max(0, precioPlazo - abonado);
+      return acc + Math.max(0, precioFinal - pagado);
     }, 0);
   };
 
@@ -121,14 +128,11 @@ export default function Deudores() {
       return r.torre.includes(t) && r.apartamento.startsWith(a) && coincideTorre;
     }
     return (r.nombre.toLowerCase().includes(term) || r.apartamento.includes(term)) && coincideTorre;
-  })
-  .sort((a, b) => {
-    // 1. Comparar Torres (Alfabéticamente para que "Torre 1" vaya antes de "Torre 5")
+  }).sort((a, b) => {
+    // 1. Comparar Torres (Alfabetico)
     if (a.torre < b.torre) return -1;
     if (a.torre > b.torre) return 1;
-    
-    // 2. Si es la misma torre, comparar Apartamentos (Numéricamente)
-    // Usamos parseInt para que el 101 vaya antes del 1001, etc.
+    // 2. Misma torre, comparar Apartamento (Numérico)
     return parseInt(a.apartamento) - parseInt(b.apartamento);
   });
 
@@ -183,7 +187,7 @@ export default function Deudores() {
                 : "text-slate-400"
                 }`}
             >
-              {t === "TODAS" ? "VER TODAS" : `T${t}`}
+              {t === "TODAS" ? "TODO" : `T${t}`}
             </button>
           ))}
         </div>
@@ -196,7 +200,7 @@ export default function Deudores() {
         </button>
       </div>
 
-      {/* 3. LISTADO (ORGANIZADO POR UBICACIÓN) */}
+      {/* 3. LISTADO */}
       <div className="space-y-2 md:space-y-3">
         {lista.map(res => (
           <div key={res.id} className="bg-white border border-slate-100 p-4 md:p-6 rounded-xl md:rounded-2xl flex flex-col md:flex-row md:items-center justify-between transition-all hover:bg-slate-50">
@@ -250,23 +254,23 @@ export default function Deudores() {
       {cobroResidente && (
         <CuentaCobro residente={cobroResidente} deudas={deudas.filter(d => d.residente_id === cobroResidente.id)} onClose={() => setCobroResidente(null)} />
       )}
-      
+
       {showManualModal && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[500] flex items-center justify-center p-4">
           <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden border">
             <form onSubmit={guardarCargoManual} className="p-8 space-y-4">
               <div className="flex justify-between items-center mb-4">
-                <h3 className="font-black text-slate-900 uppercase text-sm tracking-tighter">Asignar Cargo Extraordinario</h3>
+                <h3 className="font-black text-slate-900 uppercase text-sm tracking-tighter italic">Cargo Manual</h3>
                 <button type="button" onClick={() => setShowManualModal(false)}><X size={20} /></button>
               </div>
 
               <div className="relative">
-                <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Buscar Residente (Apto o Nombre)</label>
+                <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Seleccionar Residente</label>
                 <div className="relative">
                   <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={16} />
                   <input
                     className="w-full bg-slate-50 border border-slate-100 p-4 pl-12 rounded-xl outline-none font-bold text-sm focus:bg-white transition-all"
-                    placeholder="Ej: 5-101 o Juan..."
+                    placeholder="Ej: 5-101 o Nombre..."
                     value={formManual.residente_id
                       ? residentes.find(r => r.id === Number(formManual.residente_id))?.nombre + " | " + residentes.find(r => r.id === Number(formManual.residente_id))?.apartamento
                       : busquedaManual}
@@ -285,7 +289,6 @@ export default function Deudores() {
                   )}
                 </div>
 
-                {/* Lista de Sugerencias */}
                 {busquedaManual && !formManual.residente_id && (
                   <div className="absolute top-[105%] left-0 right-0 bg-white border border-slate-200 rounded-xl shadow-2xl z-[100] overflow-hidden max-h-48 overflow-y-auto">
                     {residentes
@@ -318,8 +321,8 @@ export default function Deudores() {
               <div>
                 <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Concepto del Cobro</label>
                 <input
-                  className="w-full bg-slate-50 border p-4 rounded-xl font-bold outline-none"
-                  placeholder="EJ: MULTA POR RUIDO / TAG ACCESO"
+                  className="w-full bg-slate-50 border p-4 rounded-xl font-bold outline-none uppercase"
+                  placeholder="EJ: MULTA POR RUIDO"
                   value={formManual.concepto}
                   onChange={(e) => setFormManual({ ...formManual, concepto: e.target.value })}
                   required
@@ -341,7 +344,7 @@ export default function Deudores() {
                   <input
                     type="number"
                     className="w-full bg-emerald-50 border-emerald-100 p-4 rounded-xl font-black text-emerald-600 outline-none"
-                    placeholder="0.00"
+                    placeholder="0"
                     value={formManual.valor}
                     onChange={(e) => setFormManual({ ...formManual, valor: e.target.value })}
                     required

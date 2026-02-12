@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import ReciboCaja from "./ReciboCaja";
 import {
-  Search, User, Wallet, Loader2, X, Receipt, ArrowRight,
+  Search, User, Wallet, Loader2, X, Receipt,
   Landmark, Banknote, Info, Hash, CheckCircle2, ChevronRight
 } from "lucide-react";
 
@@ -34,7 +34,6 @@ export default function Ingresos() {
     setLoading(false);
   }
 
-  // --- NÚMERO DE RECIBO AUTOMÁTICO ---
   async function sugerirSiguienteRecibo() {
     const { data } = await supabase
       .from("pagos")
@@ -56,7 +55,7 @@ export default function Ingresos() {
     setBusqueda("");
     const { data } = await supabase
       .from("deudas_residentes")
-      .select("*, causaciones_globales(mes_causado, cobro_mora_activo)")
+      .select("*, causaciones_globales(mes_causado, tipo_cobro)") // Cambiado a tipo_cobro
       .eq("residente_id", res.id)
       .gt("saldo_pendiente", 0);
 
@@ -69,33 +68,39 @@ export default function Ingresos() {
     await sugerirSiguienteRecibo();
   }
 
-  // --- LÓGICA DE SALDO REAL DINÁMICO (Tramo Fecha - Abonos Anteriores) ---
-  const calcularSaldoRealHoy = (deuda: any) => {
-    // --- AGREGA ESTA LÍNEA AL PRINCIPIO ---
-    if (!deuda.causaciones_globales) return deuda.saldo_pendiente || 0;
+  // --- LÓGICA DE SALDO REAL DINÁMICO (Tramo Fecha / Modos Forzados) ---
+  const calcularSaldoRealHoy = (d: any) => {
+    // 1. Cargo Manual (Sin causación asociada)
+    if (!d.causaciones_globales) return d.saldo_pendiente || 0;
 
-    if (deuda.causaciones_globales.cobro_mora_activo === false) {
-      const m1 = deuda.monto_original || 0;
-      const pagado = m1 - (deuda.saldo_pendiente || 0);
-      return Math.max(0, m1 - pagado);
-    }
+    // Valores Base
+    const m1 = d.precio_m1 || d.monto_original || 0;
+    const m2 = d.precio_m2 || m1;
+    const m3 = d.precio_m3 || m1;
+    const pagado = m1 - (d.saldo_pendiente || 0);
 
+    // 2. Modos Forzados (M1, M2, M3)
+    const modo = d.causaciones_globales.tipo_cobro || 'NORMAL';
+    if (modo === 'M1') return Math.max(0, m1 - pagado);
+    if (modo === 'M2') return Math.max(0, m2 - pagado);
+    if (modo === 'M3') return Math.max(0, m3 - pagado);
+
+    // 3. Modo NORMAL (Cálculo por fecha actual)
     const hoy = new Date();
     const dia = hoy.getDate();
     const mesAct = hoy.getMonth() + 1;
     const anioAct = hoy.getFullYear();
-    const [yC, mC] = deuda.causaciones_globales.mes_causado.split("-").map(Number);
+    const [yC, mC] = d.causaciones_globales.mes_causado.split("-").map(Number);
 
-    let precioBaseTramo = deuda.precio_m1 || 0;
+    let precioBaseTramo = m1;
     if (anioAct > yC || (anioAct === yC && mesAct > mC)) {
-      precioBaseTramo = deuda.precio_m3 || 0;
+      precioBaseTramo = m3;
     } else {
-      if (dia > 10 && dia <= 20) precioBaseTramo = deuda.precio_m2 || 0;
-      if (dia > 20) precioBaseTramo = deuda.precio_m3 || 0;
+      if (dia > 10 && dia <= 20) precioBaseTramo = m2;
+      if (dia > 20) precioBaseTramo = m3;
     }
 
-    const yaPagadoPrevio = (deuda.precio_m1 || 0) - (deuda.saldo_pendiente || 0);
-    return Math.max(0, precioBaseTramo - yaPagadoPrevio);
+    return Math.max(0, precioBaseTramo - pagado);
   };
 
   const totalAPagarRecibo = deudas.reduce((acc, d) => acc + (Number(abonos[d.id]) || 0), 0);
@@ -108,23 +113,16 @@ export default function Ingresos() {
     try {
       const mesesNombres = ["ENERO", "FEBRERO", "MARZO", "ABRIL", "MAYO", "JUNIO", "JULIO", "AGOSTO", "SEPTIEMBRE", "OCTUBRE", "NOVIEMBRE", "DICIEMBRE"];
 
-      // Generar el texto con el separador | para que ReciboCaja lo rompa bien
       const conceptoTextoParaDB = deudas
         .filter(d => Number(abonos[d.id]) > 0)
         .map(d => {
           const montoInd = Number(abonos[d.id]).toLocaleString('es-CO');
-
-          // Si tiene causación global (ADMINISTRACIÓN)
           if (d.causaciones_globales) {
             const [anio, mes] = d.causaciones_globales.mes_causado.split("-");
-            const mesesNombres = ["ENERO", "FEBRERO", "MARZO", "ABRIL", "MAYO", "JUNIO", "JULIO", "AGOSTO", "SEPTIEMBRE", "OCTUBRE", "NOVIEMBRE", "DICIEMBRE"];
             const mesNombre = mesesNombres[parseInt(mes) - 1];
             const nombreC = d.causaciones_globales?.concepto_nombre || "ADMINISTRACIÓN";
             return `${nombreC} (${mesNombre} ${anio})|$${montoInd}`;
-          }
-
-          // Si es un CARGO MANUAL
-          else {
+          } else {
             return `${d.concepto_nombre || 'CARGO EXTRA'} (PAGO ÚNICO)|$${montoInd}`;
           }
         })
@@ -140,7 +138,8 @@ export default function Ingresos() {
         comprobante: formRecibo.referencia.toUpperCase(),
         concepto_texto: conceptoTextoParaDB,
         saldo_anterior: totalDeudaAcumulada
-      }]); // <--- Agrega esto justo aquí antes de cerrar el corchete y paréntesis
+      }]);
+      
       if (errP) throw errP;
 
       for (const dId in abonos) {
@@ -166,7 +165,6 @@ export default function Ingresos() {
     finally { setProcesando(false); }
   }
 
-  // Filtrado 5-101 o Nombre
   const filteredRes = busqueda.length > 0 ? residentes.filter(r => {
     const term = busqueda.toLowerCase();
     const unidadId = `${r.torre.replace("Torre ", "")}-${r.apartamento}`;
@@ -180,7 +178,6 @@ export default function Ingresos() {
 
       {datosRecibo && <ReciboCaja datos={datosRecibo} onClose={() => setDatosRecibo(null)} />}
 
-      {/* 1. BUSCADOR INTELIGENTE */}
       <section className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm relative z-[30]">
         <div className="relative">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
@@ -211,7 +208,6 @@ export default function Ingresos() {
       {resSeleccionado && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-in slide-in-from-bottom-2 duration-500">
 
-          {/* TABLA DE DEUDAS (PC Y MÓVIL) */}
           <div className="lg:col-span-2 space-y-6">
             <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
               <div className="p-4 bg-slate-50 border-b border-slate-100 flex items-center justify-between uppercase">
@@ -219,7 +215,6 @@ export default function Ingresos() {
                 <span className="text-[10px] font-bold text-emerald-600">Al día: ${totalDeudaAcumulada.toLocaleString('es-CO')}</span>
               </div>
 
-              {/* VERSION PC: TABLE */}
               <div className="hidden md:block">
                 <table className="w-full text-left">
                   <thead>
@@ -234,24 +229,23 @@ export default function Ingresos() {
                       const sHoy = calcularSaldoRealHoy(d);
                       return (
                         <tr key={d.id} className="hover:bg-slate-50/50 transition-colors group">
-                          {/* COLUMNA 1: CONCEPTO Y MES (CORREGIDA) */}
                           <td className="p-6">
                             <p className="text-slate-800 font-black text-sm">
                               {d.causaciones_globales?.concepto_nombre || d.concepto_nombre}
                             </p>
-                            <p className="text-[10px] text-slate-400 font-bold">
-                              {d.causaciones_globales?.mes_causado || "CARGO MANUAL / EXTRA"}
-                            </p>
+                            <div className="flex items-center gap-2 mt-1">
+                                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tighter">
+                                    {d.causaciones_globales?.mes_causado || "CARGO MANUAL"}
+                                </p>
+                                {/* Indicador de Tarifa Forzada */}
+                                {d.causaciones_globales?.tipo_cobro && d.causaciones_globales.tipo_cobro !== 'NORMAL' && (
+                                    <span className="text-[8px] bg-amber-100 text-amber-600 px-1.5 rounded font-black uppercase">
+                                        Fijo: {d.causaciones_globales.tipo_cobro}
+                                    </span>
+                                )}
+                            </div>
                           </td>
-
-                          {/* COLUMNA 2: SALDO A HOY */}
-                          <td className="p-6 text-right">
-                            <span className="text-slate-900 font-black tabular-nums">
-                              ${sHoy.toLocaleString()}
-                            </span>
-                          </td>
-
-                          {/* COLUMNA 3: CUADRO PARA ESCRIBIR EL PAGO (ESTA FALTABA EN TU CÓDIGO) */}
+                          <td className="p-6 text-right"><span className="text-slate-900 font-black tabular-nums">${sHoy.toLocaleString()}</span></td>
                           <td className="p-6">
                             <div className="relative w-40 mx-auto">
                               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-emerald-500 font-black">$</span>
@@ -271,7 +265,6 @@ export default function Ingresos() {
                 </table>
               </div>
 
-              {/* VERSION MOVIL: CARDS */}
               <div className="md:hidden divide-y divide-slate-100">
                 {deudas.map(d => (
                   <div key={d.id} className="p-5 flex flex-col gap-4">
@@ -298,7 +291,6 @@ export default function Ingresos() {
             </div>
           </div>
 
-          {/* FICHA TÉCNICA DEL RECIBO (DERECHA) */}
           <div className="space-y-6">
             <div className="bg-white p-8 rounded-2xl border border-slate-200 shadow-sm space-y-6">
               <div className="flex justify-between border-b border-slate-100 pb-5">
@@ -333,11 +325,6 @@ export default function Ingresos() {
               >
                 {procesando ? <Loader2 className="animate-spin mx-auto" /> : "Generar y Guardar Pago"}
               </button>
-            </div>
-
-            <div className="bg-slate-50 p-6 rounded-2xl border border-slate-200 flex gap-4">
-              <div className="w-1.5 h-auto bg-amber-400 rounded-full"></div>
-              <p className="text-[10px] font-bold text-slate-400 uppercase leading-relaxed tracking-wider">Una vez procesado el abono, no se podrán realizar correcciones sin soporte de eliminación manual.</p>
             </div>
           </div>
 

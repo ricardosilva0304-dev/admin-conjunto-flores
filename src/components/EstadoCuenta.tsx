@@ -28,11 +28,24 @@ export default function EstadoCuenta({ residente, deudas, onClose }: Props) {
     fetchPagos();
   }, [residente]);
 
-  // --- Lógica de Cálculos (M1, M2, M3) ---
+  // --- 1. LÓGICA DE CÁLCULOS (M1, M2, M3 + MODOS FORZADOS) ---
   const calcularValorHoy = (d: any) => {
-    // Si es manual, no calculamos intereses, devolvemos saldo directo
+    // Si es manual (sin causación), devuelve saldo directo
     if (!d.causaciones_globales) return d.saldo_pendiente || 0;
 
+    const m1 = d.precio_m1 || d.monto_original || 0;
+    const m2 = d.precio_m2 || m1;
+    const m3 = d.precio_m3 || m1;
+    const pagado = m1 - (d.saldo_pendiente || 0);
+
+    // Revisar si hay un modo forzado (M1, M2, M3)
+    const modo = d.causaciones_globales.tipo_cobro || 'NORMAL';
+
+    if (modo === 'M1') return Math.max(0, m1 - pagado);
+    if (modo === 'M2') return Math.max(0, m2 - pagado);
+    if (modo === 'M3') return Math.max(0, m3 - pagado);
+
+    // Lógica Normal (AUTO por fecha)
     const hoy = new Date();
     const dia = hoy.getDate();
     const mesAct = hoy.getMonth() + 1;
@@ -42,13 +55,8 @@ export default function EstadoCuenta({ residente, deudas, onClose }: Props) {
     if (!mesCausado) return d.saldo_pendiente || 0;
 
     const [yC, mC] = mesCausado.split("-").map(Number);
-    const m1 = d.precio_m1 || d.monto_original || 0;
-    const m2 = d.precio_m2 || m1;
-    const m3 = d.precio_m3 || m1;
 
     let precio = m1;
-    
-    // Lógica de Tramos
     if (anioAct > yC || (anioAct === yC && mesAct > mC)) {
       precio = m3;
     } else {
@@ -56,39 +64,33 @@ export default function EstadoCuenta({ residente, deudas, onClose }: Props) {
       else if (dia > 20) precio = m3;
     }
 
-    return Math.max(0, precio - (m1 - (d.saldo_pendiente || 0)));
+    return Math.max(0, precio - pagado);
   };
 
   const totalDeuda = deudas.reduce((acc, d) => acc + calcularValorHoy(d), 0);
 
-  // --- Formateo de Periodo (Corrección aplicada) ---
+  // --- 2. FORMATEO DE PERIODO (Soporta Manual y Automático) ---
   const formatPeriodo = (d: any) => {
-    // 1. Prioridad: Fecha de la causación (Automático)
-    // 2. Respaldo: Fecha de vencimiento guardada manualmente (Manual)
     const fechaStr = d.causaciones_globales?.mes_causado || d.fecha_vencimiento?.substring(0, 7);
-
-    if (!fechaStr) return "CARGO EXTRA"; 
+    if (!fechaStr) return "CARGO EXTRA";
 
     const [year, month] = fechaStr.split("-");
     const meses = ["ENE", "FEB", "MAR", "ABR", "MAY", "JUN", "JUL", "AGO", "SEP", "OCT", "NOV", "DIC"];
-    
-    // Validación para evitar errores si el mes no es válido
     const mesIndex = parseInt(month) - 1;
-    if(isNaN(mesIndex) || mesIndex < 0 || mesIndex > 11) return "CARGO EXTRA";
-
+    
+    if (isNaN(mesIndex) || mesIndex < 0 || mesIndex > 11) return "CARGO EXTRA";
     return `${meses[mesIndex]} ${year}`;
   };
 
-  // --- Paginación y Orden ---
+  // --- 3. PAGINACIÓN Y ORDENAMIENTO ---
   const ROWS_PER_PAGE = 13;
-  
+
   const chunkArray = (array: any[], size: number) => {
     const result = [];
     for (let i = 0; i < array.length; i += size) { result.push(array.slice(i, i + size)); }
     return result;
   };
 
-  // Ordenar: Deudas más antiguas primero (Ascendente)
   const deudasOrdenadas = [...deudas].sort((a, b) => {
     const fechaA = a.causaciones_globales?.mes_causado || a.fecha_vencimiento?.substring(0, 7) || "9999-99";
     const fechaB = b.causaciones_globales?.mes_causado || b.fecha_vencimiento?.substring(0, 7) || "9999-99";
@@ -98,7 +100,7 @@ export default function EstadoCuenta({ residente, deudas, onClose }: Props) {
   const deudaPages = chunkArray(deudasOrdenadas, ROWS_PER_PAGE);
   const pagosPages = chunkArray(pagos, ROWS_PER_PAGE + 5);
 
-  // --- Lógica de Impresión ---
+  // --- 4. MOTOR DE IMPRESIÓN ---
   const handlePrint = () => {
     const content = printRef.current;
     if (!content) return;
@@ -123,14 +125,14 @@ export default function EstadoCuenta({ residente, deudas, onClose }: Props) {
             .print-page { width: 100%; height: 100vh; padding: 1.5cm; box-sizing: border-box; page-break-after: always; position: relative; }
             .print-page:last-child { page-break-after: auto; }
             * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-            table { width: 100%; border-collapse: collapse; font-size: 10px; }
+            table { width: 100%; border-collapse: collapse; font-size: 10px; table-fixed; }
             th { background-color: #f1f5f9 !important; color: #64748b !important; font-weight: 800 !important; text-transform: uppercase; padding: 8px; text-align: left; border-bottom: 2px solid #cbd5e1; }
-            td { padding: 8px; border-bottom: 1px solid #e2e8f0; color: #334155; }
+            td { padding: 8px; border-bottom: 1px solid #e2e8f0; color: #334155; vertical-align: top; }
             .text-right { text-align: right; }
           </style>
         </head>
         <body>
-          ${content.innerHTML}
+          <div class="print-container">${content.innerHTML}</div>
           <script>
             setTimeout(() => { window.print(); window.frameElement.remove(); }, 500);
           </script>
@@ -164,7 +166,6 @@ export default function EstadoCuenta({ residente, deudas, onClose }: Props) {
       {/* CONTENEDOR DE HOJAS */}
       <div ref={printRef} className="w-full flex flex-col items-center gap-8 pb-20">
 
-        {/* PAGINAS DE DEUDAS */}
         {deudaPages.length > 0 ? deudaPages.map((chunk, index) => (
           <div key={`page-${index}`} className="print-page bg-white shadow-2xl w-[816px] h-[1056px] flex flex-col relative overflow-hidden">
 
@@ -175,8 +176,8 @@ export default function EstadoCuenta({ residente, deudas, onClose }: Props) {
                 <div>
                   <h1 className="text-lg font-black text-slate-900 uppercase leading-none mb-1">Agrupación Res. El Parque de las Flores</h1>
                   <p className="text-[10px] font-bold text-slate-500 tracking-widest mb-1">NIT. 832.011.421-3</p>
-                  <p className="text-[9px] text-slate-400 flex items-center gap-1"><MapPin size={10} /> Diagonal 9 # 4B-90 • Soacha, Cundinamarca</p>
-                  <p className="text-[9px] text-slate-400 flex items-center gap-1"><Phone size={10} /> 315 340 0657</p>
+                  <p className="text-[9px] text-slate-500 flex items-center gap-1"><MapPin size={10} /> Diagonal 9 # 4B-90 • Soacha, Cundinamarca</p>
+                  <p className="text-[9px] text-slate-500 flex items-center gap-1"><Phone size={10} /> 315 340 0657</p>
                 </div>
               </div>
               <div className="text-right">
@@ -204,7 +205,6 @@ export default function EstadoCuenta({ residente, deudas, onClose }: Props) {
                 <p className={`text-3xl font-black tabular-nums tracking-tighter ${totalDeuda > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
                   ${totalDeuda.toLocaleString()}
                 </p>
-                {totalDeuda === 0 && <span className="text-[9px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full self-end mt-1">PAZ Y SALVO</span>}
               </div>
             </div>
 
@@ -226,28 +226,22 @@ export default function EstadoCuenta({ residente, deudas, onClose }: Props) {
                 <tbody className="divide-y divide-slate-100">
                   {chunk.map((d: any) => {
                     const periodoTexto = formatPeriodo(d);
-                    const esCargoExtra = periodoTexto === "CARGO EXTRA";
-
                     return (
                       <tr key={d.id} className="hover:bg-slate-50">
-                        <td className="py-2 align-top">
-                          {esCargoExtra ? (
-                            <span className="text-[8px] bg-slate-100 px-1.5 py-0.5 rounded text-slate-500 font-bold border border-slate-200">
-                              CARGO EXTRA
-                            </span>
+                        <td className="py-2">
+                          {periodoTexto === "CARGO EXTRA" ? (
+                            <span className="text-[8px] bg-slate-100 px-1.5 py-0.5 rounded text-slate-500 font-bold border border-slate-200 uppercase">Cargo Extra</span>
                           ) : (
-                            <span className="font-bold text-slate-800">
-                              {periodoTexto}
-                            </span>
+                            <span className="font-bold text-slate-800">{periodoTexto}</span>
                           )}
                         </td>
-                        <td className="py-2 align-top text-slate-600 uppercase pr-2 leading-tight">
+                        <td className="py-2 text-slate-600 uppercase pr-2 leading-tight break-words">
                           {d.concepto_nombre || d.causaciones_globales?.concepto_nombre}
                         </td>
-                        <td className="py-2 align-top text-right text-slate-400 tabular-nums">
+                        <td className="py-2 text-right text-slate-400 tabular-nums">
                           ${(d.monto_original || 0).toLocaleString()}
                         </td>
-                        <td className="py-2 align-top text-right font-black text-rose-600 tabular-nums">
+                        <td className="py-2 text-right font-black text-rose-600 tabular-nums">
                           ${calcularValorHoy(d).toLocaleString()}
                         </td>
                       </tr>
@@ -260,63 +254,43 @@ export default function EstadoCuenta({ residente, deudas, onClose }: Props) {
             {/* PIE DE PAGINA */}
             <div className="mt-auto border-t-2 border-slate-800 pt-4">
               <div className="grid grid-cols-2 gap-8">
-                <div>
-                  <p className="text-[9px] font-black uppercase text-slate-800 mb-1">Instrucciones de Pago</p>
-                  <p className="text-[9px] font-medium text-slate-600">Banco: <b>Caja Social</b> - Ahorros No. <b>24511819298</b></p>
-                  <p className="text-[9px] font-medium text-slate-600">Convenio: <b>15939402</b> - Ref: <b>{residente.apartamento}</b></p>
+                <div className="text-[9px] text-slate-500">
+                   <p className="font-bold text-slate-800 mb-1 uppercase">Información de Pago</p>
+                   <p>Banco Caja Social • Ahorros • No. 24511819298</p>
+                   <p>Convenio: 15939402 • Ref: {residente.apartamento}</p>
                 </div>
-                <div className="text-right">
-                  <p className="text-[8px] font-bold text-slate-400 uppercase italic">
-                    "La puntualidad en sus pagos garantiza el bienestar y la valorización de su patrimonio."
-                  </p>
-                  <p className="text-[8px] text-slate-300 mt-1">Generado por AdminPro Flores</p>
+                <div className="text-right text-[8px] text-slate-300">
+                  Generado automáticamente por AdminPro Flores
                 </div>
               </div>
             </div>
-
           </div>
         )) : (
-          // CERTIFICADO PAZ Y SALVO
           <div className="print-page bg-white shadow-2xl w-[816px] h-[1056px] flex flex-col items-center justify-center text-center p-20 border-4 border-double border-emerald-100">
-            <div className="w-24 h-24 bg-emerald-50 rounded-full flex items-center justify-center text-emerald-500 mb-6">
-              <CheckCircle2 size={60} />
-            </div>
-            <h1 className="text-4xl font-black text-slate-900 uppercase mb-2">Paz y Salvo</h1>
-            <p className="text-sm font-bold text-slate-500 uppercase tracking-widest mb-10">Agrupación Res. El Parque de las Flores</p>
-            <p className="text-lg text-slate-700 max-w-lg leading-relaxed">
-              Certificamos que la unidad <b>{residente.torre} - {residente.apartamento}</b>, propiedad de <b>{residente.nombre}</b>, se encuentra al día por todo concepto de administración y expensas comunes a la fecha de corte.
-            </p>
-            <p className="mt-10 text-xs font-bold text-slate-400">Expedido el: {new Date().toLocaleDateString('es-CO', { dateStyle: 'full' })}</p>
+            <CheckCircle2 size={60} className="text-emerald-500 mb-6" />
+            <h1 className="text-4xl font-black text-slate-900 uppercase">Paz y Salvo</h1>
+            <p className="text-lg text-slate-700 mt-4 max-w-lg">La unidad <b>{residente.torre} - {residente.apartamento}</b> se encuentra al día con sus obligaciones.</p>
           </div>
         )}
 
-        {/* PAGINAS DE PAGOS (HISTORIAL) */}
+        {/* HISTORIAL PAGOS */}
         {pagos.length > 0 && pagosPages.map((chunk, index) => (
           <div key={`pago-page-${index}`} className="print-page bg-white shadow-2xl w-[816px] h-[1056px] flex flex-col">
-            <div className="border-b pb-4 mb-6 flex justify-between items-end">
-              <h3 className="text-sm font-black uppercase text-slate-800 flex items-center gap-2">
-                <History size={16} className="text-emerald-600" /> Historial de Pagos
-              </h3>
+            <div className="border-b-2 pb-4 mb-6 flex justify-between items-end">
+              <h3 className="text-sm font-black uppercase text-slate-800 flex items-center gap-2"><History size={16} className="text-emerald-600" /> Historial de Pagos</h3>
               <span className="text-[9px] font-bold text-slate-400">Anexo {index + 1}</span>
             </div>
-
             <table className="w-full">
               <thead>
-                <tr>
-                  <th>Recibo No.</th>
-                  <th>Fecha</th>
-                  <th>Concepto</th>
-                  <th>Medio</th>
-                  <th className="text-right">Monto</th>
-                </tr>
+                <tr><th>Recibo No.</th><th>Fecha</th><th>Concepto</th><th>Medio</th><th className="text-right">Monto</th></tr>
               </thead>
-              <tbody>
+              <tbody className="divide-y">
                 {chunk.map((p) => (
                   <tr key={p.id}>
-                    <td className="font-bold text-slate-700">RC-{p.numero_recibo}</td>
+                    <td className="font-bold">RC-{p.numero_recibo}</td>
                     <td>{p.fecha_pago}</td>
                     <td className="text-[8px] uppercase max-w-[200px] truncate">{p.concepto_texto?.split("||")[0]}</td>
-                    <td><span className="uppercase text-[8px] font-bold bg-slate-100 px-1 rounded">{p.metodo_pago}</span></td>
+                    <td className="text-[9px] font-bold uppercase">{p.metodo_pago}</td>
                     <td className="text-right font-black text-emerald-600">${Number(p.monto_total).toLocaleString()}</td>
                   </tr>
                 ))}
@@ -324,7 +298,6 @@ export default function EstadoCuenta({ residente, deudas, onClose }: Props) {
             </table>
           </div>
         ))}
-
       </div>
     </div>
   );
