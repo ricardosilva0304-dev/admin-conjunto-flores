@@ -65,8 +65,8 @@ export default function Deudores() {
       saldo_pendiente: monto,
       precio_m1: monto,
       precio_m2: monto,
-      precio_m3: monto
-      // NO enviamos causacion_id para que el sistema sepa que es MANUAL
+      precio_m3: monto,
+      fecha_vencimiento: `${formManual.mes}-01` 
     }]);
 
     if (!error) {

@@ -30,13 +30,14 @@ export default function EstadoCuenta({ residente, deudas, onClose }: Props) {
 
   // --- Lógica de Cálculos (M1, M2, M3) ---
   const calcularValorHoy = (d: any) => {
+    // Si es manual, no calculamos intereses, devolvemos saldo directo
     if (!d.causaciones_globales) return d.saldo_pendiente || 0;
+
     const hoy = new Date();
     const dia = hoy.getDate();
     const mesAct = hoy.getMonth() + 1;
     const anioAct = hoy.getFullYear();
 
-    // Protección contra fechas inválidas
     const mesCausado = d.causaciones_globales.mes_causado;
     if (!mesCausado) return d.saldo_pendiente || 0;
 
@@ -46,7 +47,8 @@ export default function EstadoCuenta({ residente, deudas, onClose }: Props) {
     const m3 = d.precio_m3 || m1;
 
     let precio = m1;
-    // Si año actual > año deuda O (mismo año Y mes actual > mes deuda)
+    
+    // Lógica de Tramos
     if (anioAct > yC || (anioAct === yC && mesAct > mC)) {
       precio = m3;
     } else {
@@ -54,13 +56,49 @@ export default function EstadoCuenta({ residente, deudas, onClose }: Props) {
       else if (dia > 20) precio = m3;
     }
 
-    // Saldo = Precio que aplica hoy - (Lo que ya pagó basándonos en M1)
     return Math.max(0, precio - (m1 - (d.saldo_pendiente || 0)));
   };
 
   const totalDeuda = deudas.reduce((acc, d) => acc + calcularValorHoy(d), 0);
 
-  // --- Lógica de Impresión (Iframe) ---
+  // --- Formateo de Periodo (Corrección aplicada) ---
+  const formatPeriodo = (d: any) => {
+    // 1. Prioridad: Fecha de la causación (Automático)
+    // 2. Respaldo: Fecha de vencimiento guardada manualmente (Manual)
+    const fechaStr = d.causaciones_globales?.mes_causado || d.fecha_vencimiento?.substring(0, 7);
+
+    if (!fechaStr) return "CARGO EXTRA"; 
+
+    const [year, month] = fechaStr.split("-");
+    const meses = ["ENE", "FEB", "MAR", "ABR", "MAY", "JUN", "JUL", "AGO", "SEP", "OCT", "NOV", "DIC"];
+    
+    // Validación para evitar errores si el mes no es válido
+    const mesIndex = parseInt(month) - 1;
+    if(isNaN(mesIndex) || mesIndex < 0 || mesIndex > 11) return "CARGO EXTRA";
+
+    return `${meses[mesIndex]} ${year}`;
+  };
+
+  // --- Paginación y Orden ---
+  const ROWS_PER_PAGE = 13;
+  
+  const chunkArray = (array: any[], size: number) => {
+    const result = [];
+    for (let i = 0; i < array.length; i += size) { result.push(array.slice(i, i + size)); }
+    return result;
+  };
+
+  // Ordenar: Deudas más antiguas primero (Ascendente)
+  const deudasOrdenadas = [...deudas].sort((a, b) => {
+    const fechaA = a.causaciones_globales?.mes_causado || a.fecha_vencimiento?.substring(0, 7) || "9999-99";
+    const fechaB = b.causaciones_globales?.mes_causado || b.fecha_vencimiento?.substring(0, 7) || "9999-99";
+    return fechaA.localeCompare(fechaB);
+  });
+
+  const deudaPages = chunkArray(deudasOrdenadas, ROWS_PER_PAGE);
+  const pagosPages = chunkArray(pagos, ROWS_PER_PAGE + 5);
+
+  // --- Lógica de Impresión ---
   const handlePrint = () => {
     const content = printRef.current;
     if (!content) return;
@@ -72,7 +110,6 @@ export default function EstadoCuenta({ residente, deudas, onClose }: Props) {
     const doc = iframe.contentWindow?.document;
     if (!doc) return;
 
-    // Copiamos los estilos de Tailwind y globales
     const styles = Array.from(document.querySelectorAll("style, link[rel='stylesheet']")).map((s) => s.outerHTML).join("");
 
     doc.write(`
@@ -82,7 +119,7 @@ export default function EstadoCuenta({ residente, deudas, onClose }: Props) {
           ${styles}
           <style>
             @page { size: letter; margin: 0; }
-            body { margin: 0; padding: 0; background: white !important; font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
+            body { margin: 0; padding: 0; background: white !important; font-family: ui-sans-serif, system-ui, sans-serif; }
             .print-page { width: 100%; height: 100vh; padding: 1.5cm; box-sizing: border-box; page-break-after: always; position: relative; }
             .print-page:last-child { page-break-after: auto; }
             * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
@@ -103,24 +140,6 @@ export default function EstadoCuenta({ residente, deudas, onClose }: Props) {
     doc.close();
   };
 
-  const formatPeriodo = (mesCausado: string) => {
-    if (!mesCausado) return "CARGO EXTRA";
-    const [year, month] = mesCausado.split("-");
-    const meses = ["ENE", "FEB", "MAR", "ABR", "MAY", "JUN", "JUL", "AGO", "SEP", "OCT", "NOV", "DIC"];
-    return `${meses[parseInt(month) - 1]} ${year}`;
-  };
-
-  // Reducimos un poco las filas por página para que quepa la info nueva del residente
-  const ROWS_PER_PAGE = 13;
-  const chunkArray = (array: any[], size: number) => {
-    const result = [];
-    for (let i = 0; i < array.length; i += size) { result.push(array.slice(i, i + size)); }
-    return result;
-  };
-
-  const deudaPages = chunkArray(deudas, ROWS_PER_PAGE);
-  const pagosPages = chunkArray(pagos, ROWS_PER_PAGE + 5); // En pagos caben más porque no hay header grande
-
   if (loading) return <div className="fixed inset-0 bg-white/90 z-[400] flex items-center justify-center"><Loader2 className="animate-spin text-slate-300" size={40} /></div>;
 
   return (
@@ -129,7 +148,7 @@ export default function EstadoCuenta({ residente, deudas, onClose }: Props) {
       {/* BARRA DE HERRAMIENTAS */}
       <div className="no-print sticky top-0 w-full max-w-[816px] bg-white p-4 mb-6 flex justify-between items-center rounded-xl shadow-xl z-50 border border-slate-100">
         <div>
-          <h2 className="text-slate-800 font-bold text-sm uppercase tracking-wider">Vista Previa de Impresión</h2>
+          <h2 className="text-slate-800 font-bold text-sm uppercase tracking-wider">Vista Previa</h2>
           <p className="text-[10px] text-slate-400 font-bold">Unidad: {residente.torre} - {residente.apartamento}</p>
         </div>
         <div className="flex gap-2">
@@ -149,7 +168,7 @@ export default function EstadoCuenta({ residente, deudas, onClose }: Props) {
         {deudaPages.length > 0 ? deudaPages.map((chunk, index) => (
           <div key={`page-${index}`} className="print-page bg-white shadow-2xl w-[816px] h-[1056px] flex flex-col relative overflow-hidden">
 
-            {/* ENCABEZADO (DATOS DEL CONJUNTO) */}
+            {/* ENCABEZADO */}
             <div className="flex justify-between items-start border-b-2 border-slate-900 pb-5 mb-6">
               <div className="flex gap-5">
                 <img src="/logo.png" alt="Logo" className="w-20 h-20 object-contain" />
@@ -169,7 +188,7 @@ export default function EstadoCuenta({ residente, deudas, onClose }: Props) {
               </div>
             </div>
 
-            {/* DATOS DEL RESIDENTE (COMPLETO) */}
+            {/* DATOS RESIDENTE */}
             <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 mb-6 grid grid-cols-2 gap-6">
               <div>
                 <p className="text-[9px] font-black text-slate-400 uppercase mb-1">Responsable</p>
@@ -190,17 +209,14 @@ export default function EstadoCuenta({ residente, deudas, onClose }: Props) {
             </div>
 
             {/* TABLA DE DEUDAS */}
-            {/* TABLA DE DEUDAS CORREGIDA */}
             <div className="flex-1 mt-6">
               <h3 className="text-[10px] font-black uppercase text-slate-800 mb-2 flex items-center gap-2">
                 <Wallet size={12} className="text-emerald-600" /> Detalle de Obligaciones
               </h3>
 
-              {/* Agregamos table-fixed para forzar los anchos */}
               <table className="w-full text-[10px] table-fixed border-collapse">
                 <thead>
                   <tr className="border-b-2 border-slate-200">
-                    {/* Definimos anchos exactos: 20% Periodo, 50% Concepto, 15% Valor, 15% Saldo */}
                     <th className="w-[20%] py-2 text-left font-black text-slate-500 uppercase">Periodo</th>
                     <th className="w-[50%] py-2 text-left font-black text-slate-500 uppercase">Concepto</th>
                     <th className="w-[15%] py-2 text-right font-black text-slate-500 uppercase">Vr. Original</th>
@@ -208,30 +224,40 @@ export default function EstadoCuenta({ residente, deudas, onClose }: Props) {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {chunk.map((d: any) => (
-                    <tr key={d.id} className="hover:bg-slate-50">
-                      <td className="py-2 align-top">
-                        {/* Lógica visual para que no se vea feo "CARGO EXTRA" */}
-                        <span className={`font-bold ${!d.causaciones_globales?.mes_causado ? 'text-[8px] bg-slate-100 px-1 rounded text-slate-500' : 'text-slate-800'}`}>
-                          {formatPeriodo(d.causaciones_globales?.mes_causado)}
-                        </span>
-                      </td>
-                      <td className="py-2 align-top text-slate-600 uppercase pr-2 leading-tight">
-                        {d.concepto_nombre || d.causaciones_globales?.concepto_nombre}
-                      </td>
-                      <td className="py-2 align-top text-right text-slate-400 tabular-nums">
-                        ${(d.monto_original || 0).toLocaleString()}
-                      </td>
-                      <td className="py-2 align-top text-right font-black text-rose-600 tabular-nums">
-                        ${calcularValorHoy(d).toLocaleString()}
-                      </td>
-                    </tr>
-                  ))}
+                  {chunk.map((d: any) => {
+                    const periodoTexto = formatPeriodo(d);
+                    const esCargoExtra = periodoTexto === "CARGO EXTRA";
+
+                    return (
+                      <tr key={d.id} className="hover:bg-slate-50">
+                        <td className="py-2 align-top">
+                          {esCargoExtra ? (
+                            <span className="text-[8px] bg-slate-100 px-1.5 py-0.5 rounded text-slate-500 font-bold border border-slate-200">
+                              CARGO EXTRA
+                            </span>
+                          ) : (
+                            <span className="font-bold text-slate-800">
+                              {periodoTexto}
+                            </span>
+                          )}
+                        </td>
+                        <td className="py-2 align-top text-slate-600 uppercase pr-2 leading-tight">
+                          {d.concepto_nombre || d.causaciones_globales?.concepto_nombre}
+                        </td>
+                        <td className="py-2 align-top text-right text-slate-400 tabular-nums">
+                          ${(d.monto_original || 0).toLocaleString()}
+                        </td>
+                        <td className="py-2 align-top text-right font-black text-rose-600 tabular-nums">
+                          ${calcularValorHoy(d).toLocaleString()}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
 
-            {/* PIE DE PAGINA (DATOS DE PAGO) */}
+            {/* PIE DE PAGINA */}
             <div className="mt-auto border-t-2 border-slate-800 pt-4">
               <div className="grid grid-cols-2 gap-8">
                 <div>
@@ -250,14 +276,13 @@ export default function EstadoCuenta({ residente, deudas, onClose }: Props) {
 
           </div>
         )) : (
-          // SI NO HAY DEUDAS, MOSTRAR CERTIFICADO DE PAZ Y SALVO
+          // CERTIFICADO PAZ Y SALVO
           <div className="print-page bg-white shadow-2xl w-[816px] h-[1056px] flex flex-col items-center justify-center text-center p-20 border-4 border-double border-emerald-100">
             <div className="w-24 h-24 bg-emerald-50 rounded-full flex items-center justify-center text-emerald-500 mb-6">
               <CheckCircle2 size={60} />
             </div>
             <h1 className="text-4xl font-black text-slate-900 uppercase mb-2">Paz y Salvo</h1>
             <p className="text-sm font-bold text-slate-500 uppercase tracking-widest mb-10">Agrupación Res. El Parque de las Flores</p>
-
             <p className="text-lg text-slate-700 max-w-lg leading-relaxed">
               Certificamos que la unidad <b>{residente.torre} - {residente.apartamento}</b>, propiedad de <b>{residente.nombre}</b>, se encuentra al día por todo concepto de administración y expensas comunes a la fecha de corte.
             </p>
