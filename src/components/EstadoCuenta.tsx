@@ -119,67 +119,70 @@ export default function EstadoCuenta({
   return (
     <>
       <style>{`
-        /* Estilos para la vista previa en pantalla */
+        /* Vista en pantalla (no afecta la impresión) */
         .print-page {
-          width: 816px; /* Ancho de hoja carta */
+          width: 816px;
           min-height: 1056px;
           margin: 20px auto;
-          padding: 40px;
+          padding: 50px;
           background: white;
           box-shadow: 0 0 15px rgba(0,0,0,0.1);
         }
 
         @media print {
+          /* Configuración de la hoja */
           @page {
             size: letter;
-            margin: 0; /* Dejamos que el padding de .print-page maneje los márgenes */
+            margin: 0;
           }
 
-          /* 1. OCULTAR TODO EL CONTENIDO DEL DASHBOARD */
-          body {
-            visibility: hidden;
+          /* Reset total para que el navegador vea páginas reales */
+          html, body {
             height: auto !important;
             overflow: visible !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            background: white !important;
           }
 
-          /* 2. MOSTRAR SOLO EL MODAL Y POSICIONARLO AL PRINCIPIO */
+          /* Ocultamos todo lo que no sea el modal */
+          body > *:not(.print-modal) {
+            display: none !important;
+          }
+
+          /* Convertimos el modal en un contenedor de flujo normal */
           .print-modal {
-            visibility: visible;
             position: absolute !important;
-            left: 0 !important;
             top: 0 !important;
+            left: 0 !important;
             width: 100% !important;
             height: auto !important;
+            display: block !important; /* Quitamos flexbox para imprimir */
             overflow: visible !important;
             background: white !important;
             padding: 0 !important;
             margin: 0 !important;
+          }
+
+          /* Forzamos el salto de página en cada bloque */
+          .print-page {
             display: block !important;
+            width: 100% !important;
+            min-height: 100vh !important; /* Fuerza a ocupar toda la hoja */
+            padding: 1.5cm !important;
+            margin: 0 !important;
+            box-shadow: none !important;
+            page-break-after: always !important; /* Compatibilidad antigua */
+            break-after: page !important;      /* Estándar moderno */
+            page-break-inside: avoid !important;
           }
 
-          /* Aseguramos que los hijos del modal sean visibles */
-          .print-modal * {
-            visibility: visible;
-          }
-
-          /* 3. QUITAR BOTONES Y ELEMENTOS DE UI */
-          .no-print, .no-print * {
+          /* Ocultar botones de la interfaz */
+          .no-print {
             display: none !important;
           }
 
-          /* 4. AJUSTAR LAS PÁGINAS PARA QUE NO SE CORTEN */
-          .print-page {
-            visibility: visible;
-            box-shadow: none !important;
-            margin: 0 !important;
-            padding: 1.5cm !important; /* Margen físico de impresión */
-            width: 100% !important;
-            min-height: auto !important;
-            page-break-after: always;
-            page-break-inside: avoid;
-          }
-
-          /* Forzar colores (para el rojo de las deudas) */
+          /* Forzar colores de texto y fondos */
           * {
             -webkit-print-color-adjust: exact !important;
             print-color-adjust: exact !important;
