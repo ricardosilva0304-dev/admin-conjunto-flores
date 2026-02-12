@@ -119,50 +119,67 @@ export default function EstadoCuenta({
   return (
     <>
       <style>{`
+        /* Estilos para la vista previa en pantalla */
         .print-page {
-          width: 816px;
+          width: 816px; /* Ancho de hoja carta */
           min-height: 1056px;
           margin: 20px auto;
           padding: 40px;
           background: white;
           box-shadow: 0 0 15px rgba(0,0,0,0.1);
-          page-break-after: always;
         }
 
         @media print {
           @page {
             size: letter;
-            margin: 1.5cm;
+            margin: 0; /* Dejamos que el padding de .print-page maneje los márgenes */
           }
 
-          html, body {
-            margin: 0;
-            padding: 0;
-            background: white;
-          }
-
-          /* Ocultar botones */
-          .no-print {
-            display: none !important;
-          }
-
-          /* Quitar overlay oscuro */
-          .print-modal {
-            position: static !important;
-            background: white !important;
-            backdrop-filter: none !important;
+          /* 1. OCULTAR TODO EL CONTENIDO DEL DASHBOARD */
+          body {
+            visibility: hidden;
+            height: auto !important;
             overflow: visible !important;
           }
 
-          /* Hojas */
+          /* 2. MOSTRAR SOLO EL MODAL Y POSICIONARLO AL PRINCIPIO */
+          .print-modal {
+            visibility: visible;
+            position: absolute !important;
+            left: 0 !important;
+            top: 0 !important;
+            width: 100% !important;
+            height: auto !important;
+            overflow: visible !important;
+            background: white !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            display: block !important;
+          }
+
+          /* Aseguramos que los hijos del modal sean visibles */
+          .print-modal * {
+            visibility: visible;
+          }
+
+          /* 3. QUITAR BOTONES Y ELEMENTOS DE UI */
+          .no-print, .no-print * {
+            display: none !important;
+          }
+
+          /* 4. AJUSTAR LAS PÁGINAS PARA QUE NO SE CORTEN */
           .print-page {
+            visibility: visible;
             box-shadow: none !important;
             margin: 0 !important;
+            padding: 1.5cm !important; /* Margen físico de impresión */
             width: 100% !important;
             min-height: auto !important;
             page-break-after: always;
+            page-break-inside: avoid;
           }
 
+          /* Forzar colores (para el rojo de las deudas) */
           * {
             -webkit-print-color-adjust: exact !important;
             print-color-adjust: exact !important;
@@ -184,19 +201,17 @@ export default function EstadoCuenta({
               <Printer size={14} /> IMPRIMIR
             </button>
 
-            <button onClick={onClose}>
-              <X />
+            <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-full">
+              <X size={20} />
             </button>
           </div>
         </div>
 
         {/* -------- PÁGINAS DE DEUDAS -------- */}
         {deudaPages.map((chunk, index) => (
-          <div key={index} className="print-page">
+          <div key={`deuda-${index}`} className="print-page">
             <Header residente={residente} />
-
             <SectionTitle icon={<Wallet size={12} />} title="Deudas Pendientes" />
-
             <TableDeudas
               data={chunk}
               formatPeriodo={formatPeriodo}
@@ -209,9 +224,7 @@ export default function EstadoCuenta({
         {pagoPages.map((chunk, index) => (
           <div key={`pagos-${index}`} className="print-page">
             <Header residente={residente} />
-
             <SectionTitle icon={<History size={12} />} title="Historial de Pagos" />
-
             <TablePagos data={chunk} />
           </div>
         ))}
