@@ -35,25 +35,25 @@ export default function EstadoCuenta({ residente, deudas, onClose }: Props) {
     const dia = hoy.getDate();
     const mesAct = hoy.getMonth() + 1;
     const anioAct = hoy.getFullYear();
-    
+
     // Protección contra fechas inválidas
     const mesCausado = d.causaciones_globales.mes_causado;
-    if(!mesCausado) return d.saldo_pendiente || 0;
+    if (!mesCausado) return d.saldo_pendiente || 0;
 
     const [yC, mC] = mesCausado.split("-").map(Number);
     const m1 = d.precio_m1 || d.monto_original || 0;
     const m2 = d.precio_m2 || m1;
     const m3 = d.precio_m3 || m1;
-    
+
     let precio = m1;
     // Si año actual > año deuda O (mismo año Y mes actual > mes deuda)
-    if (anioAct > yC || (anioAct === yC && mesAct > mC)) { 
-        precio = m3; 
-    } else { 
-        if (dia > 10 && dia <= 20) precio = m2; 
-        else if (dia > 20) precio = m3; 
+    if (anioAct > yC || (anioAct === yC && mesAct > mC)) {
+      precio = m3;
+    } else {
+      if (dia > 10 && dia <= 20) precio = m2;
+      else if (dia > 20) precio = m3;
     }
-    
+
     // Saldo = Precio que aplica hoy - (Lo que ya pagó basándonos en M1)
     return Math.max(0, precio - (m1 - (d.saldo_pendiente || 0)));
   };
@@ -68,7 +68,7 @@ export default function EstadoCuenta({ residente, deudas, onClose }: Props) {
     iframe.style.position = "fixed"; iframe.style.right = "0"; iframe.style.bottom = "0";
     iframe.style.width = "0"; iframe.style.height = "0"; iframe.style.border = "0";
     document.body.appendChild(iframe);
-    
+
     const doc = iframe.contentWindow?.document;
     if (!doc) return;
 
@@ -111,7 +111,7 @@ export default function EstadoCuenta({ residente, deudas, onClose }: Props) {
   };
 
   // Reducimos un poco las filas por página para que quepa la info nueva del residente
-  const ROWS_PER_PAGE = 13; 
+  const ROWS_PER_PAGE = 13;
   const chunkArray = (array: any[], size: number) => {
     const result = [];
     for (let i = 0; i < array.length; i += size) { result.push(array.slice(i, i + size)); }
@@ -125,7 +125,7 @@ export default function EstadoCuenta({ residente, deudas, onClose }: Props) {
 
   return (
     <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-[300] flex flex-col items-center p-4 md:p-6 overflow-y-auto">
-      
+
       {/* BARRA DE HERRAMIENTAS */}
       <div className="no-print sticky top-0 w-full max-w-[816px] bg-white p-4 mb-6 flex justify-between items-center rounded-xl shadow-xl z-50 border border-slate-100">
         <div>
@@ -144,11 +144,11 @@ export default function EstadoCuenta({ residente, deudas, onClose }: Props) {
 
       {/* CONTENEDOR DE HOJAS */}
       <div ref={printRef} className="w-full flex flex-col items-center gap-8 pb-20">
-        
+
         {/* PAGINAS DE DEUDAS */}
         {deudaPages.length > 0 ? deudaPages.map((chunk, index) => (
           <div key={`page-${index}`} className="print-page bg-white shadow-2xl w-[816px] h-[1056px] flex flex-col relative overflow-hidden">
-            
+
             {/* ENCABEZADO (DATOS DEL CONJUNTO) */}
             <div className="flex justify-between items-start border-b-2 border-slate-900 pb-5 mb-6">
               <div className="flex gap-5">
@@ -156,8 +156,8 @@ export default function EstadoCuenta({ residente, deudas, onClose }: Props) {
                 <div>
                   <h1 className="text-lg font-black text-slate-900 uppercase leading-none mb-1">Agrupación Res. El Parque de las Flores</h1>
                   <p className="text-[10px] font-bold text-slate-500 tracking-widest mb-1">NIT. 832.011.421-3</p>
-                  <p className="text-[9px] text-slate-400 flex items-center gap-1"><MapPin size={10}/> Diagonal 9 # 4B-90 • Soacha, Cundinamarca</p>
-                  <p className="text-[9px] text-slate-400 flex items-center gap-1"><Phone size={10}/> 315 340 0657</p>
+                  <p className="text-[9px] text-slate-400 flex items-center gap-1"><MapPin size={10} /> Diagonal 9 # 4B-90 • Soacha, Cundinamarca</p>
+                  <p className="text-[9px] text-slate-400 flex items-center gap-1"><Phone size={10} /> 315 340 0657</p>
                 </div>
               </div>
               <div className="text-right">
@@ -175,9 +175,9 @@ export default function EstadoCuenta({ residente, deudas, onClose }: Props) {
                 <p className="text-[9px] font-black text-slate-400 uppercase mb-1">Responsable</p>
                 <p className="text-sm font-black text-slate-800 uppercase mb-1">{residente.nombre || 'Propietario'}</p>
                 <div className="flex flex-col gap-0.5">
-                   <span className="text-[9px] text-slate-500 font-medium flex items-center gap-1.5"><MapPin size={10} className="text-emerald-500"/> {residente.torre} - Apt {residente.apartamento}</span>
-                   <span className="text-[9px] text-slate-500 font-medium flex items-center gap-1.5"><Mail size={10} className="text-emerald-500"/> {residente.email || 'Sin correo registrado'}</span>
-                   <span className="text-[9px] text-slate-500 font-medium flex items-center gap-1.5"><Phone size={10} className="text-emerald-500"/> {residente.celular || 'Sin teléfono'}</span>
+                  <span className="text-[9px] text-slate-500 font-medium flex items-center gap-1.5"><MapPin size={10} className="text-emerald-500" /> {residente.torre} - Apt {residente.apartamento}</span>
+                  <span className="text-[9px] text-slate-500 font-medium flex items-center gap-1.5"><Mail size={10} className="text-emerald-500" /> {residente.email || 'Sin correo registrado'}</span>
+                  <span className="text-[9px] text-slate-500 font-medium flex items-center gap-1.5"><Phone size={10} className="text-emerald-500" /> {residente.celular || 'Sin teléfono'}</span>
                 </div>
               </div>
               <div className="text-right flex flex-col justify-center border-l border-slate-200 pl-6">
@@ -190,26 +190,41 @@ export default function EstadoCuenta({ residente, deudas, onClose }: Props) {
             </div>
 
             {/* TABLA DE DEUDAS */}
-            <div className="flex-1">
+            {/* TABLA DE DEUDAS CORREGIDA */}
+            <div className="flex-1 mt-6">
               <h3 className="text-[10px] font-black uppercase text-slate-800 mb-2 flex items-center gap-2">
-                <Wallet size={12} className="text-rose-500" /> Obligaciones Pendientes
+                <Wallet size={12} className="text-emerald-600" /> Detalle de Obligaciones
               </h3>
-              <table>
+
+              {/* Agregamos table-fixed para forzar los anchos */}
+              <table className="w-full text-[10px] table-fixed border-collapse">
                 <thead>
-                  <tr>
-                    <th>Periodo</th>
-                    <th>Concepto</th>
-                    <th className="text-right">Vr. Original</th>
-                    <th className="text-right">Saldo Hoy</th>
+                  <tr className="border-b-2 border-slate-200">
+                    {/* Definimos anchos exactos: 20% Periodo, 50% Concepto, 15% Valor, 15% Saldo */}
+                    <th className="w-[20%] py-2 text-left font-black text-slate-500 uppercase">Periodo</th>
+                    <th className="w-[50%] py-2 text-left font-black text-slate-500 uppercase">Concepto</th>
+                    <th className="w-[15%] py-2 text-right font-black text-slate-500 uppercase">Vr. Original</th>
+                    <th className="w-[15%] py-2 text-right font-black text-slate-800 uppercase">Saldo Hoy</th>
                   </tr>
                 </thead>
-                <tbody>
+                <tbody className="divide-y divide-slate-100">
                   {chunk.map((d: any) => (
-                    <tr key={d.id}>
-                      <td className="font-bold">{formatPeriodo(d.causaciones_globales?.mes_causado)}</td>
-                      <td className="uppercase text-[9px]">{d.concepto_nombre || d.causaciones_globales?.concepto_nombre}</td>
-                      <td className="text-right text-slate-400">${(d.monto_original || 0).toLocaleString()}</td>
-                      <td className="text-right font-black text-rose-600">${calcularValorHoy(d).toLocaleString()}</td>
+                    <tr key={d.id} className="hover:bg-slate-50">
+                      <td className="py-2 align-top">
+                        {/* Lógica visual para que no se vea feo "CARGO EXTRA" */}
+                        <span className={`font-bold ${!d.causaciones_globales?.mes_causado ? 'text-[8px] bg-slate-100 px-1 rounded text-slate-500' : 'text-slate-800'}`}>
+                          {formatPeriodo(d.causaciones_globales?.mes_causado)}
+                        </span>
+                      </td>
+                      <td className="py-2 align-top text-slate-600 uppercase pr-2 leading-tight">
+                        {d.concepto_nombre || d.causaciones_globales?.concepto_nombre}
+                      </td>
+                      <td className="py-2 align-top text-right text-slate-400 tabular-nums">
+                        ${(d.monto_original || 0).toLocaleString()}
+                      </td>
+                      <td className="py-2 align-top text-right font-black text-rose-600 tabular-nums">
+                        ${calcularValorHoy(d).toLocaleString()}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -237,52 +252,52 @@ export default function EstadoCuenta({ residente, deudas, onClose }: Props) {
         )) : (
           // SI NO HAY DEUDAS, MOSTRAR CERTIFICADO DE PAZ Y SALVO
           <div className="print-page bg-white shadow-2xl w-[816px] h-[1056px] flex flex-col items-center justify-center text-center p-20 border-4 border-double border-emerald-100">
-             <div className="w-24 h-24 bg-emerald-50 rounded-full flex items-center justify-center text-emerald-500 mb-6">
-                <CheckCircle2 size={60} />
-             </div>
-             <h1 className="text-4xl font-black text-slate-900 uppercase mb-2">Paz y Salvo</h1>
-             <p className="text-sm font-bold text-slate-500 uppercase tracking-widest mb-10">Agrupación Res. El Parque de las Flores</p>
-             
-             <p className="text-lg text-slate-700 max-w-lg leading-relaxed">
-               Certificamos que la unidad <b>{residente.torre} - {residente.apartamento}</b>, propiedad de <b>{residente.nombre}</b>, se encuentra al día por todo concepto de administración y expensas comunes a la fecha de corte.
-             </p>
-             <p className="mt-10 text-xs font-bold text-slate-400">Expedido el: {new Date().toLocaleDateString('es-CO', {dateStyle: 'full'})}</p>
+            <div className="w-24 h-24 bg-emerald-50 rounded-full flex items-center justify-center text-emerald-500 mb-6">
+              <CheckCircle2 size={60} />
+            </div>
+            <h1 className="text-4xl font-black text-slate-900 uppercase mb-2">Paz y Salvo</h1>
+            <p className="text-sm font-bold text-slate-500 uppercase tracking-widest mb-10">Agrupación Res. El Parque de las Flores</p>
+
+            <p className="text-lg text-slate-700 max-w-lg leading-relaxed">
+              Certificamos que la unidad <b>{residente.torre} - {residente.apartamento}</b>, propiedad de <b>{residente.nombre}</b>, se encuentra al día por todo concepto de administración y expensas comunes a la fecha de corte.
+            </p>
+            <p className="mt-10 text-xs font-bold text-slate-400">Expedido el: {new Date().toLocaleDateString('es-CO', { dateStyle: 'full' })}</p>
           </div>
         )}
 
         {/* PAGINAS DE PAGOS (HISTORIAL) */}
         {pagos.length > 0 && pagosPages.map((chunk, index) => (
-           <div key={`pago-page-${index}`} className="print-page bg-white shadow-2xl w-[816px] h-[1056px] flex flex-col">
-              <div className="border-b pb-4 mb-6 flex justify-between items-end">
-                 <h3 className="text-sm font-black uppercase text-slate-800 flex items-center gap-2">
-                   <History size={16} className="text-emerald-600" /> Historial de Pagos
-                 </h3>
-                 <span className="text-[9px] font-bold text-slate-400">Anexo {index + 1}</span>
-              </div>
-              
-              <table className="w-full">
-                <thead>
-                  <tr>
-                    <th>Recibo No.</th>
-                    <th>Fecha</th>
-                    <th>Concepto</th>
-                    <th>Medio</th>
-                    <th className="text-right">Monto</th>
+          <div key={`pago-page-${index}`} className="print-page bg-white shadow-2xl w-[816px] h-[1056px] flex flex-col">
+            <div className="border-b pb-4 mb-6 flex justify-between items-end">
+              <h3 className="text-sm font-black uppercase text-slate-800 flex items-center gap-2">
+                <History size={16} className="text-emerald-600" /> Historial de Pagos
+              </h3>
+              <span className="text-[9px] font-bold text-slate-400">Anexo {index + 1}</span>
+            </div>
+
+            <table className="w-full">
+              <thead>
+                <tr>
+                  <th>Recibo No.</th>
+                  <th>Fecha</th>
+                  <th>Concepto</th>
+                  <th>Medio</th>
+                  <th className="text-right">Monto</th>
+                </tr>
+              </thead>
+              <tbody>
+                {chunk.map((p) => (
+                  <tr key={p.id}>
+                    <td className="font-bold text-slate-700">RC-{p.numero_recibo}</td>
+                    <td>{p.fecha_pago}</td>
+                    <td className="text-[8px] uppercase max-w-[200px] truncate">{p.concepto_texto?.split("||")[0]}</td>
+                    <td><span className="uppercase text-[8px] font-bold bg-slate-100 px-1 rounded">{p.metodo_pago}</span></td>
+                    <td className="text-right font-black text-emerald-600">${Number(p.monto_total).toLocaleString()}</td>
                   </tr>
-                </thead>
-                <tbody>
-                  {chunk.map((p) => (
-                    <tr key={p.id}>
-                      <td className="font-bold text-slate-700">RC-{p.numero_recibo}</td>
-                      <td>{p.fecha_pago}</td>
-                      <td className="text-[8px] uppercase max-w-[200px] truncate">{p.concepto_texto?.split("||")[0]}</td>
-                      <td><span className="uppercase text-[8px] font-bold bg-slate-100 px-1 rounded">{p.metodo_pago}</span></td>
-                      <td className="text-right font-black text-emerald-600">${Number(p.monto_total).toLocaleString()}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-           </div>
+                ))}
+              </tbody>
+            </table>
+          </div>
         ))}
 
       </div>

@@ -20,7 +20,7 @@ export default function CuentaCobro({ residente, deudas, onClose }: any) {
 
     const hoy = new Date();
     const dia = hoy.getDate();
-    
+
     // Protección contra fechas nulas
     const mesCausado = d.causaciones_globales.mes_causado;
     if (!mesCausado) return d.saldo_pendiente || 0;
@@ -29,9 +29,9 @@ export default function CuentaCobro({ residente, deudas, onClose }: any) {
     const m1 = d.precio_m1 || d.monto_original || 0;
     const m2 = d.precio_m2 || m1;
     const m3 = d.precio_m3 || m1;
-    
+
     let precio = m1;
-    
+
     // Lógica M1, M2, M3
     if (hoy.getFullYear() > yC || (hoy.getFullYear() === yC && (hoy.getMonth() + 1) > mC)) {
       precio = m3;
@@ -39,7 +39,7 @@ export default function CuentaCobro({ residente, deudas, onClose }: any) {
       if (dia > 10 && dia <= 20) precio = m2;
       else if (dia > 20) precio = m3;
     }
-    
+
     // Restamos lo que ya se pagó sobre la base M1
     return Math.max(0, precio - (m1 - (d.saldo_pendiente || 0)));
   };
@@ -95,7 +95,7 @@ export default function CuentaCobro({ residente, deudas, onClose }: any) {
 
   return (
     <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[300] flex flex-col items-center p-4 md:p-8 overflow-y-auto">
-      
+
       {/* BARRA DE HERRAMIENTAS */}
       <div className="no-print sticky top-0 w-full max-w-[816px] bg-white p-4 mb-6 flex justify-between items-center rounded-xl shadow-xl border border-slate-100 z-50">
         <div className="flex items-center gap-3">
@@ -119,7 +119,7 @@ export default function CuentaCobro({ residente, deudas, onClose }: any) {
 
       {/* DOCUMENTO (HOJA CARTA) */}
       <div ref={printRef} className="w-[816px] min-h-[1056px] bg-white p-16 shadow-2xl text-slate-800 relative">
-        
+
         {/* ENCABEZADO CONJUNTO */}
         <div className="flex justify-between items-start mb-10 pb-6 border-b-2 border-slate-900">
           <div className="flex gap-5">
@@ -128,9 +128,9 @@ export default function CuentaCobro({ residente, deudas, onClose }: any) {
               <h1 className="text-lg font-black text-slate-900 uppercase leading-none">Agrupación Res. El Parque de las Flores</h1>
               <p className="text-[10px] font-bold text-slate-500 tracking-widest">NIT. 832.011.421-3</p>
               <div className="pt-1 space-y-0.5">
-                <p className="text-[9px] text-slate-500 flex items-center gap-1"><MapPin size={10}/> Diagonal 9 # 4B-90 • Soacha, Cundinamarca</p>
-                <p className="text-[9px] text-slate-500 flex items-center gap-1"><Phone size={10}/> 315 340 0657</p>
-                <p className="text-[9px] text-slate-500 flex items-center gap-1"><Mail size={10}/> cr.parquedelasflores@gmail.com</p>
+                <p className="text-[9px] text-slate-500 flex items-center gap-1"><MapPin size={10} /> Diagonal 9 # 4B-90 • Soacha, Cundinamarca</p>
+                <p className="text-[9px] text-slate-500 flex items-center gap-1"><Phone size={10} /> 315 340 0657</p>
+                <p className="text-[9px] text-slate-500 flex items-center gap-1"><Mail size={10} /> cr.parquedelasflores@gmail.com</p>
               </div>
             </div>
           </div>
@@ -138,7 +138,7 @@ export default function CuentaCobro({ residente, deudas, onClose }: any) {
             <div className="bg-slate-900 text-white px-4 py-1.5 rounded mb-2 inline-block">
               <span className="text-sm font-black italic uppercase">CUENTA DE COBRO</span>
             </div>
-            <p className="text-xl font-black text-slate-900">No. {new Date().getFullYear()}{String(new Date().getMonth()+1).padStart(2,'0')}-{residente.apartamento}</p>
+            <p className="text-xl font-black text-slate-900">No. {new Date().getFullYear()}{String(new Date().getMonth() + 1).padStart(2, '0')}-{residente.apartamento}</p>
             <p className="text-[9px] font-bold text-slate-400 uppercase mt-1">Fecha Emisión: {new Date().toLocaleDateString('es-CO')}</p>
           </div>
         </div>
@@ -158,38 +158,51 @@ export default function CuentaCobro({ residente, deudas, onClose }: any) {
 
         {/* TEXTO LEGAL */}
         <div className="mb-8 text-xs text-slate-600 leading-relaxed text-justify">
-          La Administración se permite informar el estado de cuenta a la fecha, correspondiente a expensas comunes y otros conceptos. 
+          La Administración se permite informar el estado de cuenta a la fecha, correspondiente a expensas comunes y otros conceptos.
           Agradecemos realizar el pago antes de la fecha límite para evitar intereses de mora.
         </div>
 
-        {/* TABLA DE CONCEPTOS */}
-        <table className="w-full mb-10">
+        <table className="w-full mb-10 table-fixed border-collapse">
           <thead>
-            <tr>
-              <th className="w-1/4 font-black text-slate-500 text-[10px]">Periodo</th>
-              <th className="w-1/2 font-black text-slate-500 text-[10px]">Concepto</th>
-              <th className="w-1/4 font-black text-slate-500 text-[10px] text-right">Valor a Pagar</th>
+            <tr className="border-y-2 border-slate-900">
+              {/* 1. Definimos anchos exactos para que no se muevan */}
+              <th className="w-[20%] font-black text-slate-500 text-[10px] text-left py-3">Periodo</th>
+              <th className="w-[60%] font-black text-slate-500 text-[10px] text-left py-3">Concepto</th>
+              <th className="w-[20%] font-black text-slate-500 text-[10px] text-right py-3">Valor a Pagar</th>
             </tr>
           </thead>
-          <tbody>
+          <tbody className="divide-y divide-slate-100">
             {deudasOrdenadas.map((d: any) => (
               <tr key={d.id}>
-                <td className="font-bold text-slate-800 text-xs py-3">
-                  {formatPeriodo(d.causaciones_globales?.mes_causado)}
+                {/* Columna Periodo: Si es Cargo Extra, lo ponemos chiquito */}
+                <td className="py-3 align-top">
+                  {!d.causaciones_globales?.mes_causado ? (
+                    <span className="text-[8px] font-bold bg-slate-100 text-slate-500 px-2 py-0.5 rounded border border-slate-200 uppercase tracking-wider">
+                      Cargo Extra
+                    </span>
+                  ) : (
+                    <span className="font-bold text-slate-800 text-xs">
+                      {formatPeriodo(d.causaciones_globales.mes_causado)}
+                    </span>
+                  )}
                 </td>
-                <td className="text-xs text-slate-600 uppercase py-3">
+
+                {/* Columna Concepto */}
+                <td className="text-xs text-slate-600 uppercase py-3 align-top leading-tight pr-4">
                   {d.concepto_nombre || d.causaciones_globales?.concepto_nombre}
                 </td>
-                <td className="text-right font-bold text-slate-900 text-xs py-3">
+
+                {/* Columna Valor */}
+                <td className="text-right font-bold text-slate-900 text-xs py-3 align-top tabular-nums">
                   ${calcularValorHoy(d).toLocaleString()}
                 </td>
               </tr>
             ))}
           </tbody>
           <tfoot>
-            <tr className="border-t-2 border-slate-900">
-              <td colSpan={2} className="text-right font-black text-xs uppercase py-4 pr-4">Total a Pagar:</td>
-              <td className="text-right font-black text-xl text-slate-900 py-4">
+            <tr className="border-t-2 border-slate-900 bg-slate-50">
+              <td colSpan={2} className="text-right font-black text-xs uppercase py-4 pr-4 text-slate-500">Total Neto a Pagar:</td>
+              <td className="text-right font-black text-xl text-slate-900 py-4 tabular-nums">
                 ${total.toLocaleString()}
               </td>
             </tr>
@@ -206,7 +219,7 @@ export default function CuentaCobro({ residente, deudas, onClose }: any) {
         <div className="mt-auto grid grid-cols-2 gap-10 items-end">
           <div className="bg-slate-50 p-4 rounded-lg border border-slate-100">
             <div className="flex items-center gap-2 mb-2">
-              <Landmark size={14} className="text-amber-600"/>
+              <Landmark size={14} className="text-amber-600" />
               <span className="text-[10px] font-black uppercase text-slate-800">Consignación Bancaria</span>
             </div>
             <ul className="text-[10px] text-slate-600 space-y-1">
