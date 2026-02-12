@@ -148,7 +148,6 @@ export default function App() {
       <Sidebar
         activeTab={activeTab}
         setActiveTab={(t: string) => { setActiveTab(t); setIsSidebarOpen(false); }}
-        onLogout={handleLogout}
         isOpen={isSidebarOpen}
         setIsOpen={setIsSidebarOpen}
       />
