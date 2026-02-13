@@ -141,34 +141,92 @@ export default function Ingresos() {
     <div className="max-w-6xl mx-auto space-y-6 pb-20 px-2 md:px-0 font-sans text-slate-800">
       {datosRecibo && <ReciboCaja datos={datosRecibo} onClose={() => setDatosRecibo(null)} />}
 
-      {/* BUSCADOR */}
-      <section className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm relative z-[30]">
-        <div className="relative">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
-          <input
-            className="w-full bg-slate-50 border border-slate-100 pl-11 pr-4 py-4 rounded-xl outline-none font-bold text-slate-700 focus:bg-white transition-all"
-            placeholder="Escribe Apto (Ej: 5-101) o Nombre del Propietario..."
-            value={resSeleccionado ? `${resSeleccionado.nombre} | T${resSeleccionado.torre.slice(-1)}-${resSeleccionado.apartamento}` : busqueda}
-            onChange={(e) => { setBusqueda(e.target.value); setResSeleccionado(null); }}
-          />
-          {resSeleccionado && <button onClick={() => setResSeleccionado(null)} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-300 hover:text-rose-500"><X size={18} /></button>}
+      {/* BUSCADOR ESTILO PREMIUM LIGHT */}
+      <section className="bg-white p-6 rounded-[2.5rem] border border-slate-100 shadow-sm relative z-[40]">
+        <div className="flex flex-col gap-2">
+          <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-4 mb-1 block">
+            Unidad Responsable del Pago
+          </label>
+
+          <div className="relative group">
+            {/* Icono de búsqueda con efecto de foco */}
+            <Search
+              className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-emerald-500 transition-colors duration-300"
+              size={20}
+            />
+
+            <input
+              className="w-full bg-slate-50/50 border border-slate-100 pl-16 pr-14 py-5 rounded-[1.8rem] outline-none font-bold text-slate-700 text-base focus:bg-white focus:ring-4 ring-emerald-500/5 transition-all shadow-inner placeholder:text-slate-300"
+              placeholder="Busca por Nombre o Unidad (ej: 7-302)"
+              value={resSeleccionado ? `${resSeleccionado.nombre} | T${resSeleccionado.torre.slice(-1)}-${resSeleccionado.apartamento}` : busqueda}
+              onChange={(e) => { setBusqueda(e.target.value); setResSeleccionado(null); }}
+            />
+
+            {/* Botón de limpiar transparente */}
+            {(busqueda || resSeleccionado) && (
+              <button
+                onClick={() => { setBusqueda(""); setResSeleccionado(null); }}
+                className="absolute right-6 top-1/2 -translate-y-1/2 text-slate-300 hover:text-rose-500 transition-all p-2 hover:bg-slate-100 rounded-2xl"
+              >
+                <X size={20} />
+              </button>
+            )}
+          </div>
         </div>
 
+        {/* DROP-DOWN DE RESULTADOS REDISEÑADO */}
         {filteredRes.length > 0 && (
-          <div className="absolute top-[105%] left-0 right-0 bg-white border border-slate-200 rounded-2xl shadow-2xl overflow-hidden z-[100]">
-            {filteredRes.map(r => (
-              <button key={r.id} onClick={() => cargarDeudasResidente(r)} className="w-full p-4 text-left border-b last:border-0 hover:bg-slate-50 flex items-center justify-between group font-bold text-sm">
-                <span>{r.nombre} <span className="text-slate-400 font-medium">| T{r.torre.slice(-1)}-{r.apartamento}</span></span>
-                <ChevronRight size={14} className="text-slate-200 group-hover:text-emerald-500" />
-              </button>
-            ))}
+          <div className="absolute top-[105%] left-0 right-0 bg-white border border-slate-100 rounded-[2rem] shadow-[0_20px_50px_rgba(0,0,0,0.1)] overflow-hidden z-[100] animate-in fade-in slide-in-from-top-2 duration-300">
+            <div className="p-3">
+              {filteredRes.map(r => (
+                <button
+                  key={r.id}
+                  onClick={() => cargarDeudasResidente(r)}
+                  className="w-full p-4 mb-1 text-left rounded-2xl hover:bg-slate-50 flex items-center justify-between group transition-all active:scale-[0.98]"
+                >
+                  <div className="flex items-center gap-5">
+                    {/* Avatar circular con inicial de torre */}
+                    <div className="w-11 h-11 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center font-black text-xs border border-emerald-100 group-hover:bg-emerald-500 group-hover:text-white group-hover:border-emerald-500 transition-all duration-300">
+                      T{r.torre.slice(-1)}
+                    </div>
+
+                    <div className="flex flex-col">
+                      <span className="font-black text-sm text-slate-800 uppercase tracking-tight group-hover:text-emerald-700 transition-colors">
+                        {r.nombre}
+                      </span>
+                      <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">
+                        Propiedad Horizontal
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-4">
+                    {/* Badge de Apartamento */}
+                    <div className="flex flex-col items-end">
+                      <span className="text-[10px] font-black text-slate-300 uppercase leading-none mb-1">Apartamento</span>
+                      <span className="bg-slate-100 text-slate-600 px-3 py-1.5 rounded-xl text-[11px] font-black group-hover:bg-emerald-600 group-hover:text-white transition-all shadow-sm">
+                        {r.apartamento}
+                      </span>
+                    </div>
+                    <ChevronRight size={18} className="text-slate-200 group-hover:text-emerald-500 group-hover:translate-x-1 transition-all" />
+                  </div>
+                </button>
+              ))}
+            </div>
+
+            {/* Pie del buscador sutil */}
+            <div className="bg-slate-50/50 p-4 text-center border-t border-slate-100">
+              <p className="text-[9px] font-black text-slate-300 uppercase tracking-[0.4em]">
+                Selecciona una unidad para registrar pago
+              </p>
+            </div>
           </div>
         )}
       </section>
 
       {resSeleccionado && (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 animate-in slide-in-from-bottom-2 duration-500">
-          
+
           {/* COLUMNA IZQUIERDA */}
           <div className="lg:col-span-8 space-y-4">
             <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">

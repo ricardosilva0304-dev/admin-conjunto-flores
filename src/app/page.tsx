@@ -150,6 +150,7 @@ export default function App() {
         setActiveTab={(t: string) => { setActiveTab(t); setIsSidebarOpen(false); }}
         isOpen={isSidebarOpen}
         setIsOpen={setIsSidebarOpen}
+        onLogout={handleLogout} // <--- AÑADE ESTA LÍNEA
       />
 
       <main className="flex-1 overflow-y-auto relative scroll-smooth flex flex-col">
