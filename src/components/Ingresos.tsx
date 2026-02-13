@@ -113,18 +113,28 @@ export default function Ingresos() {
     try {
       const mesesNombres = ["ENERO", "FEBRERO", "MARZO", "ABRIL", "MAYO", "JUNIO", "JULIO", "AGOSTO", "SEPTIEMBRE", "OCTUBRE", "NOVIEMBRE", "DICIEMBRE"];
 
+      // DENTRO DE procesarPago en Ingresos.tsx
       const conceptoTextoParaDB = deudas
-        .filter(d => Number(abonos[d.id]) > 0)
+        .filter(d => Number(abonos[d.id]) !== 0) // Incluimos abonos positivos y negativos
         .map(d => {
           const montoInd = Number(abonos[d.id]).toLocaleString('es-CO');
-          if (d.causaciones_globales) {
+
+          // 1. Prioridad: Usar el nombre que ya tiene la deuda (sea manual o automática)
+          const nombreC = d.concepto_nombre || d.causaciones_globales?.concepto_nombre || "ADMINISTRACIÓN";
+
+          // 2. Intentar sacar el mes si existe
+          let periodoLabel = "";
+          if (d.causaciones_globales?.mes_causado) {
             const [anio, mes] = d.causaciones_globales.mes_causado.split("-");
-            const mesNombre = mesesNombres[parseInt(mes) - 1];
-            const nombreC = d.causaciones_globales?.concepto_nombre || "ADMINISTRACIÓN";
-            return `${nombreC} (${mesNombre} ${anio})|$${montoInd}`;
-          } else {
-            return `${d.concepto_nombre || 'CARGO EXTRA'} (PAGO ÚNICO)|$${montoInd}`;
+            const mesesNombres = ["ENERO", "FEBRERO", "MARZO", "ABRIL", "MAYO", "JUNIO", "JULIO", "AGOSTO", "SEPTIEMBRE", "OCTUBRE", "NOVIEMBRE", "DICIEMBRE"];
+            periodoLabel = ` (${mesesNombres[parseInt(mes) - 1]} ${anio})`;
+          } else if (d.fecha_vencimiento) {
+            // Si es manual y tiene fecha
+            periodoLabel = ` (${d.fecha_vencimiento.substring(0, 7)})`;
           }
+
+          // Retornamos el nombre exacto + el periodo + el monto
+          return `${nombreC}${periodoLabel}|$${montoInd}`;
         })
         .join("||");
 
@@ -139,15 +149,16 @@ export default function Ingresos() {
         concepto_texto: conceptoTextoParaDB,
         saldo_anterior: totalDeudaAcumulada
       }]);
-      
+
       if (errP) throw errP;
 
       for (const dId in abonos) {
         const valorAbono = Number(abonos[dId]);
-        if (valorAbono > 0) {
+        if (valorAbono !== 0) {
           const original = deudas.find(d => d.id === Number(dId));
-          const result = Math.max(0, (original.saldo_pendiente || 0) - valorAbono);
-          await supabase.from("deudas_residentes").update({ saldo_pendiente: result }).eq("id", dId);
+          // QUITAMOS Math.max para permitir que saldo_pendiente sea negativo
+          const nuevoSaldo = (original.saldo_pendiente || 0) - valorAbono;
+          await supabase.from("deudas_residentes").update({ saldo_pendiente: nuevoSaldo }).eq("id", dId);
         }
       }
 
@@ -234,15 +245,15 @@ export default function Ingresos() {
                               {d.causaciones_globales?.concepto_nombre || d.concepto_nombre}
                             </p>
                             <div className="flex items-center gap-2 mt-1">
-                                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tighter">
-                                    {d.causaciones_globales?.mes_causado || "CARGO MANUAL"}
-                                </p>
-                                {/* Indicador de Tarifa Forzada */}
-                                {d.causaciones_globales?.tipo_cobro && d.causaciones_globales.tipo_cobro !== 'NORMAL' && (
-                                    <span className="text-[8px] bg-amber-100 text-amber-600 px-1.5 rounded font-black uppercase">
-                                        Fijo: {d.causaciones_globales.tipo_cobro}
-                                    </span>
-                                )}
+                              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tighter">
+                                {d.causaciones_globales?.mes_causado || "CARGO MANUAL"}
+                              </p>
+                              {/* Indicador de Tarifa Forzada */}
+                              {d.causaciones_globales?.tipo_cobro && d.causaciones_globales.tipo_cobro !== 'NORMAL' && (
+                                <span className="text-[8px] bg-amber-100 text-amber-600 px-1.5 rounded font-black uppercase">
+                                  Fijo: {d.causaciones_globales.tipo_cobro}
+                                </span>
+                              )}
                             </div>
                           </td>
                           <td className="p-6 text-right"><span className="text-slate-900 font-black tabular-nums">${sHoy.toLocaleString()}</span></td>

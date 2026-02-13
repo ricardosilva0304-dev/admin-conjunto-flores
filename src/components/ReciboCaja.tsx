@@ -21,6 +21,9 @@ interface ReciboProps {
 }
 
 const ReciboContenido = ({ datos }: { datos: any }) => {
+  const nuevoSaldoRaw = datos.saldoAnterior - datos.valor;
+  const esAFAvor = nuevoSaldoRaw < 0;
+
   const cargos = datos.concepto.includes("||")
     ? datos.concepto.split("||")
     : [datos.concepto];
@@ -121,8 +124,12 @@ const ReciboContenido = ({ datos }: { datos: any }) => {
         </div>
         <div className="hidden md:block text-slate-200 text-xl">=</div>
         <div className="text-center">
-          <p className="text-[7px] font-black text-rose-500 uppercase tracking-widest">Nuevo Saldo</p>
-          <p className="font-black text-base md:text-lg text-rose-600 italic">${Math.max(0, datos.saldoAnterior - datos.valor).toLocaleString('es-CO')}</p>
+          <p className={`text-[7px] font-black uppercase tracking-widest ${esAFAvor ? 'text-emerald-500' : 'text-rose-500'}`}>
+            {esAFAvor ? 'Saldo a Favor' : 'Nuevo Saldo'}
+          </p>
+          <p className={`font-black text-base md:text-lg italic ${esAFAvor ? 'text-emerald-600' : 'text-rose-600'}`}>
+            ${Math.abs(nuevoSaldoRaw).toLocaleString('es-CO')}
+          </p>
         </div>
       </div>
 

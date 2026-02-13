@@ -3,8 +3,7 @@ import { useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { 
   TrendingUp, TrendingDown, Landmark, Banknote, 
-  FileText, Calendar, Loader2, ArrowRightLeft, 
-  ArrowUpRight, ArrowDownRight, Scale
+  Calendar, Loader2, Wallet, ArrowRight, PieChart
 } from "lucide-react";
 
 export default function BalanceHistorial() {
@@ -21,170 +20,155 @@ export default function BalanceHistorial() {
     const ultimoDia = `${periodo}-${new Date(anio, mesNum, 0).getDate()}`;
 
     try {
-      const [causado, recaudado, egresos] = await Promise.all([
-        // 1. Lo que se le cobró a la gente este mes (Facturación)
-        supabase.from("deudas_residentes")
-          .select("monto_original, causaciones_globales!inner(mes_causado)")
-          .eq("causaciones_globales.mes_causado", periodo),
-
-        // 2. Lo que entró a caja este mes (Recaudo)
+      const [recaudado, egresos] = await Promise.all([
+        // 1. Recaudo real (Lo que entró)
         supabase.from("pagos")
           .select("monto_total, metodo_pago")
           .gte("fecha_pago", primerDia)
           .lte("fecha_pago", ultimoDia),
 
-        // 3. Lo que salió de caja este mes (Gastos)
+        // 2. Gastos reales (Lo que salió)
         supabase.from("egresos")
-          .select("monto, concepto")
+          .select("monto, concepto, pagado_a, fecha")
           .gte("fecha", primerDia)
           .lte("fecha", ultimoDia)
       ]);
 
-      const totalFacturado = causado.data?.reduce((acc, d) => acc + Number(d.monto_original), 0) || 0;
       const totalRecaudado = recaudado.data?.reduce((acc, p) => acc + Number(p.monto_total), 0) || 0;
       const totalGastos = egresos.data?.reduce((acc, e) => acc + Number(e.monto), 0) || 0;
 
       setResumen({
-        facturado: totalFacturado,
-        recaudado: totalRecaudado,
-        gastos: totalGastos,
+        total: totalRecaudado,
         banco: recaudado.data?.filter(p => p.metodo_pago === 'Transferencia').reduce((acc, p) => acc + Number(p.monto_total), 0) || 0,
         efectivo: recaudado.data?.filter(p => p.metodo_pago === 'Efectivo').reduce((acc, p) => acc + Number(p.monto_total), 0) || 0,
-        excedente: totalRecaudado - totalGastos,
-        carteraDelMes: Math.max(0, totalFacturado - totalRecaudado),
-        detallesEgresos: egresos.data || []
+        gastos: totalGastos,
+        balanceNeto: totalRecaudado - totalGastos,
+        listaEgresos: egresos.data || []
       });
     } catch (e) { console.error(e); }
     finally { setLoading(false); }
   }
 
   return (
-    <div className="max-w-6xl mx-auto space-y-6 pb-24 font-sans px-2 md:px-0 animate-in fade-in duration-700">
+    <div className="max-w-6xl mx-auto space-y-6 pb-24 font-sans px-2 md:px-0">
       
-      {/* SELECTOR DE PERIODO PROFESIONAL */}
-      <section className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col md:flex-row items-center justify-between gap-4">
-        <div className="flex items-center gap-4">
-          <div className="w-12 h-12 bg-slate-900 rounded-xl flex items-center justify-center text-white">
-            <Calendar size={22} />
-          </div>
-          <div>
-            <h2 className="text-slate-900 font-black text-lg uppercase tracking-tight">Auditoría de Periodo</h2>
-            <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest">Consulta de flujo de caja histórico</p>
-          </div>
+      {/* SELECTOR DE PERIODO SIMPLE */}
+      <section className="bg-white p-5 rounded-2xl border border-slate-200 flex flex-col md:flex-row items-center justify-between gap-4 shadow-sm">
+        <div className="flex items-center gap-3">
+          <Calendar className="text-slate-400" size={20} />
+          <h2 className="text-slate-700 font-bold text-sm uppercase tracking-widest">Cierre de Caja Mensual</h2>
         </div>
 
         <div className="flex items-center gap-2 w-full md:w-auto">
           <input 
             type="month" 
-            className="flex-1 md:w-48 bg-slate-50 border border-slate-200 p-3.5 rounded-xl outline-none font-black text-slate-700 focus:bg-white transition-all"
+            className="flex-1 md:w-48 bg-slate-50 border border-slate-200 p-3 rounded-xl outline-none font-bold text-slate-700 focus:ring-2 ring-emerald-500/10 transition-all"
             onChange={(e) => { setPeriodo(e.target.value); setResumen(null); }}
           />
           <button 
             onClick={cargarBalance}
             disabled={loading || !periodo}
-            className="bg-slate-900 text-white px-8 py-3.5 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-black active:scale-95 disabled:opacity-20 transition-all"
+            className="bg-slate-900 text-white px-8 py-3 rounded-xl font-black text-[10px] uppercase tracking-[0.2em] hover:bg-black active:scale-95 disabled:opacity-20 transition-all"
           >
-            {loading ? <Loader2 className="animate-spin" size={18} /> : "ANALIZAR"}
+            {loading ? <Loader2 className="animate-spin" size={16} /> : "Consultar"}
           </button>
         </div>
       </section>
 
       {resumen ? (
-        <div className="space-y-6">
+        <div className="animate-in fade-in slide-in-from-bottom-4 duration-700 space-y-6">
           
-          {/* GRILLA DE KPIS PRINCIPALES */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="bg-white p-8 rounded-3xl border border-slate-100 shadow-sm">
-              <p className="text-slate-400 text-[10px] font-black uppercase tracking-[0.2em] mb-4">Ingresos Reales (Caja)</p>
-              <h3 className="text-4xl font-black text-slate-900 tabular-nums">${resumen.recaudado.toLocaleString()}</h3>
-              <div className="mt-6 space-y-3">
-                <div className="flex justify-between text-[11px] font-bold text-slate-500 uppercase">
-                   <span className="flex items-center gap-2"><Landmark size={14} className="text-slate-300"/> Transferencias</span>
-                   <span className="text-slate-900">${resumen.banco.toLocaleString()}</span>
+          {/* GRILLA DE RESULTADOS DIRECTOS */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            
+            {/* INGRESOS TOTALES */}
+            <div className="bg-white p-6 rounded-2xl border border-slate-200 flex flex-col justify-between">
+              <div>
+                <p className="text-slate-400 text-[9px] font-black uppercase tracking-widest mb-1">Ingresos Totales</p>
+                <h3 className="text-2xl font-black text-emerald-600 tabular-nums">${resumen.total.toLocaleString()}</h3>
+              </div>
+              <div className="mt-4 pt-4 border-t border-slate-50 space-y-2">
+                <div className="flex justify-between text-[10px] font-bold text-slate-500">
+                  <span className="flex items-center gap-1.5"><Landmark size={12}/> Bancos</span>
+                  <span className="text-slate-900">${resumen.banco.toLocaleString()}</span>
                 </div>
-                <div className="flex justify-between text-[11px] font-bold text-slate-500 uppercase">
-                   <span className="flex items-center gap-2"><Banknote size={14} className="text-slate-300"/> Efectivo</span>
-                   <span className="text-slate-900">${resumen.efectivo.toLocaleString()}</span>
+                <div className="flex justify-between text-[10px] font-bold text-slate-500">
+                  <span className="flex items-center gap-1.5"><Banknote size={12}/> Efectivo</span>
+                  <span className="text-slate-900">${resumen.efectivo.toLocaleString()}</span>
                 </div>
               </div>
             </div>
 
-            <div className="bg-white p-8 rounded-3xl border border-slate-100 shadow-sm">
-              <p className="text-slate-400 text-[10px] font-black uppercase tracking-[0.2em] mb-4">Egresos Reales (Gastos)</p>
-              <h3 className="text-4xl font-black text-rose-600 tabular-nums">-${resumen.gastos.toLocaleString()}</h3>
-              <p className="mt-6 text-[11px] font-bold text-slate-400 uppercase tracking-widest">
-                Total de comprobantes: {resumen.detallesEgresos.length}
+            {/* EGRESOS TOTALES */}
+            <div className="bg-white p-6 rounded-2xl border border-slate-200 flex flex-col justify-between">
+              <div>
+                <p className="text-slate-400 text-[9px] font-black uppercase tracking-widest mb-1">Egresos Totales</p>
+                <h3 className="text-2xl font-black text-rose-500 tabular-nums">${resumen.gastos.toLocaleString()}</h3>
+              </div>
+              <p className="text-[9px] text-slate-400 font-medium mt-4 uppercase">
+                {resumen.listaEgresos.length} facturas pagadas
               </p>
             </div>
 
-            <div className="bg-slate-900 p-8 rounded-3xl shadow-xl shadow-slate-200">
-              <p className="text-slate-500 text-[10px] font-black uppercase tracking-[0.2em] mb-4 text-emerald-500">Resultado Neto</p>
-              <h3 className={`text-4xl font-black tabular-nums ${resumen.excedente >= 0 ? 'text-white' : 'text-rose-500'}`}>
-                ${resumen.excedente.toLocaleString()}
-              </h3>
-              <div className="mt-6 p-4 bg-white/5 rounded-2xl border border-white/5">
-                <p className="text-[9px] font-black text-slate-400 uppercase mb-1">Liquidez del Mes</p>
-                <p className="text-xs text-slate-300 font-medium">Fondos disponibles tras cubrir gastos operativos.</p>
-              </div>
+            {/* BALANCE NETO (DESTACADO) */}
+            <div className="lg:col-span-2 bg-slate-900 p-6 rounded-2xl shadow-xl flex flex-col justify-between relative overflow-hidden">
+               <div className="absolute top-0 right-0 p-4 opacity-10 text-white">
+                  <PieChart size={80} />
+               </div>
+               <div className="relative z-10">
+                  <p className="text-emerald-400 text-[9px] font-black uppercase tracking-[0.2em] mb-1">Utilidad / Saldo Neto</p>
+                  <h3 className={`text-4xl font-black tabular-nums ${resumen.balanceNeto >= 0 ? 'text-white' : 'text-rose-400'}`}>
+                    ${resumen.balanceNeto.toLocaleString()}
+                  </h3>
+               </div>
+               <div className="relative z-10 mt-4 flex items-center gap-2">
+                  <div className={`w-2 h-2 rounded-full ${resumen.balanceNeto >= 0 ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'}`}></div>
+                  <p className="text-slate-400 text-[10px] font-bold uppercase">Estado de liquidez mensual</p>
+               </div>
             </div>
           </div>
 
-          {/* COMPARATIVA CONTABLE: LO QUE SE DEBIÓ COBRAR VS LO QUE ENTRÓ */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div className="bg-white p-8 rounded-3xl border border-slate-100">
-              <h4 className="text-slate-800 font-black text-sm uppercase tracking-tighter mb-8 flex items-center gap-2">
-                <Scale size={18} className="text-slate-400" /> Conciliación de Facturación
-              </h4>
-              <div className="space-y-8">
-                <div>
-                   <div className="flex justify-between mb-2">
-                     <span className="text-[10px] font-black text-slate-400 uppercase">Facturación Generada (M1)</span>
-                     <span className="text-sm font-black text-slate-700">${resumen.facturado.toLocaleString()}</span>
-                   </div>
-                   <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden flex">
-                      <div className="h-full bg-slate-900" style={{ width: '100%' }}></div>
-                   </div>
-                </div>
-                <div>
-                   <div className="flex justify-between mb-2">
-                     <span className="text-[10px] font-black text-slate-400 uppercase">Recaudo Efectivo</span>
-                     <span className="text-sm font-black text-emerald-600">${resumen.recaudado.toLocaleString()}</span>
-                   </div>
-                   <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden flex">
-                      <div className="h-full bg-emerald-500" style={{ width: `${(resumen.recaudado / resumen.facturado) * 100}%` }}></div>
-                   </div>
-                </div>
-                <div className="pt-4 border-t border-dashed">
-                  <p className="text-[10px] font-black text-rose-400 uppercase mb-1">Diferencia (Cartera Nueva)</p>
-                  <p className="text-xl font-black text-slate-900">${resumen.carteraDelMes.toLocaleString()}</p>
-                </div>
-              </div>
+          {/* TABLA SENCILLA DE GASTOS */}
+          <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
+            <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/50">
+               <h3 className="text-slate-700 font-bold text-xs uppercase tracking-widest flex items-center gap-2">
+                 <TrendingDown size={14} className="text-rose-500"/> Detalle de Egresos
+               </h3>
             </div>
-
-            {/* LISTADO DE GASTOS DEL MES */}
-            <div className="bg-white p-8 rounded-3xl border border-slate-100 flex flex-col">
-              <h4 className="text-slate-800 font-black text-sm uppercase tracking-tighter mb-6 flex items-center gap-2">
-                <ArrowDownRight size={18} className="text-rose-500" /> Desglose de Egresos
-              </h4>
-              <div className="flex-1 overflow-y-auto max-h-[250px] space-y-3 pr-2 custom-scrollbar">
-                {resumen.detallesEgresos.map((e: any, i: number) => (
-                  <div key={i} className="flex justify-between items-center p-3 bg-slate-50 rounded-xl border border-slate-100">
-                    <span className="text-[10px] font-bold text-slate-600 uppercase truncate max-w-[180px]">{e.concepto}</span>
-                    <span className="text-xs font-black text-rose-600">-${Number(e.monto).toLocaleString()}</span>
-                  </div>
-                ))}
-                {resumen.detallesEgresos.length === 0 && (
-                  <div className="py-10 text-center text-slate-300 italic text-xs">No se registraron gastos este periodo.</div>
-                )}
-              </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left">
+                <thead>
+                  <tr className="text-slate-400 text-[10px] font-black uppercase tracking-widest border-b border-slate-100">
+                    <th className="px-6 py-3">Fecha</th>
+                    <th className="px-6 py-3">Beneficiario</th>
+                    <th className="px-6 py-3">Concepto</th>
+                    <th className="px-6 py-3 text-right">Monto</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-50">
+                  {resumen.listaEgresos.map((e: any, i: number) => (
+                    <tr key={i} className="hover:bg-slate-50 transition-colors">
+                      <td className="px-6 py-4 text-[11px] font-bold text-slate-400">{e.fecha}</td>
+                      <td className="px-6 py-4 text-xs font-black text-slate-700 uppercase">{e.pagado_a}</td>
+                      <td className="px-6 py-4 text-xs text-slate-500 italic">{e.concepto}</td>
+                      <td className="px-6 py-4 text-right text-xs font-black text-rose-600 tabular-nums">-${Number(e.monto).toLocaleString()}</td>
+                    </tr>
+                  ))}
+                  {resumen.listaEgresos.length === 0 && (
+                    <tr>
+                      <td colSpan={4} className="px-6 py-12 text-center text-slate-400 text-xs italic">No hay gastos registrados en este mes</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
             </div>
           </div>
 
         </div>
       ) : (
-        <div className="py-32 text-center bg-white border border-slate-200 border-dashed rounded-[3rem]">
-          <FileText className="mx-auto text-slate-200 mb-6" size={60} />
-          <p className="text-slate-400 text-xs font-black uppercase tracking-[0.3em]">Seleccione un periodo para auditar</p>
+        <div className="py-32 text-center bg-white border border-slate-200 border-dashed rounded-[2.5rem]">
+          <Wallet className="mx-auto text-slate-200 mb-4" size={48} />
+          <p className="text-slate-400 text-[10px] font-black uppercase tracking-[0.3em]">Seleccione un periodo para liquidar</p>
         </div>
       )}
     </div>

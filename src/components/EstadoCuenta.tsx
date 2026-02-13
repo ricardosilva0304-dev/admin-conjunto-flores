@@ -1,8 +1,8 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import { supabase } from "@/lib/supabase";
-import { Printer, X, Loader2, Wallet, History, Info, MapPin, Phone, Mail, CheckCircle2 } from "lucide-react";
+import { Printer, X, Loader2, Wallet, History, MapPin, Phone, Mail, CheckCircle2 } from "lucide-react";
 
 interface Props {
   residente: any;
@@ -30,7 +30,7 @@ export default function EstadoCuenta({ residente, deudas, onClose }: Props) {
 
   // --- 1. LÓGICA DE CÁLCULOS (M1, M2, M3 + MODOS FORZADOS) ---
   const calcularValorHoy = (d: any) => {
-    // Si es manual (sin causación), devuelve saldo directo
+    // Si es manual (sin causación), devuelve saldo directo (puede ser negativo/a favor)
     if (!d.causaciones_globales) return d.saldo_pendiente || 0;
 
     const m1 = d.precio_m1 || d.monto_original || 0;
@@ -41,61 +41,60 @@ export default function EstadoCuenta({ residente, deudas, onClose }: Props) {
     // Revisar si hay un modo forzado (M1, M2, M3)
     const modo = d.causaciones_globales.tipo_cobro || 'NORMAL';
 
-    if (modo === 'M1') return Math.max(0, m1 - pagado);
-    if (modo === 'M2') return Math.max(0, m2 - pagado);
-    if (modo === 'M3') return Math.max(0, m3 - pagado);
+    let precioBase = m1;
+    if (modo === 'M1') precioBase = m1;
+    else if (modo === 'M2') precioBase = m2;
+    else if (modo === 'M3') precioBase = m3;
+    else {
+      // Lógica Normal (AUTO por fecha)
+      const hoy = new Date();
+      const dia = hoy.getDate();
+      const mesAct = hoy.getMonth() + 1;
+      const anioAct = hoy.getFullYear();
+      const mesCausado = d.causaciones_globales.mes_causado;
+      if (!mesCausado) return d.saldo_pendiente || 0;
 
-    // Lógica Normal (AUTO por fecha)
-    const hoy = new Date();
-    const dia = hoy.getDate();
-    const mesAct = hoy.getMonth() + 1;
-    const anioAct = hoy.getFullYear();
-
-    const mesCausado = d.causaciones_globales.mes_causado;
-    if (!mesCausado) return d.saldo_pendiente || 0;
-
-    const [yC, mC] = mesCausado.split("-").map(Number);
-
-    let precio = m1;
-    if (anioAct > yC || (anioAct === yC && mesAct > mC)) {
-      precio = m3;
-    } else {
-      if (dia > 10 && dia <= 20) precio = m2;
-      else if (dia > 20) precio = m3;
+      const [yC, mC] = mesCausado.split("-").map(Number);
+      if (anioAct > yC || (anioAct === yC && mesAct > mC)) {
+        precioBase = m3;
+      } else {
+        if (dia > 10 && dia <= 20) precioBase = m2;
+        else if (dia > 20) precioBase = m3;
+      }
     }
 
-    return Math.max(0, precio - pagado);
+    return precioBase - pagado; // Retornamos el valor (permite negativos)
   };
 
   const totalDeuda = deudas.reduce((acc, d) => acc + calcularValorHoy(d), 0);
 
-  // --- 2. FORMATEO DE PERIODO (Soporta Manual y Automático) ---
+  // --- 2. FORMATEO DE PERIODO ---
   const formatPeriodo = (d: any) => {
     const fechaStr = d.causaciones_globales?.mes_causado || d.fecha_vencimiento?.substring(0, 7);
-    if (!fechaStr) return "CARGO EXTRA";
+    if (!fechaStr) return "";
 
     const [year, month] = fechaStr.split("-");
-    const meses = ["ENE", "FEB", "MAR", "ABR", "MAY", "JUN", "JUL", "AGO", "SEP", "OCT", "NOV", "DIC"];
+    const meses = ["ENERO", "FEBRERO", "MARZO", "ABRIL", "MAYO", "JUNIO", "JULIO", "AGOSTO", "SEPTIEMBRE", "OCTUBRE", "NOVIEMBRE", "DICIEMBRE"];
     const mesIndex = parseInt(month) - 1;
 
-    if (isNaN(mesIndex) || mesIndex < 0 || mesIndex > 11) return "CARGO EXTRA";
-    return `${meses[mesIndex]} ${year}`;
+    return isNaN(mesIndex) ? "" : `${meses[mesIndex]} ${year}`;
   };
 
   // --- 3. PAGINACIÓN Y ORDENAMIENTO ---
   const ROWS_PER_PAGE = 13;
-
   const chunkArray = (array: any[], size: number) => {
     const result = [];
     for (let i = 0; i < array.length; i += size) { result.push(array.slice(i, i + size)); }
     return result;
   };
 
-  const deudasOrdenadas = [...deudas].sort((a, b) => {
-    const fechaA = a.causaciones_globales?.mes_causado || a.fecha_vencimiento?.substring(0, 7) || "9999-99";
-    const fechaB = b.causaciones_globales?.mes_causado || b.fecha_vencimiento?.substring(0, 7) || "9999-99";
-    return fechaA.localeCompare(fechaB);
-  });
+  const deudasOrdenadas = useMemo(() => {
+    return [...deudas].sort((a, b) => {
+      const fA = a.causaciones_globales?.mes_causado || a.fecha_vencimiento || "9999-12";
+      const fB = b.causaciones_globales?.mes_causado || b.fecha_vencimiento || "9999-12";
+      return fA.localeCompare(fB);
+    });
+  }, [deudas]);
 
   const deudaPages = chunkArray(deudasOrdenadas, ROWS_PER_PAGE);
   const pagosPages = chunkArray(pagos, ROWS_PER_PAGE + 5);
@@ -108,7 +107,6 @@ export default function EstadoCuenta({ residente, deudas, onClose }: Props) {
     iframe.style.position = "fixed"; iframe.style.right = "0"; iframe.style.bottom = "0";
     iframe.style.width = "0"; iframe.style.height = "0"; iframe.style.border = "0";
     document.body.appendChild(iframe);
-
     const doc = iframe.contentWindow?.document;
     if (!doc) return;
 
@@ -121,11 +119,11 @@ export default function EstadoCuenta({ residente, deudas, onClose }: Props) {
           ${styles}
           <style>
             @page { size: letter; margin: 0; }
-            body { margin: 0; padding: 0; background: white !important; font-family: ui-sans-serif, system-ui, sans-serif; }
+            body { margin: 0; padding: 0; background: white !important; font-family: sans-serif; }
             .print-page { width: 100%; height: 100vh; padding: 1.5cm; box-sizing: border-box; page-break-after: always; position: relative; }
             .print-page:last-child { page-break-after: auto; }
             * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-            table { width: 100%; border-collapse: collapse; font-size: 10px; table-fixed; }
+            table { width: 100%; border-collapse: collapse; font-size: 10px; table-layout: fixed; }
             th { background-color: #f1f5f9 !important; color: #64748b !important; font-weight: 800 !important; text-transform: uppercase; padding: 8px; text-align: left; border-bottom: 2px solid #cbd5e1; }
             td { padding: 8px; border-bottom: 1px solid #e2e8f0; color: #334155; vertical-align: top; }
             .text-right { text-align: right; }
@@ -133,9 +131,7 @@ export default function EstadoCuenta({ residente, deudas, onClose }: Props) {
         </head>
         <body>
           <div class="print-container">${content.innerHTML}</div>
-          <script>
-            setTimeout(() => { window.print(); window.frameElement.remove(); }, 500);
-          </script>
+          <script>setTimeout(() => { window.print(); window.frameElement.remove(); }, 500);</script>
         </body>
       </html>
     `);
@@ -147,7 +143,6 @@ export default function EstadoCuenta({ residente, deudas, onClose }: Props) {
   return (
     <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-[300] flex flex-col items-center p-4 md:p-6 overflow-y-auto">
 
-      {/* BARRA DE HERRAMIENTAS */}
       <div className="no-print sticky top-0 w-full max-w-[816px] bg-white p-4 mb-6 flex justify-between items-center rounded-xl shadow-xl z-50 border border-slate-100">
         <div>
           <h2 className="text-slate-800 font-bold text-sm uppercase tracking-wider">Vista Previa</h2>
@@ -163,13 +158,11 @@ export default function EstadoCuenta({ residente, deudas, onClose }: Props) {
         </div>
       </div>
 
-      {/* CONTENEDOR DE HOJAS */}
       <div ref={printRef} className="w-full flex flex-col items-center gap-8 pb-20">
 
         {deudaPages.length > 0 ? deudaPages.map((chunk, index) => (
           <div key={`page-${index}`} className="print-page bg-white shadow-2xl w-[816px] h-[1056px] flex flex-col relative overflow-hidden">
 
-            {/* ENCABEZADO */}
             <div className="flex justify-between items-start border-b-2 border-slate-900 pb-5 mb-6">
               <div className="flex gap-5">
                 <img src="/logo.png" alt="Logo" className="w-20 h-20 object-contain" />
@@ -189,7 +182,6 @@ export default function EstadoCuenta({ residente, deudas, onClose }: Props) {
               </div>
             </div>
 
-            {/* DATOS RESIDENTE */}
             <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 mb-6 grid grid-cols-2 gap-6">
               <div>
                 <p className="text-[9px] font-black text-slate-400 uppercase mb-1">Responsable</p>
@@ -201,14 +193,18 @@ export default function EstadoCuenta({ residente, deudas, onClose }: Props) {
                 </div>
               </div>
               <div className="text-right flex flex-col justify-center border-l border-slate-200 pl-6">
-                <p className="text-[9px] font-black text-slate-400 uppercase mb-1">Total Deuda a la Fecha</p>
-                <p className={`text-3xl font-black tabular-nums tracking-tighter ${totalDeuda > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
-                  ${totalDeuda.toLocaleString()}
+                <p className="text-[9px] font-black text-slate-400 uppercase mb-1">
+                  {totalDeuda < 0 ? 'Crédito a favor' : 'Total Deuda a la Fecha'}
                 </p>
+                <p className={`text-3xl font-black tabular-nums tracking-tighter ${totalDeuda < 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                  ${Math.abs(totalDeuda).toLocaleString()}
+                </p>
+                {totalDeuda < 0 && (
+                  <span className="text-[9px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full self-end mt-1 uppercase">Saldo a Favor</span>
+                )}
               </div>
             </div>
 
-            {/* TABLA DE DEUDAS */}
             <div className="flex-1 mt-6">
               <h3 className="text-[10px] font-black uppercase text-slate-800 mb-2 flex items-center gap-2">
                 <Wallet size={12} className="text-emerald-600" /> Detalle de Obligaciones
@@ -219,57 +215,44 @@ export default function EstadoCuenta({ residente, deudas, onClose }: Props) {
                   <tr className="border-b-2 border-slate-200">
                     <th className="w-[20%] py-2 text-left font-black text-slate-500 uppercase">Periodo</th>
                     <th className="w-[50%] py-2 text-left font-black text-slate-500 uppercase">Concepto</th>
-                    <th className="w-[15%] py-2 text-right font-black text-slate-500 uppercase">Vr. Original</th>
+                    <th className="w-[15%] py-2 text-right font-black text-slate-500 uppercase">Tarifa</th>
                     <th className="w-[15%] py-2 text-right font-black text-slate-800 uppercase">Saldo Hoy</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {chunk.map((d: any) => {
                     const periodoTexto = formatPeriodo(d);
+                    const valorHoy = calcularValorHoy(d);
 
-                    // CALCULAMOS LOS DOS VALORES PARA QUE SEAN COHERENTES
+                    // Tarifa base para columna izquierda
                     const m1 = d.precio_m1 || d.monto_original || 0;
                     const m2 = d.precio_m2 || m1;
                     const m3 = d.precio_m3 || m1;
-
-                    // Determinar qué tarifa base mostrar en la columna izquierda
                     const modo = d.causaciones_globales?.tipo_cobro || 'NORMAL';
                     let tarifaBase = m1;
-
-                    if (modo === 'M1') tarifaBase = m1;
-                    else if (modo === 'M2') tarifaBase = m2;
+                    if (modo === 'M2') tarifaBase = m2;
                     else if (modo === 'M3') tarifaBase = m3;
-                    else {
-                      // Si es NORMAL (AUTO), mostramos la tarifa que aplicaría hoy según calendario
-                      const hoy = new Date();
-                      const dia = hoy.getDate();
-                      const [yC, mC] = (d.causaciones_globales?.mes_causado || "0-0").split("-").map(Number);
-                      if (hoy.getFullYear() > yC || (hoy.getFullYear() === yC && hoy.getMonth() + 1 > mC)) tarifaBase = m3;
-                      else if (dia > 10 && dia <= 20) tarifaBase = m2;
-                      else if (dia > 20) tarifaBase = m3;
-                    }
 
                     return (
                       <tr key={d.id} className="hover:bg-slate-50">
                         <td className="py-2">
                           {periodoTexto === "CARGO EXTRA" ? (
-                            <span className="text-[8px] bg-slate-100 px-1.5 py-0.5 rounded text-slate-500 font-bold border border-slate-200 uppercase">Cargo Extra</span>
+                            <span className="text-[8px] bg-slate-100 px-1.5 py-0.5 rounded text-slate-500 font-bold border border-slate-200 uppercase">Extra</span>
                           ) : (
                             <span className="font-bold text-slate-800">{periodoTexto}</span>
                           )}
                         </td>
-                        <td className="py-2 text-slate-600 uppercase pr-2 leading-tight break-words">
+                        <td className="py-2 text-slate-600 uppercase pr-2 leading-tight break-words font-medium">
                           {d.concepto_nombre || d.causaciones_globales?.concepto_nombre}
+                          <span className="ml-1 text-slate-400 font-bold">
+                            - {formatPeriodo(d)}
+                          </span>
                         </td>
-
-                        {/* COLUMNA IZQUIERDA: Ahora muestra la tarifa del tramo seleccionado */}
                         <td className="py-2 text-right text-slate-400 tabular-nums">
                           ${tarifaBase.toLocaleString()}
                         </td>
-
-                        {/* COLUMNA DERECHA: Muestra el saldo real (Tarifa - Pagos) */}
-                        <td className="py-2 text-right font-black text-rose-600 tabular-nums">
-                          ${calcularValorHoy(d).toLocaleString()}
+                        <td className={`py-2 text-right font-black tabular-nums ${valorHoy < 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                          ${Math.abs(valorHoy).toLocaleString()}
                         </td>
                       </tr>
                     );
@@ -278,7 +261,6 @@ export default function EstadoCuenta({ residente, deudas, onClose }: Props) {
               </table>
             </div>
 
-            {/* PIE DE PAGINA */}
             <div className="mt-auto border-t-2 border-slate-800 pt-4">
               <div className="grid grid-cols-2 gap-8">
                 <div className="text-[9px] text-slate-500">
@@ -300,7 +282,6 @@ export default function EstadoCuenta({ residente, deudas, onClose }: Props) {
           </div>
         )}
 
-        {/* HISTORIAL PAGOS */}
         {pagos.length > 0 && pagosPages.map((chunk, index) => (
           <div key={`pago-page-${index}`} className="print-page bg-white shadow-2xl w-[816px] h-[1056px] flex flex-col">
             <div className="border-b-2 pb-4 mb-6 flex justify-between items-end">
@@ -311,13 +292,13 @@ export default function EstadoCuenta({ residente, deudas, onClose }: Props) {
               <thead>
                 <tr><th>Recibo No.</th><th>Fecha</th><th>Concepto</th><th>Medio</th><th className="text-right">Monto</th></tr>
               </thead>
-              <tbody className="divide-y">
+              <tbody className="divide-y text-[10px]">
                 {chunk.map((p) => (
                   <tr key={p.id}>
-                    <td className="font-bold">RC-{p.numero_recibo}</td>
+                    <td className="font-bold py-2">RC-{p.numero_recibo}</td>
                     <td>{p.fecha_pago}</td>
-                    <td className="text-[8px] uppercase max-w-[200px] truncate">{p.concepto_texto?.split("||")[0]}</td>
-                    <td className="text-[9px] font-bold uppercase">{p.metodo_pago}</td>
+                    <td className="uppercase max-w-[200px] truncate">{p.concepto_texto?.split("||")[0]}</td>
+                    <td className="font-bold uppercase">{p.metodo_pago}</td>
                     <td className="text-right font-black text-emerald-600">${Number(p.monto_total).toLocaleString()}</td>
                   </tr>
                 ))}

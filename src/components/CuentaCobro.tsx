@@ -9,14 +9,11 @@ export default function CuentaCobro({ residente, deudas, onClose }: any) {
   // --- 1. LÓGICA DE FECHAS (Soporta Manual y Automático) ---
   const formatPeriodo = (d: any) => {
     const fechaStr = d.causaciones_globales?.mes_causado || d.fecha_vencimiento?.substring(0, 7);
-    if (!fechaStr) return "CARGO EXTRA";
-
+    if (!fechaStr) return "";
     const [year, month] = fechaStr.split("-");
-    const meses = ["ENE", "FEB", "MAR", "ABR", "MAY", "JUN", "JUL", "AGO", "SEP", "OCT", "NOV", "DIC"];
+    const meses = ["ENERO", "FEBRERO", "MARZO", "ABRIL", "MAYO", "JUNIO", "JULIO", "AGOSTO", "SEPTIEMBRE", "OCTUBRE", "NOVIEMBRE", "DICIEMBRE"];
     const mesIndex = parseInt(month) - 1;
-    if (isNaN(mesIndex) || mesIndex < 0 || mesIndex > 11) return "CARGO EXTRA";
-
-    return `${meses[mesIndex]} ${year}`;
+    return isNaN(mesIndex) ? "" : `${meses[mesIndex]} ${year}`;
   };
 
   // --- 2. LÓGICA DE VALORES (M1, M2, M3 + MODOS FORZADOS) ---
@@ -208,12 +205,24 @@ export default function CuentaCobro({ residente, deudas, onClose }: any) {
                     )}
                   </td>
                   <td className="text-xs text-slate-600 uppercase py-3 align-top leading-tight pr-4 break-words">
-                    {d.concepto_nombre || d.causaciones_globales?.concepto_nombre}
+                    <span className="font-bold text-slate-800">
+                      {d.concepto_nombre || d.causaciones_globales?.concepto_nombre}
+                    </span>
+                    <span className="ml-1 text-slate-400">
+                      - {formatPeriodo(d)}
+                    </span>
                   </td>
 
                   {/* Aquí mostramos la tarifa base que calculamos arriba */}
                   <td className="text-right font-bold text-slate-900 text-xs py-3 align-top tabular-nums">
                     ${tarifaBase.toLocaleString()}
+                  </td>
+                  <td className="py-6 px-4 text-right font-black text-2xl">
+                    {total < 0 ? (
+                      <span className="text-emerald-600">A FAVOR: ${Math.abs(total).toLocaleString()}</span>
+                    ) : (
+                      <span className="text-rose-600">${total.toLocaleString()}</span>
+                    )}
                   </td>
                 </tr>
               );

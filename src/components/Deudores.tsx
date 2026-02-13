@@ -34,10 +34,12 @@ export default function Deudores() {
   async function cargarInformacion() {
     setLoading(true);
     const { data: resData } = await supabase.from("residentes").select("*");
+    
+    // CORRECCIÓN: Quitamos .gt(0) para poder traer y ver saldos a favor (negativos)
     const { data: deudasData } = await supabase
       .from("deudas_residentes")
       .select("*, causaciones_globales(mes_causado, tipo_cobro)")
-      .gt("saldo_pendiente", 0);
+      .neq("saldo_pendiente", 0);
 
     if (resData) setResidentes(resData);
     if (deudasData) setDeudas(deudasData);
@@ -75,11 +77,11 @@ export default function Deudores() {
     setLoading(false);
   }
 
-  // --- LÓGICA DE CÁLCULO DE DEUDA REAL (PROTEGIDA) ---
-  const calcularDeudaReal = (resId: number) => {
+  // --- CORRECCIÓN DE LA LÓGICA DE CÁLCULO ---
+  const obtenerSaldoRealDeResidente = (resId: number) => {
     const deudasRes = deudas.filter(d => d.residente_id === resId);
-    return deudasRes.reduce((acc, d) => {
-      // 1. Si es cargo manual (sin causación global)
+    return deudasRes.reduce((acc: number, d) => {
+      // 1. Cargo Manual
       if (!d.causaciones_globales) return acc + (Number(d.saldo_pendiente) || 0);
 
       // Valores Base
@@ -88,37 +90,37 @@ export default function Deudores() {
       const m3 = d.precio_m3 || m1;
       const pagado = m1 - (d.saldo_pendiente || 0);
 
-      // 2. Revisar si hay un modo de tarifa forzado (M1, M2, M3)
+      // 2. Modo Forzado (M1, M2, M3)
       const modo = d.causaciones_globales.tipo_cobro || 'NORMAL';
-      let precioFinal = m1;
+      let precioActual = m1;
 
-      if (modo === 'M1') precioFinal = m1;
-      else if (modo === 'M2') precioFinal = m2;
-      else if (modo === 'M3') precioFinal = m3;
+      if (modo === 'M1') precioActual = m1;
+      else if (modo === 'M2') precioActual = m2;
+      else if (modo === 'M3') precioActual = m3;
       else {
-        // 3. Modo NORMAL (Cálculo automático por fecha)
+        // 3. Modo AUTO (Normal por fecha)
         const hoy = new Date();
         const dia = hoy.getDate();
+        const [yC, mC] = d.causaciones_globales.mes_causado.split("-").map(Number);
         const mesAct = hoy.getMonth() + 1;
         const anioAct = hoy.getFullYear();
-        const [yC, mC] = d.causaciones_globales.mes_causado.split("-").map(Number);
 
-        if (anioAct > yC || (anioAct === yC && mesAct > mC)) {
-          precioFinal = m3;
-        } else {
-          if (dia > 10 && dia <= 20) precioFinal = m2;
-          if (dia > 20) precioFinal = m3;
+        if (anioAct > yC || (anioAct === yC && mesAct > mC)) precioActual = m3;
+        else {
+          if (dia > 10 && dia <= 20) precioActual = m2;
+          if (dia > 20) precioActual = m3;
         }
       }
 
-      return acc + Math.max(0, precioFinal - pagado);
+      // Devolvemos el saldo (Tarifa - Lo pagado) permitiendo negativos
+      return acc + (precioActual - pagado);
     }, 0);
   };
 
   // --- LÓGICA DE LISTADO Y ORDENAMIENTO POR UBICACIÓN ---
   const lista = residentes.map(r => ({
     ...r,
-    saldoReal: calcularDeudaReal(r.id)
+    saldoReal: obtenerSaldoRealDeResidente(r.id)
   })).filter(r => {
     const term = busqueda.toLowerCase().trim();
     const coincideTorre = filtroTorre === "TODAS" || r.torre === filtroTorre;
@@ -129,10 +131,8 @@ export default function Deudores() {
     }
     return (r.nombre.toLowerCase().includes(term) || r.apartamento.includes(term)) && coincideTorre;
   }).sort((a, b) => {
-    // 1. Comparar Torres (Alfabetico)
     if (a.torre < b.torre) return -1;
     if (a.torre > b.torre) return 1;
-    // 2. Misma torre, comparar Apartamento (Numérico)
     return parseInt(a.apartamento) - parseInt(b.apartamento);
   });
 
@@ -146,7 +146,7 @@ export default function Deudores() {
         <div className="bg-slate-900 p-6 rounded-xl text-white">
           <p className="text-[10px] font-black uppercase text-slate-400 tracking-wider mb-2">Total en Calle</p>
           <h3 className="text-2xl md:text-3xl font-black tabular-nums text-emerald-400">
-            ${lista.reduce((acc, r) => acc + r.saldoReal, 0).toLocaleString('es-CO')}
+            ${lista.reduce((acc, r) => acc + (r.saldoReal > 0 ? r.saldoReal : 0), 0).toLocaleString('es-CO')}
           </h3>
         </div>
         <div className="bg-white p-6 rounded-xl border border-slate-200">
@@ -159,7 +159,7 @@ export default function Deudores() {
           <div>
             <p className="text-[10px] font-black uppercase text-slate-400 tracking-wider mb-2">Paz y Salvo</p>
             <h3 className="text-3xl font-black text-emerald-600">
-              {lista.filter(r => r.saldoReal === 0).length}
+              {lista.filter(r => r.saldoReal <= 0).length}
             </h3>
           </div>
           <CheckCircle2 className="text-emerald-100" size={36} />
@@ -215,16 +215,19 @@ export default function Deudores() {
                 <div className="flex items-center gap-2 mt-1">
                   <div className={`w-1.5 h-1.5 rounded-full ${res.saldoReal > 0 ? "bg-rose-500 animate-pulse" : "bg-emerald-500"}`}></div>
                   <p className="text-[9px] font-black uppercase text-slate-400 tracking-wider">
-                    {res.saldoReal > 0 ? "Tiene Pendientes" : "Al día"}
+                    {res.saldoReal > 0 ? "Tiene Pendientes" : res.saldoReal < 0 ? "Saldo a Favor" : "Al día"}
                   </p>
                 </div>
               </div>
             </div>
 
             <div className="text-right flex items-center md:flex-col justify-between md:justify-center border-t md:border-t-0 md:border-x border-slate-100 pt-3 md:pt-0 md:px-10 mb-4 md:mb-0">
-              <p className="text-[9px] font-black text-slate-400 uppercase md:mb-1 tracking-widest">Saldo Real Hoy</p>
-              <span className={`text-xl md:text-2xl font-black tabular-nums tracking-tighter ${res.saldoReal > 0 ? "text-rose-600" : "text-slate-200"}`}>
-                ${res.saldoReal.toLocaleString('es-CO')}
+              <p className="text-[9px] font-black text-slate-400 uppercase md:mb-1 tracking-widest">
+                {res.saldoReal < 0 ? 'Saldo a Favor' : 'Saldo Real Hoy'}
+              </p>
+              <span className={`text-xl md:text-2xl font-black tabular-nums tracking-tighter ${res.saldoReal < 0 ? "text-emerald-600" : res.saldoReal > 0 ? "text-rose-600" : "text-slate-200"
+                }`}>
+                ${Math.abs(res.saldoReal).toLocaleString('es-CO')}
               </span>
             </div>
 
@@ -247,30 +250,23 @@ export default function Deudores() {
         ))}
       </div>
 
-      {/* MODALES */}
-      {residenteDetalle && (
-        <EstadoCuenta residente={residenteDetalle} deudas={deudas.filter(d => d.residente_id === residenteDetalle.id)} onClose={() => setResidenteDetalle(null)} />
-      )}
-      {cobroResidente && (
-        <CuentaCobro residente={cobroResidente} deudas={deudas.filter(d => d.residente_id === cobroResidente.id)} onClose={() => setCobroResidente(null)} />
-      )}
-
+      {/* MODAL CARGO MANUAL */}
       {showManualModal && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[500] flex items-center justify-center p-4">
-          <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden border">
+          <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden border animate-in zoom-in-95 duration-200">
             <form onSubmit={guardarCargoManual} className="p-8 space-y-4">
               <div className="flex justify-between items-center mb-4">
-                <h3 className="font-black text-slate-900 uppercase text-sm tracking-tighter italic">Cargo Manual</h3>
+                <h3 className="font-black text-slate-900 uppercase text-sm tracking-tighter italic">Nuevo Cargo Manual</h3>
                 <button type="button" onClick={() => setShowManualModal(false)}><X size={20} /></button>
               </div>
 
               <div className="relative">
-                <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Seleccionar Residente</label>
-                <div className="relative">
+                <label className="text-[9px] font-black text-slate-400 uppercase ml-1 tracking-widest">Residente Responsable</label>
+                <div className="relative mt-1">
                   <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={16} />
                   <input
                     className="w-full bg-slate-50 border border-slate-100 p-4 pl-12 rounded-xl outline-none font-bold text-sm focus:bg-white transition-all"
-                    placeholder="Ej: 5-101 o Nombre..."
+                    placeholder="Escribe 5-101 o Nombre..."
                     value={formManual.residente_id
                       ? residentes.find(r => r.id === Number(formManual.residente_id))?.nombre + " | " + residentes.find(r => r.id === Number(formManual.residente_id))?.apartamento
                       : busquedaManual}
@@ -282,13 +278,14 @@ export default function Deudores() {
                   {formManual.residente_id && (
                     <button
                       onClick={() => { setFormManual({ ...formManual, residente_id: "" }); setBusquedaManual(""); }}
-                      className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-rose-500"
+                      className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400"
                     >
                       <X size={16} />
                     </button>
                   )}
                 </div>
 
+                {/* SUGERENCIAS */}
                 {busquedaManual && !formManual.residente_id && (
                   <div className="absolute top-[105%] left-0 right-0 bg-white border border-slate-200 rounded-xl shadow-2xl z-[100] overflow-hidden max-h-48 overflow-y-auto">
                     {residentes
@@ -319,9 +316,9 @@ export default function Deudores() {
               </div>
 
               <div>
-                <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Concepto del Cobro</label>
+                <label className="text-[9px] font-black text-slate-400 uppercase ml-1 tracking-widest">Concepto del Cobro</label>
                 <input
-                  className="w-full bg-slate-50 border p-4 rounded-xl font-bold outline-none uppercase"
+                  className="w-full bg-slate-50 border p-4 rounded-xl font-bold outline-none uppercase mt-1"
                   placeholder="EJ: MULTA POR RUIDO"
                   value={formManual.concepto}
                   onChange={(e) => setFormManual({ ...formManual, concepto: e.target.value })}
@@ -331,19 +328,19 @@ export default function Deudores() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Mes de Referencia</label>
+                  <label className="text-[9px] font-black text-slate-400 uppercase ml-1 tracking-widest">Mes de Referencia</label>
                   <input
                     type="month"
-                    className="w-full bg-slate-50 border p-4 rounded-xl font-bold text-sm outline-none"
+                    className="w-full bg-slate-50 border p-4 rounded-xl font-bold text-sm mt-1 outline-none"
                     value={formManual.mes}
                     onChange={(e) => setFormManual({ ...formManual, mes: e.target.value })}
                   />
                 </div>
                 <div>
-                  <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Valor a Cobrar</label>
+                  <label className="text-[9px] font-black text-slate-400 uppercase ml-1 tracking-widest">Valor</label>
                   <input
                     type="number"
-                    className="w-full bg-emerald-50 border-emerald-100 p-4 rounded-xl font-black text-emerald-600 outline-none"
+                    className="w-full bg-emerald-50 border border-emerald-100 p-4 rounded-xl font-black text-emerald-600 outline-none mt-1"
                     placeholder="0"
                     value={formManual.valor}
                     onChange={(e) => setFormManual({ ...formManual, valor: e.target.value })}
@@ -352,8 +349,8 @@ export default function Deudores() {
                 </div>
               </div>
 
-              <button type="submit" className="w-full bg-slate-900 text-white font-black py-4 rounded-xl uppercase tracking-widest text-[10px] mt-4">
-                Confirmar y Cargar a Cuenta
+              <button type="submit" className="w-full bg-slate-900 text-white font-black py-4 rounded-xl uppercase tracking-widest text-[10px] mt-4 shadow-xl active:scale-95 transition-all">
+                Cargar Obligación
               </button>
             </form>
           </div>
