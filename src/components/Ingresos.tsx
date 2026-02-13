@@ -114,26 +114,28 @@ export default function Ingresos() {
       const mesesNombres = ["ENERO", "FEBRERO", "MARZO", "ABRIL", "MAYO", "JUNIO", "JULIO", "AGOSTO", "SEPTIEMBRE", "OCTUBRE", "NOVIEMBRE", "DICIEMBRE"];
 
       // DENTRO DE procesarPago en Ingresos.tsx
+      // DENTRO DE procesarPago en Ingresos.tsx
       const conceptoTextoParaDB = deudas
-        .filter(d => Number(abonos[d.id]) !== 0) // Incluimos abonos positivos y negativos
+        .filter(d => Number(abonos[d.id]) !== 0)
         .map(d => {
           const montoInd = Number(abonos[d.id]).toLocaleString('es-CO');
 
-          // 1. Prioridad: Usar el nombre que ya tiene la deuda (sea manual o automática)
+          // --- CORRECCIÓN AQUÍ ---
+          // Prioridad 1: El nombre específico de la deuda (Ej: "PARQUEADERO CARRO")
+          // Prioridad 2: El nombre del lote global
+          // Prioridad 3: Texto por defecto
           const nombreC = d.concepto_nombre || d.causaciones_globales?.concepto_nombre || "ADMINISTRACIÓN";
 
-          // 2. Intentar sacar el mes si existe
+          // Intentar sacar el mes para que el recibo sea claro
           let periodoLabel = "";
           if (d.causaciones_globales?.mes_causado) {
             const [anio, mes] = d.causaciones_globales.mes_causado.split("-");
             const mesesNombres = ["ENERO", "FEBRERO", "MARZO", "ABRIL", "MAYO", "JUNIO", "JULIO", "AGOSTO", "SEPTIEMBRE", "OCTUBRE", "NOVIEMBRE", "DICIEMBRE"];
             periodoLabel = ` (${mesesNombres[parseInt(mes) - 1]} ${anio})`;
           } else if (d.fecha_vencimiento) {
-            // Si es manual y tiene fecha
             periodoLabel = ` (${d.fecha_vencimiento.substring(0, 7)})`;
           }
 
-          // Retornamos el nombre exacto + el periodo + el monto
           return `${nombreC}${periodoLabel}|$${montoInd}`;
         })
         .join("||");
@@ -242,7 +244,8 @@ export default function Ingresos() {
                         <tr key={d.id} className="hover:bg-slate-50/50 transition-colors group">
                           <td className="p-6">
                             <p className="text-slate-800 font-black text-sm">
-                              {d.causaciones_globales?.concepto_nombre || d.concepto_nombre}
+                              {/* Priorizamos siempre el nombre individual de la deuda */}
+                              {d.concepto_nombre || d.causaciones_globales?.concepto_nombre}
                             </p>
                             <div className="flex items-center gap-2 mt-1">
                               <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tighter">
@@ -281,8 +284,9 @@ export default function Ingresos() {
                   <div key={d.id} className="p-5 flex flex-col gap-4">
                     <div className="flex justify-between items-start">
                       <div>
-                        <p className="font-black text-slate-900 text-xs uppercase">
-                          {d.causaciones_globales?.concepto_nombre || d.concepto_nombre}
+                        <p className="text-slate-800 font-black text-sm">
+                          {/* Priorizamos siempre el nombre individual de la deuda */}
+                          {d.concepto_nombre || d.causaciones_globales?.concepto_nombre}
                         </p>
                       </div>
                       <p className="text-right font-black text-slate-700">${calcularSaldoRealHoy(d).toLocaleString()}</p>
