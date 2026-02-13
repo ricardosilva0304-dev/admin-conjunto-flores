@@ -7,7 +7,7 @@ import {
 
 const menuItems = [
   { id: 'resumen', label: 'Resumen', icon: <LayoutDashboard size={18} /> },
-  { id: 'balance', label: 'Balance Histórico', icon: <History size={18} /> },
+  { id: 'balance', label: 'Saldos', icon: <History size={18} /> },
   { id: 'ingresos', label: 'Ingresos', icon: <Wallet size={18} /> },
   { id: 'recibos', label: 'Historial Recibos', icon: <Receipt size={18} /> },
   { id: 'causacion', label: 'Causación Mensual', icon: <Zap size={18} /> },
@@ -46,8 +46,8 @@ export default function Sidebar({ activeTab, setActiveTab, isOpen, setIsOpen, on
             <Flower2 className="text-black" size={22} strokeWidth={2.5} />
           </div>
           <div className="flex flex-col">
-            <h1 className="text-white text-base font-black tracking-tighter italic leading-none">ADMIN.PRO</h1>
-            <p className="text-zinc-600 font-bold uppercase text-[7px] tracking-[0.2em] mt-1">Flores del Parque</p>
+            <h1 className="text-white text-base font-black tracking-tighter italic leading-none">ADMIN</h1>
+            <p className="text-zinc-600 font-bold uppercase text-[7px] tracking-[0.2em] mt-1">Parque de las Flores</p>
           </div>
         </div>
 
