@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { supabase } from "@/lib/supabase";
 import ReciboCaja from "./ReciboCaja";
 import {
@@ -55,9 +55,9 @@ export default function Ingresos() {
     setBusqueda("");
     const { data } = await supabase
       .from("deudas_residentes")
-      .select("*, causaciones_globales(mes_causado, tipo_cobro)") // Cambiado a tipo_cobro
+      .select("*, causaciones_globales(mes_causado, concepto_nombre, tipo_cobro)")
       .eq("residente_id", res.id)
-      .gt("saldo_pendiente", 0);
+      .neq("saldo_pendiente", 0); 
 
     if (data) {
       setDeudas(data);
@@ -68,77 +68,64 @@ export default function Ingresos() {
     await sugerirSiguienteRecibo();
   }
 
-  // --- LÓGICA DE SALDO REAL DINÁMICO (Tramo Fecha / Modos Forzados) ---
   const calcularSaldoRealHoy = (d: any) => {
-    // 1. Cargo Manual (Sin causación asociada)
     if (!d.causaciones_globales) return d.saldo_pendiente || 0;
 
-    // Valores Base
     const m1 = d.precio_m1 || d.monto_original || 0;
     const m2 = d.precio_m2 || m1;
     const m3 = d.precio_m3 || m1;
-    const pagado = m1 - (d.saldo_pendiente || 0);
+    const pagadoYa = m1 - (d.saldo_pendiente || 0);
 
-    // 2. Modos Forzados (M1, M2, M3)
     const modo = d.causaciones_globales.tipo_cobro || 'NORMAL';
-    if (modo === 'M1') return Math.max(0, m1 - pagado);
-    if (modo === 'M2') return Math.max(0, m2 - pagado);
-    if (modo === 'M3') return Math.max(0, m3 - pagado);
+    let precioTarifa = m1;
 
-    // 3. Modo NORMAL (Cálculo por fecha actual)
-    const hoy = new Date();
-    const dia = hoy.getDate();
-    const mesAct = hoy.getMonth() + 1;
-    const anioAct = hoy.getFullYear();
-    const [yC, mC] = d.causaciones_globales.mes_causado.split("-").map(Number);
+    if (modo === 'M1') precioTarifa = m1;
+    else if (modo === 'M2') precioTarifa = m2;
+    else if (modo === 'M3') precioTarifa = m3;
+    else {
+      const hoy = new Date();
+      const dia = hoy.getDate();
+      const mesAct = hoy.getMonth() + 1;
+      const anioAct = hoy.getFullYear();
+      const [yC, mC] = d.causaciones_globales.mes_causado.split("-").map(Number);
 
-    let precioBaseTramo = m1;
-    if (anioAct > yC || (anioAct === yC && mesAct > mC)) {
-      precioBaseTramo = m3;
-    } else {
-      if (dia > 10 && dia <= 20) precioBaseTramo = m2;
-      if (dia > 20) precioBaseTramo = m3;
+      if (anioAct > yC || (anioAct === yC && mesAct > mC)) precioTarifa = m3;
+      else if (dia > 10 && dia <= 20) precioTarifa = m2;
+      else if (dia > 20) precioTarifa = m3;
     }
 
-    return Math.max(0, precioBaseTramo - pagado);
+    return precioTarifa - pagadoYa;
   };
 
   const totalAPagarRecibo = deudas.reduce((acc, d) => acc + (Number(abonos[d.id]) || 0), 0);
-  const totalDeudaAcumulada = deudas.reduce((acc, d) => acc + calcularSaldoRealHoy(d), 0);
+  
+  // Cálculo acumulado de toda la cuenta del residente
+  const totalDeudaAcumulada = useMemo(() => {
+    return deudas.reduce((acc, d) => acc + calcularSaldoRealHoy(d), 0);
+  }, [deudas]);
 
   async function procesarPago() {
     if (totalAPagarRecibo <= 0 || !formRecibo.numero) return alert("Verifica el Nº de recibo y montos.");
     setProcesando(true);
 
     try {
+      const saldoGlobalAntesDelPago = totalDeudaAcumulada;
       const mesesNombres = ["ENERO", "FEBRERO", "MARZO", "ABRIL", "MAYO", "JUNIO", "JULIO", "AGOSTO", "SEPTIEMBRE", "OCTUBRE", "NOVIEMBRE", "DICIEMBRE"];
 
-      // DENTRO DE procesarPago en Ingresos.tsx
-      // DENTRO DE procesarPago en Ingresos.tsx
       const conceptoTextoParaDB = deudas
         .filter(d => Number(abonos[d.id]) !== 0)
         .map(d => {
           const montoInd = Number(abonos[d.id]).toLocaleString('es-CO');
-
-          // --- CORRECCIÓN AQUÍ ---
-          // Prioridad 1: El nombre específico de la deuda (Ej: "PARQUEADERO CARRO")
-          // Prioridad 2: El nombre del lote global
-          // Prioridad 3: Texto por defecto
           const nombreC = d.concepto_nombre || d.causaciones_globales?.concepto_nombre || "ADMINISTRACIÓN";
 
-          // Intentar sacar el mes para que el recibo sea claro
-          let periodoLabel = "";
+          let periodo = "";
           if (d.causaciones_globales?.mes_causado) {
             const [anio, mes] = d.causaciones_globales.mes_causado.split("-");
-            const mesesNombres = ["ENERO", "FEBRERO", "MARZO", "ABRIL", "MAYO", "JUNIO", "JULIO", "AGOSTO", "SEPTIEMBRE", "OCTUBRE", "NOVIEMBRE", "DICIEMBRE"];
-            periodoLabel = ` (${mesesNombres[parseInt(mes) - 1]} ${anio})`;
-          } else if (d.fecha_vencimiento) {
-            periodoLabel = ` (${d.fecha_vencimiento.substring(0, 7)})`;
+            // CORRECCIÓN DE VARIABLES:
+            periodo = ` (${mesesNombres[parseInt(mes) - 1]} ${anio})`;
           }
-
-          return `${nombreC}${periodoLabel}|$${montoInd}`;
-        })
-        .join("||");
+          return `${nombreC}${periodo}|$${montoInd}`;
+        }).join("||");
 
       const { error: errP } = await supabase.from("pagos").insert([{
         residente_id: resSeleccionado.id,
@@ -149,7 +136,7 @@ export default function Ingresos() {
         metodo_pago: formRecibo.metodo,
         comprobante: formRecibo.referencia.toUpperCase(),
         concepto_texto: conceptoTextoParaDB,
-        saldo_anterior: totalDeudaAcumulada
+        saldo_anterior: saldoGlobalAntesDelPago
       }]);
 
       if (errP) throw errP;
@@ -158,7 +145,6 @@ export default function Ingresos() {
         const valorAbono = Number(abonos[dId]);
         if (valorAbono !== 0) {
           const original = deudas.find(d => d.id === Number(dId));
-          // QUITAMOS Math.max para permitir que saldo_pendiente sea negativo
           const nuevoSaldo = (original.saldo_pendiente || 0) - valorAbono;
           await supabase.from("deudas_residentes").update({ saldo_pendiente: nuevoSaldo }).eq("id", dId);
         }
@@ -169,7 +155,7 @@ export default function Ingresos() {
         nombre: resSeleccionado.nombre, unidad: `${resSeleccionado.torre.replace("Torre ", "T")}-${resSeleccionado.apartamento}`,
         valor: totalAPagarRecibo, concepto: conceptoTextoParaDB,
         metodo: formRecibo.metodo, comprobante: formRecibo.referencia,
-        saldoAnterior: totalDeudaAcumulada, email: resSeleccionado.email
+        saldoAnterior: saldoGlobalAntesDelPago, email: resSeleccionado.email
       });
 
       setResSeleccionado(null);
@@ -187,8 +173,7 @@ export default function Ingresos() {
   if (loading) return <div className="flex h-96 items-center justify-center"><Loader2 className="animate-spin text-slate-300" /></div>;
 
   return (
-    <div className="max-w-6xl mx-auto space-y-6 pb-20 px-2 md:px-0">
-
+    <div className="max-w-6xl mx-auto space-y-6 pb-20 px-2 md:px-0 font-sans">
       {datosRecibo && <ReciboCaja datos={datosRecibo} onClose={() => setDatosRecibo(null)} />}
 
       <section className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm relative z-[30]">
@@ -220,52 +205,46 @@ export default function Ingresos() {
 
       {resSeleccionado && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-in slide-in-from-bottom-2 duration-500">
-
           <div className="lg:col-span-2 space-y-6">
             <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
               <div className="p-4 bg-slate-50 border-b border-slate-100 flex items-center justify-between uppercase">
-                <span className="text-[10px] font-black text-slate-400 tracking-widest flex items-center gap-2"><Wallet size={12} /> Pendientes del Propietario</span>
-                <span className="text-[10px] font-bold text-emerald-600">Al día: ${totalDeudaAcumulada.toLocaleString('es-CO')}</span>
+                <span className="text-[10px] font-black text-slate-400 tracking-widest flex items-center gap-2"><Wallet size={12} /> Obligaciones de la Unidad</span>
+                <span className={`text-[10px] font-bold ${totalDeudaAcumulada < 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                   Saldo Total: ${Math.abs(totalDeudaAcumulada).toLocaleString('es-CO')} {totalDeudaAcumulada < 0 ? 'A FAVOR' : ''}
+                </span>
               </div>
 
               <div className="hidden md:block">
                 <table className="w-full text-left">
                   <thead>
                     <tr className="text-[9px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 bg-slate-50/20">
-                      <th className="p-6">Obligación / Mes</th>
-                      <th className="p-6 text-right">Saldo Hoy</th>
-                      <th className="p-6 text-center">Aplicar Abono</th>
+                      <th className="p-6">Concepto / Periodo</th>
+                      <th className="p-6 text-right">Saldo Actual</th>
+                      <th className="p-6 text-center">Abonar</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-50">
                     {deudas.map(d => {
                       const sHoy = calcularSaldoRealHoy(d);
                       return (
-                        <tr key={d.id} className="hover:bg-slate-50/50 transition-colors group">
+                        <tr key={d.id} className="hover:bg-slate-50/50 transition-colors">
                           <td className="p-6">
-                            <p className="text-slate-800 font-black text-sm">
-                              {/* Priorizamos siempre el nombre individual de la deuda */}
-                              {d.concepto_nombre || d.causaciones_globales?.concepto_nombre}
-                            </p>
-                            <div className="flex items-center gap-2 mt-1">
-                              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tighter">
+                            <p className="text-slate-800 font-black text-sm">{d.concepto_nombre || d.causaciones_globales?.concepto_nombre}</p>
+                            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tighter">
                                 {d.causaciones_globales?.mes_causado || "CARGO MANUAL"}
-                              </p>
-                              {/* Indicador de Tarifa Forzada */}
-                              {d.causaciones_globales?.tipo_cobro && d.causaciones_globales.tipo_cobro !== 'NORMAL' && (
-                                <span className="text-[8px] bg-amber-100 text-amber-600 px-1.5 rounded font-black uppercase">
-                                  Fijo: {d.causaciones_globales.tipo_cobro}
-                                </span>
-                              )}
-                            </div>
+                            </p>
                           </td>
-                          <td className="p-6 text-right"><span className="text-slate-900 font-black tabular-nums">${sHoy.toLocaleString()}</span></td>
+                          <td className="p-6 text-right">
+                             <span className={`font-black tabular-nums ${sHoy < 0 ? 'text-emerald-600' : 'text-slate-900'}`}>
+                               ${Math.abs(sHoy).toLocaleString()} {sHoy < 0 ? '(-)' : ''}
+                             </span>
+                          </td>
                           <td className="p-6">
                             <div className="relative w-40 mx-auto">
                               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-emerald-500 font-black">$</span>
                               <input
                                 type="number"
-                                className="w-full bg-white border border-slate-200 p-3 pl-8 rounded-xl text-right font-black outline-none focus:border-emerald-500 shadow-sm"
+                                className="w-full bg-white border border-slate-200 p-3 pl-8 rounded-xl text-right font-black outline-none focus:border-emerald-500"
                                 value={abonos[d.id] || ""}
                                 onChange={(e) => setAbonos({ ...abonos, [d.id]: e.target.value })}
                                 placeholder="0"
@@ -284,16 +263,16 @@ export default function Ingresos() {
                   <div key={d.id} className="p-5 flex flex-col gap-4">
                     <div className="flex justify-between items-start">
                       <div>
-                        <p className="text-slate-800 font-black text-sm">
-                          {/* Priorizamos siempre el nombre individual de la deuda */}
-                          {d.concepto_nombre || d.causaciones_globales?.concepto_nombre}
-                        </p>
+                        <p className="font-black text-slate-900 text-xs uppercase">{d.concepto_nombre || d.causaciones_globales?.concepto_nombre}</p>
+                        <p className="text-[10px] font-bold text-slate-400">{d.causaciones_globales?.mes_causado || "UNICO"}</p>
                       </div>
-                      <p className="text-right font-black text-slate-700">${calcularSaldoRealHoy(d).toLocaleString()}</p>
+                      <p className={`font-black ${calcularSaldoRealHoy(d) < 0 ? 'text-emerald-600' : 'text-slate-700'}`}>
+                         ${Math.abs(calcularSaldoRealHoy(d)).toLocaleString()}
+                      </p>
                     </div>
                     <div className="relative">
                       <span className="absolute left-3 top-1/2 -translate-y-1/2 text-emerald-500 font-black">$</span>
-                      <input type="number" placeholder="Cuanto va a pagar..." className="w-full bg-slate-50 border border-slate-100 p-4 pl-8 rounded-xl text-right font-black outline-none" value={abonos[d.id] || ""} onChange={(e) => setAbonos({ ...abonos, [d.id]: e.target.value })} />
+                      <input type="number" className="w-full bg-slate-50 border border-slate-100 p-4 pl-8 rounded-xl text-right font-black outline-none" value={abonos[d.id] || ""} onChange={(e) => setAbonos({ ...abonos, [d.id]: e.target.value })} />
                     </div>
                   </div>
                 ))}
@@ -302,7 +281,7 @@ export default function Ingresos() {
 
             <div className="grid grid-cols-2 gap-3">
               <div className="bg-emerald-600 p-6 rounded-2xl text-white shadow-lg"><p className="text-emerald-100 text-[9px] font-black uppercase mb-1">Entrada a Caja</p><h4 className="text-3xl font-black tabular-nums">${totalAPagarRecibo.toLocaleString()}</h4></div>
-              <div className="bg-slate-900 p-6 rounded-2xl text-white"><p className="text-slate-400 text-[9px] font-black uppercase mb-1">Mora Restante</p><h4 className="text-3xl font-black tabular-nums opacity-60">${Math.max(0, totalDeudaAcumulada - totalAPagarRecibo).toLocaleString()}</h4></div>
+              <div className="bg-slate-900 p-6 rounded-2xl text-white"><p className="text-slate-400 text-[9px] font-black uppercase mb-1">Nuevo Saldo Est.</p><h4 className="text-3xl font-black tabular-nums opacity-60">${Math.abs(totalDeudaAcumulada - totalAPagarRecibo).toLocaleString()}</h4></div>
             </div>
           </div>
 
@@ -342,7 +321,6 @@ export default function Ingresos() {
               </button>
             </div>
           </div>
-
         </div>
       )}
     </div>

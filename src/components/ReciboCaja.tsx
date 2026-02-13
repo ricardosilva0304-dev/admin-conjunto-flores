@@ -21,8 +21,12 @@ interface ReciboProps {
 }
 
 const ReciboContenido = ({ datos }: { datos: any }) => {
-  const nuevoSaldoRaw = datos.saldoAnterior - datos.valor;
-  const esAFAvor = nuevoSaldoRaw < 0;
+  const saldoAnterior = Number(datos.saldoAnterior) || 0;
+  const abonoRealizado = Number(datos.valor) || 0;
+  const nuevoSaldoRaw = saldoAnterior - abonoRealizado;
+
+  // Si el número es negativo, significa que el residente tiene dinero a favor
+  const esSaldoAFavor = nuevoSaldoRaw < 0;
 
   const cargos = datos.concepto.includes("||")
     ? datos.concepto.split("||")
@@ -111,23 +115,30 @@ const ReciboContenido = ({ datos }: { datos: any }) => {
         <div className="flex-1 text-[8px] text-slate-400 text-right italic font-bold truncate">Ref: {datos.comprobante || 'Digital'}</div>
       </div>
 
-      {/* RESUMEN DE SALDOS: Se apila en móvil */}
       <div className="flex flex-col md:flex-row justify-between items-center px-4 md:px-10 mb-6 py-4 border-y border-slate-100 bg-[#fdfdfd] gap-4">
         <div className="text-center">
-          <p className="text-[7px] font-black text-slate-300 uppercase tracking-widest">Saldo Ant.</p>
-          <p className="font-bold text-xs md:text-sm text-slate-500">${datos.saldoAnterior.toLocaleString('es-CO')}</p>
-        </div>
-        <div className="hidden md:block text-slate-200 text-xl">-</div>
-        <div className="text-center">
-          <p className="text-[7px] font-black text-emerald-500 uppercase tracking-widest">Abono</p>
-          <p className="font-black text-sm md:text-base text-emerald-600">${datos.valor.toLocaleString('es-CO')}</p>
-        </div>
-        <div className="hidden md:block text-slate-200 text-xl">=</div>
-        <div className="text-center">
-          <p className={`text-[7px] font-black uppercase tracking-widest ${esAFAvor ? 'text-emerald-500' : 'text-rose-500'}`}>
-            {esAFAvor ? 'Saldo a Favor' : 'Nuevo Saldo'}
+          <p className="text-[7px] font-black text-slate-300 uppercase tracking-widest">Saldo Anterior</p>
+          <p className="font-bold text-xs md:text-sm text-slate-500">
+            ${Math.abs(saldoAnterior).toLocaleString('es-CO')} {saldoAnterior < 0 ? '(A Favor)' : ''}
           </p>
-          <p className={`font-black text-base md:text-lg italic ${esAFAvor ? 'text-emerald-600' : 'text-rose-600'}`}>
+        </div>
+
+        <div className="hidden md:block text-slate-200 text-xl">-</div>
+
+        <div className="text-center">
+          <p className="text-[7px] font-black text-emerald-500 uppercase tracking-widest">Abono Realizado</p>
+          <p className="font-black text-sm md:text-base text-emerald-600">
+            ${abonoRealizado.toLocaleString('es-CO')}
+          </p>
+        </div>
+
+        <div className="hidden md:block text-slate-200 text-xl">=</div>
+
+        <div className="text-center">
+          <p className={`text-[7px] font-black uppercase tracking-widest ${esSaldoAFavor ? 'text-emerald-500' : 'text-rose-500'}`}>
+            {esSaldoAFavor ? 'Saldo a Favor' : 'Nuevo Saldo Pendiente'}
+          </p>
+          <p className={`font-black text-base md:text-lg italic ${esSaldoAFavor ? 'text-emerald-600' : 'text-rose-600'}`}>
             ${Math.abs(nuevoSaldoRaw).toLocaleString('es-CO')}
           </p>
         </div>
