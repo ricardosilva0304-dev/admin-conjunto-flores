@@ -136,7 +136,7 @@ const ReciboContenido = ({ datos }: { datos: any }) => {
 
         <div className="text-center">
           <p className={`text-[7px] font-black uppercase tracking-widest ${esSaldoAFavor ? 'text-emerald-500' : 'text-rose-500'}`}>
-            {esSaldoAFavor ? 'Saldo a Favor' : 'Nuevo Saldo Pendiente'}
+            {esSaldoAFavor ? 'Nuevo Saldo a Favor' : 'Nuevo Saldo Pendiente'}
           </p>
           <p className={`font-black text-base md:text-lg italic ${esSaldoAFavor ? 'text-emerald-600' : 'text-rose-600'}`}>
             ${Math.abs(nuevoSaldoRaw).toLocaleString('es-CO')}

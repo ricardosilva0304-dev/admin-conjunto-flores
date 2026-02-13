@@ -57,7 +57,7 @@ export default function Ingresos() {
       .from("deudas_residentes")
       .select("*, causaciones_globales(mes_causado, concepto_nombre, tipo_cobro)")
       .eq("residente_id", res.id)
-      .neq("saldo_pendiente", 0); 
+      .neq("saldo_pendiente", 0);
 
     if (data) {
       setDeudas(data);
@@ -98,32 +98,39 @@ export default function Ingresos() {
   };
 
   const totalAPagarRecibo = deudas.reduce((acc, d) => acc + (Number(abonos[d.id]) || 0), 0);
-  
+
   // Cálculo acumulado de toda la cuenta del residente
   const totalDeudaAcumulada = useMemo(() => {
-    return deudas.reduce((acc, d) => acc + calcularSaldoRealHoy(d), 0);
+    return deudas.reduce((acc, d) => {
+      // IMPORTANTE: Sumamos el valor real de cada fila de deuda
+      return acc + calcularSaldoRealHoy(d);
+    }, 0);
   }, [deudas]);
 
   async function procesarPago() {
-    if (totalAPagarRecibo <= 0 || !formRecibo.numero) return alert("Verifica el Nº de recibo y montos.");
+    if (totalAPagarRecibo <= 0 || !formRecibo.numero) return alert("Verifica montos.");
     setProcesando(true);
 
     try {
+      // Este es el valor clave: Lo que debía el residente el segundo exacto antes de pagar
       const saldoGlobalAntesDelPago = totalDeudaAcumulada;
-      const mesesNombres = ["ENERO", "FEBRERO", "MARZO", "ABRIL", "MAYO", "JUNIO", "JULIO", "AGOSTO", "SEPTIEMBRE", "OCTUBRE", "NOVIEMBRE", "DICIEMBRE"];
-
       const conceptoTextoParaDB = deudas
-        .filter(d => Number(abonos[d.id]) !== 0)
+        .filter(d => Number(abonos[d.id]) !== 0) // Solo tomamos deudas donde se abonó algo
         .map(d => {
           const montoInd = Number(abonos[d.id]).toLocaleString('es-CO');
-          const nombreC = d.concepto_nombre || d.causaciones_globales?.concepto_nombre || "ADMINISTRACIÓN";
+
+          // CORRECCIÓN AQUÍ: 
+          // Priorizamos el nombre específico de la deuda que viene de la causación
+          const nombreC = d.concepto_nombre || d.causaciones_globales?.concepto_nombre || "CONCEPTO";
 
           let periodo = "";
-          if (d.causaciones_globales?.mes_causado) {
-            const [anio, mes] = d.causaciones_globales.mes_causado.split("-");
-            // CORRECCIÓN DE VARIABLES:
+          if (d.causaciones_globales?.mes_causado || d.fecha_vencimiento) {
+            const fechaBase = d.causaciones_globales?.mes_causado || d.fecha_vencimiento;
+            const [anio, mes] = fechaBase.split("-");
+            const mesesNombres = ["ENERO", "FEBRERO", "MARZO", "ABRIL", "MAYO", "JUNIO", "JULIO", "AGOSTO", "SEPTIEMBRE", "OCTUBRE", "NOVIEMBRE", "DICIEMBRE"];
             periodo = ` (${mesesNombres[parseInt(mes) - 1]} ${anio})`;
           }
+
           return `${nombreC}${periodo}|$${montoInd}`;
         }).join("||");
 
@@ -136,6 +143,7 @@ export default function Ingresos() {
         metodo_pago: formRecibo.metodo,
         comprobante: formRecibo.referencia.toUpperCase(),
         concepto_texto: conceptoTextoParaDB,
+        // GUARDAMOS EL SALDO QUE CALCULAMOS ARRIBA
         saldo_anterior: saldoGlobalAntesDelPago
       }]);
 
@@ -210,7 +218,7 @@ export default function Ingresos() {
               <div className="p-4 bg-slate-50 border-b border-slate-100 flex items-center justify-between uppercase">
                 <span className="text-[10px] font-black text-slate-400 tracking-widest flex items-center gap-2"><Wallet size={12} /> Obligaciones de la Unidad</span>
                 <span className={`text-[10px] font-bold ${totalDeudaAcumulada < 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
-                   Saldo Total: ${Math.abs(totalDeudaAcumulada).toLocaleString('es-CO')} {totalDeudaAcumulada < 0 ? 'A FAVOR' : ''}
+                  Saldo Total: ${Math.abs(totalDeudaAcumulada).toLocaleString('es-CO')} {totalDeudaAcumulada < 0 ? 'A FAVOR' : ''}
                 </span>
               </div>
 
@@ -231,13 +239,13 @@ export default function Ingresos() {
                           <td className="p-6">
                             <p className="text-slate-800 font-black text-sm">{d.concepto_nombre || d.causaciones_globales?.concepto_nombre}</p>
                             <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tighter">
-                                {d.causaciones_globales?.mes_causado || "CARGO MANUAL"}
+                              {d.causaciones_globales?.mes_causado || "CARGO MANUAL"}
                             </p>
                           </td>
                           <td className="p-6 text-right">
-                             <span className={`font-black tabular-nums ${sHoy < 0 ? 'text-emerald-600' : 'text-slate-900'}`}>
-                               ${Math.abs(sHoy).toLocaleString()} {sHoy < 0 ? '(-)' : ''}
-                             </span>
+                            <span className={`font-black tabular-nums ${sHoy < 0 ? 'text-emerald-600' : 'text-slate-900'}`}>
+                              ${Math.abs(sHoy).toLocaleString()} {sHoy < 0 ? '(-)' : ''}
+                            </span>
                           </td>
                           <td className="p-6">
                             <div className="relative w-40 mx-auto">
@@ -267,7 +275,7 @@ export default function Ingresos() {
                         <p className="text-[10px] font-bold text-slate-400">{d.causaciones_globales?.mes_causado || "UNICO"}</p>
                       </div>
                       <p className={`font-black ${calcularSaldoRealHoy(d) < 0 ? 'text-emerald-600' : 'text-slate-700'}`}>
-                         ${Math.abs(calcularSaldoRealHoy(d)).toLocaleString()}
+                        ${Math.abs(calcularSaldoRealHoy(d)).toLocaleString()}
                       </p>
                     </div>
                     <div className="relative">
