@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import { calcularValorDeudaHoy } from "@/lib/utils"; // Importamos la lógica central
 import {
-  Zap, History, Trash2, Eye, X, Loader2, 
+  Zap, History, Trash2, Eye, X, Loader2,
   PieChart, RefreshCw, CheckCircle2
 } from "lucide-react";
 
@@ -63,14 +63,19 @@ export default function Causacion() {
   async function generarCausacion() {
     if (!conceptoId || !mesDeuda || !fechaLimite) return;
     const concepto = conceptos.find(c => c.id === parseInt(conceptoId));
-    if (!concepto || !confirm(`¿Generar cobros de ${concepto.nombre} para ${residentesAfectados.length} unidades?`)) return;
+    if (!concepto || !confirm(`¿Generar cobros para ${residentesAfectados.length} unidades?`)) return;
 
     setGenerando(true);
     try {
-      // 1. Crear el lote global
+      // FORMATEAMOS EL PERIODO PARA EL NOMBRE (Ej: ENERO 2026)
+      const [anio, mes] = mesDeuda.split("-");
+      const mesesNombres = ["ENERO", "FEBRERO", "MARZO", "ABRIL", "MAYO", "JUNIO", "JULIO", "AGOSTO", "SEPTIEMBRE", "OCTUBRE", "NOVIEMBRE", "DICIEMBRE"];
+      const periodoTexto = `${mesesNombres[parseInt(mes) - 1]} ${anio}`;
+      const nombreConPeriodo = `${concepto.nombre.trim().toUpperCase()} (${periodoTexto})`;
+
       const { data: lote, error: errLote } = await supabase.from("causaciones_globales").insert([{
         mes_causado: mesDeuda,
-        concepto_nombre: concepto.nombre.trim().toUpperCase(),
+        concepto_nombre: nombreConPeriodo, // <--- GUARDAMOS CON EL MES INCLUIDO
         total_residentes: residentesAfectados.length,
         fecha_limite: fechaLimite,
         tipo_cobro: 'NORMAL'
@@ -78,17 +83,14 @@ export default function Causacion() {
 
       if (errLote) throw errLote;
 
-      // 2. Preparar deudas individuales
       const deudas = residentesAfectados.map(res => {
         let factor = 1;
         const nombreC = concepto.nombre.toUpperCase();
-
         if (concepto.cobro_por_vehiculo) {
           if (nombreC.includes("CARRO")) factor = Number(res.carros) || 0;
           else if (nombreC.includes("MOTO")) factor = Number(res.motos) || 0;
           else if (nombreC.includes("BICI")) factor = Number(res.bicis) || 0;
         }
-
         if (factor === 0) return null;
 
         const montoBase = (Number(concepto.monto_1_10) || 0) * factor;
@@ -97,7 +99,7 @@ export default function Causacion() {
           causacion_id: lote.id,
           residente_id: res.id,
           unidad: `T${res.torre.slice(-1)}-${res.apartamento}`,
-          concepto_nombre: nombreC, // Guardado blindado
+          concepto_nombre: nombreConPeriodo, // <--- COHERENCIA TOTAL
           monto_original: montoBase,
           precio_m1: montoBase,
           precio_m2: (Number(concepto.monto_11_20) || montoBase) * factor,
@@ -107,18 +109,13 @@ export default function Causacion() {
         };
       }).filter(d => d !== null);
 
-      if (deudas.length > 0) {
-        await supabase.from("deudas_residentes").insert(deudas);
-      }
+      if (deudas.length > 0) await supabase.from("deudas_residentes").insert(deudas);
 
       await cargarDatos();
       setConceptoId("");
-      alert("¡Proceso finalizado con éxito!");
-    } catch (err: any) {
-      alert("Error: " + err.message);
-    } finally {
-      setGenerando(false);
-    }
+      alert("¡Causación generada correctamente!");
+    } catch (err: any) { alert(err.message); }
+    finally { setGenerando(false); }
   }
 
   const residentesAfectados = residentes.filter(r => {
@@ -178,44 +175,44 @@ export default function Causacion() {
 
       {/* ARCHIVO HISTÓRICO */}
       <section className="bg-white border border-slate-200 rounded-xl overflow-x-auto shadow-sm">
-          <table className="w-full text-left text-sm">
-            <thead className="bg-slate-50 border-b text-slate-400 font-bold text-[10px] uppercase">
-              <tr>
-                <th className="px-6 py-4">Mes</th>
-                <th className="px-6 py-4">Concepto</th>
-                <th className="px-6 py-4 text-center">Unidades</th>
-                <th className="px-6 py-4 text-center">Tarifa Activa</th>
-                <th className="px-6 py-4 text-right">Acción</th>
+        <table className="w-full text-left text-sm">
+          <thead className="bg-slate-50 border-b text-slate-400 font-bold text-[10px] uppercase">
+            <tr>
+              <th className="px-6 py-4">Mes</th>
+              <th className="px-6 py-4">Concepto</th>
+              <th className="px-6 py-4 text-center">Unidades</th>
+              <th className="px-6 py-4 text-center">Tarifa Activa</th>
+              <th className="px-6 py-4 text-right">Acción</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {historialFiltrado.map(h => (
+              <tr key={h.id} className="hover:bg-slate-50 transition-colors">
+                <td className="px-6 py-4 font-black">{h.mes_causado}</td>
+                <td className="px-6 py-4 uppercase text-xs font-bold text-slate-500">{h.concepto_nombre}</td>
+                <td className="px-6 py-4 text-center font-bold text-slate-400">{h.total_residentes}</td>
+                <td className="px-6 py-4">
+                  <div className="flex justify-center gap-1 bg-slate-100 p-1 rounded-lg w-fit mx-auto">
+                    {['M1', 'M2', 'M3', 'NORMAL'].map((m) => {
+                      const active = (h.tipo_cobro || 'NORMAL') === m;
+                      return (
+                        <button key={m} onClick={() => cambiarModo(h.id, m)} className={`px-2 py-1 rounded text-[8px] font-black transition-all ${active ? "bg-slate-800 text-white shadow-sm" : "text-slate-400"}`}>
+                          {m === 'NORMAL' ? 'AUTO' : m}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </td>
+                <td className="px-6 py-4 text-right">
+                  <div className="flex justify-end gap-2">
+                    <button onClick={() => verDetalles(h)} className="p-2 bg-slate-100 rounded-lg text-slate-400 hover:text-emerald-600 transition-colors"><Eye size={18} /></button>
+                    <button onClick={async () => { if (confirm("¿Borrar lote?")) { await supabase.from("causaciones_globales").delete().eq("id", h.id); cargarDatos(); } }} className="p-2 bg-slate-100 rounded-lg text-slate-300 hover:text-rose-500 transition-colors"><Trash2 size={18} /></button>
+                  </div>
+                </td>
               </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {historialFiltrado.map(h => (
-                <tr key={h.id} className="hover:bg-slate-50 transition-colors">
-                  <td className="px-6 py-4 font-black">{h.mes_causado}</td>
-                  <td className="px-6 py-4 uppercase text-xs font-bold text-slate-500">{h.concepto_nombre}</td>
-                  <td className="px-6 py-4 text-center font-bold text-slate-400">{h.total_residentes}</td>
-                  <td className="px-6 py-4">
-                    <div className="flex justify-center gap-1 bg-slate-100 p-1 rounded-lg w-fit mx-auto">
-                        {['M1', 'M2', 'M3', 'NORMAL'].map((m) => {
-                            const active = (h.tipo_cobro || 'NORMAL') === m;
-                            return (
-                                <button key={m} onClick={() => cambiarModo(h.id, m)} className={`px-2 py-1 rounded text-[8px] font-black transition-all ${active ? "bg-slate-800 text-white shadow-sm" : "text-slate-400"}`}>
-                                    {m === 'NORMAL' ? 'AUTO' : m}
-                                </button>
-                            );
-                        })}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 text-right">
-                    <div className="flex justify-end gap-2">
-                        <button onClick={() => verDetalles(h)} className="p-2 bg-slate-100 rounded-lg text-slate-400 hover:text-emerald-600 transition-colors"><Eye size={18} /></button>
-                        <button onClick={async () => { if (confirm("¿Borrar lote?")) { await supabase.from("causaciones_globales").delete().eq("id", h.id); cargarDatos(); } }} className="p-2 bg-slate-100 rounded-lg text-slate-300 hover:text-rose-500 transition-colors"><Trash2 size={18} /></button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+            ))}
+          </tbody>
+        </table>
       </section>
 
       {/* MODAL AUDITORÍA */}
@@ -223,17 +220,17 @@ export default function Causacion() {
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[300] flex flex-col items-center justify-center p-4">
           <div className="bg-white w-full max-w-5xl h-[85vh] rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95">
             <div className="p-6 border-b flex items-center justify-between">
-                <h3 className="font-black text-slate-900 uppercase italic">Auditoría: {causacionActiva?.concepto_nombre} ({causacionActiva?.mes_causado})</h3>
-                <button onClick={() => setShowDetalles(false)} className="p-2 hover:bg-slate-100 rounded-xl"><X /></button>
+              <h3 className="font-black text-slate-900 uppercase italic">Auditoría: {causacionActiva?.concepto_nombre} ({causacionActiva?.mes_causado})</h3>
+              <button onClick={() => setShowDetalles(false)} className="p-2 hover:bg-slate-100 rounded-xl"><X /></button>
             </div>
-            
+
             <div className="p-4 bg-slate-50 border-b flex gap-4 overflow-x-auto">
               <input placeholder="Buscar apto..." className="bg-white border border-slate-200 p-3 rounded-xl text-xs font-bold w-full max-w-xs" onChange={(e) => setBusquedaDetalle(e.target.value)} />
               <div className="flex-1 text-right flex items-center justify-end gap-4">
-                  <div>
-                    <p className="text-[8px] font-black text-slate-400 uppercase">Total Recaudado</p>
-                    <span className="font-black text-emerald-600 text-sm">${deudasDetalle.reduce((acc, d) => acc + (Number(d.monto_original) - Number(d.saldo_pendiente)), 0).toLocaleString()}</span>
-                  </div>
+                <div>
+                  <p className="text-[8px] font-black text-slate-400 uppercase">Total Recaudado</p>
+                  <span className="font-black text-emerald-600 text-sm">${deudasDetalle.reduce((acc, d) => acc + (Number(d.monto_original) - Number(d.saldo_pendiente)), 0).toLocaleString()}</span>
+                </div>
               </div>
             </div>
 

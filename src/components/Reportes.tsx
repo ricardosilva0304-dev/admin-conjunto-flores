@@ -1,10 +1,10 @@
 "use client";
 import { useState, useRef } from "react";
 import { supabase } from "@/lib/supabase";
-import { calcularValorDeudaHoy } from "@/lib/utils"; // Importamos lógica central
+import { calcularValorDeudaHoy } from "@/lib/utils";
 import {
   FileText, Printer, Loader2, Scale, TrendingDown, TrendingUp,
-  Wallet, Landmark, Banknote
+  Wallet, Landmark, Banknote, Users, PieChart, ChevronRight
 } from "lucide-react";
 
 export default function Reportes() {
@@ -24,8 +24,7 @@ export default function Reportes() {
     const content = printRef.current;
     if (!content) return;
     const iframe = document.createElement("iframe");
-    iframe.style.position = "fixed"; iframe.style.right = "0"; iframe.style.bottom = "0";
-    iframe.style.width = "0"; iframe.style.height = "0"; iframe.style.border = "0";
+    iframe.style.position = "fixed"; iframe.style.bottom = "0"; iframe.style.width = "0"; iframe.style.height = "0"; iframe.style.border = "0";
     document.body.appendChild(iframe);
     const doc = iframe.contentWindow?.document;
     if (!doc) return;
@@ -35,21 +34,23 @@ export default function Reportes() {
     doc.write(`
       <html>
         <head>
-          <title>Reporte Flores - ${tipo}</title>
+          <title>Reporte Administrativo</title>
           ${styles}
           <style>
             @page { size: letter; margin: 1.5cm; }
-            body { margin: 0; padding: 0; background: white !important; font-family: sans-serif; }
-            table { width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 10px; }
-            th { background: #f8fafc; border-bottom: 2px solid #000; padding: 8px; text-align: left; text-transform: uppercase; }
-            td { padding: 8px; border-bottom: 1px solid #eee; }
+            body { background: white !important; font-family: 'Inter', sans-serif; }
+            table { width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 9.5px; }
+            th { background: #f8fafc !important; padding: 8px; text-align: left; border-bottom: 2px solid #1e293b; color: #475569; font-weight: 800; text-transform: uppercase; }
+            td { padding: 8px; border-bottom: 1px solid #e2e8f0; vertical-align: top; color: #334155; }
             .text-right { text-align: right; }
+            .kpi-grid { display: grid; grid-template-cols: repeat(3, 1fr); gap: 15px; margin-bottom: 30px; }
+            .kpi-card { padding: 15px; border: 1px solid #e2e8f0; border-radius: 12px; }
             * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
           </style>
         </head>
         <body>
           <div class="print-container">${content.innerHTML}</div>
-          <script>window.onload = () => { window.print(); setTimeout(() => { window.frameElement.remove(); }, 100); };</script>
+          <script>window.onload=()=>{window.print();setTimeout(()=>window.frameElement.remove(),100);};</script>
         </body>
       </html>
     `);
@@ -80,158 +81,227 @@ export default function Reportes() {
           supabase.from("residentes").select("*").neq("torre", "Torre 1").order("torre").order("apartamento"),
           supabase.from("deudas_residentes").select("*, causaciones_globales(mes_causado, tipo_cobro)").gt("saldo_pendiente", 0)
         ]);
-        
-        const residentes = resRes.data || [];
-        const todasDeudas = deudasRes.data || [];
-        
-        // CÁLCULO DE CARTERA USANDO LIBRERÍA UNIFICADA
-        const cartera = residentes.map(r => {
-            const deudasUnidad = todasDeudas.filter((d:any) => d.residente_id === r.id);
-            const total = deudasUnidad.reduce((acc, d) => acc + calcularValorDeudaHoy(d), 0);
-            return { ...r, deudaTotal: total };
-        });
-
+        const cartera = (resRes.data || []).map(r => {
+            const dUnidad = (deudasRes.data || []).filter((d:any) => d.residente_id === r.id);
+            return { ...r, total: dUnidad.reduce((acc, d) => acc + calcularValorDeudaHoy(d), 0) };
+        }).filter(r => r.total !== 0);
         setReporteData({ ingresos: [], egresos: [], residentes: [], cartera });
       }
     } catch (e) { console.error(e); } finally { setLoading(false); }
   }
 
-  const totalIng = reporteData?.ingresos.reduce((acc, i) => acc + Number(i.monto_total), 0) || 0;
-  const totalEgr = reporteData?.egresos.reduce((acc, e) => acc + Number(e.monto), 0) || 0;
-  const ingBanco = reporteData?.ingresos.filter(i => i.metodo_pago === 'Transferencia').reduce((acc, i) => acc + Number(i.monto_total), 0) || 0;
-  const ingEfectivo = reporteData?.ingresos.filter(i => i.metodo_pago === 'Efectivo').reduce((acc, i) => acc + Number(i.monto_total), 0) || 0;
+  // Cálculos rápidos para los KPIs
+  const totalIng = reporteData?.ingresos.reduce((a, b) => a + Number(b.monto_total), 0) || 0;
+  const totalEgr = reporteData?.egresos.reduce((a, b) => a + Number(b.monto), 0) || 0;
+  const banco = reporteData?.ingresos.filter(i => i.metodo_pago === 'Transferencia').reduce((a, b) => a + Number(b.monto_total), 0) || 0;
+  const efectivo = reporteData?.ingresos.filter(i => i.metodo_pago === 'Efectivo').reduce((a, b) => a + Number(b.monto_total), 0) || 0;
 
   return (
     <div className="max-w-6xl mx-auto space-y-6 pb-24 font-sans text-slate-800">
       
-      {/* PANEL DE CONTROL */}
-      <section className="bg-white p-4 rounded-xl border shadow-sm no-print flex flex-col md:flex-row items-center gap-4">
-        <div className="flex items-center gap-3 flex-1">
-          <div className="w-10 h-10 bg-slate-900 rounded-lg flex items-center justify-center text-white"><FileText size={20} /></div>
-          <div><h2 className="font-black text-xs uppercase tracking-widest leading-none">Generador de Informes</h2><p className="text-[9px] font-bold text-slate-400 uppercase mt-1">Auditoría y Contabilidad</p></div>
+      {/* SECCIÓN DE FILTROS (MÓVIL-FIRST) */}
+      <section className="no-print bg-slate-900 p-6 rounded-[2rem] shadow-2xl flex flex-col md:flex-row items-center gap-6 border border-white/5">
+        <div className="flex items-center gap-4 flex-1">
+          <div className="w-12 h-12 bg-emerald-500 rounded-2xl flex items-center justify-center text-slate-900 shadow-lg shadow-emerald-500/20">
+            <PieChart size={24} strokeWidth={2.5}/>
+          </div>
+          <div>
+            <h2 className="text-white font-black text-sm uppercase tracking-widest leading-none">Módulo de Auditoría</h2>
+            <p className="text-slate-400 text-[10px] font-bold uppercase mt-1 tracking-tighter">Generación de informes contables</p>
+          </div>
         </div>
-        <div className="flex gap-2 w-full md:w-auto">
-          <select className="bg-slate-50 border p-2.5 rounded-lg text-xs font-bold outline-none uppercase" value={tipo} onChange={(e) => { setTipo(e.target.value); setReporteData(null); }}>
-            <option value="General">Balance Mensual</option>
-            <option value="Solo Ingresos">Libro de Ingresos</option>
-            <option value="Solo Egresos">Libro de Gastos</option>
-            <option value="Estado Cartera">Estado de Cartera</option>
-            <option value="Directorio Residentes">Censo Residentes</option>
+
+        <div className="flex flex-wrap gap-3 w-full md:w-auto">
+          <select 
+            className="flex-1 md:w-56 bg-slate-800 border border-white/10 text-white p-3 rounded-xl text-xs font-black outline-none focus:ring-2 ring-emerald-500/50" 
+            value={tipo} 
+            onChange={(e) => { setTipo(e.target.value); setReporteData(null); }}
+          >
+            <optgroup label="FINANCIEROS" className="bg-slate-900">
+              <option value="General">Balance Consolidado</option>
+              <option value="Solo Ingresos">Libro de Ingresos</option>
+              <option value="Solo Egresos">Libro de Gastos</option>
+            </optgroup>
+            <optgroup label="ADMINISTRATIVOS" className="bg-slate-900">
+              <option value="Estado Cartera">Estado de Cartera (Mora)</option>
+              <option value="Directorio Residentes">Censo de Residentes</option>
+            </optgroup>
           </select>
-          {(tipo === "General" || tipo.includes("Solo")) && <input type="month" className="bg-slate-50 border p-2 rounded-lg text-xs font-bold outline-none" onChange={(e) => setMes(e.target.value)} />}
+
+          {(tipo === "General" || tipo.includes("Solo")) && (
+            <input type="month" className="bg-slate-800 border border-white/10 text-white p-3 rounded-xl text-xs font-black outline-none" onChange={(e) => setMes(e.target.value)} />
+          )}
+          
+          <button 
+            onClick={generarReporte} 
+            disabled={loading} 
+            className="bg-emerald-500 hover:bg-emerald-400 text-slate-900 px-8 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all active:scale-95 disabled:opacity-20"
+          >
+            {loading ? <Loader2 className="animate-spin" /> : "GENERAR"}
+          </button>
         </div>
-        <button onClick={generarReporte} disabled={loading} className="bg-slate-900 text-white px-6 py-2.5 rounded-lg text-xs font-black uppercase tracking-widest">{loading ? <Loader2 className="animate-spin" /> : "GENERAR"}</button>
-        {reporteData && <button onClick={handlePrint} className="bg-emerald-600 text-white px-6 py-2.5 rounded-lg text-xs font-black uppercase tracking-widest">IMPRIMIR</button>}
       </section>
 
-      {/* DOCUMENTO IMPRIMIBLE */}
+      {/* ÁREA DEL REPORTE */}
       {reporteData && (
-        <div className="bg-white border shadow-2xl rounded-2xl overflow-hidden">
-          <div ref={printRef} className="p-10 md:p-14 w-full bg-white">
+        <div className="bg-white border-2 border-slate-100 shadow-2xl rounded-[2.5rem] overflow-hidden animate-in slide-in-from-bottom-4 duration-700">
+          
+          <div className="no-print p-6 border-b border-slate-50 flex justify-end">
+             <button onClick={handlePrint} className="bg-slate-900 text-white px-6 py-3 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-black transition-all flex items-center gap-2">
+                <Printer size={16}/> Imprimir en PDF
+             </button>
+          </div>
+
+          <div ref={printRef} className="p-12 md:p-16 w-full bg-white text-slate-900">
             
-            {/* CABEZOTE REPORTE */}
-            <div className="flex justify-between items-center border-b-2 border-slate-900 pb-4 mb-8">
-              <div className="flex items-center gap-4">
-                <img src="/logo.png" alt="Logo" className="w-16" />
+            {/* CABEZOTE PROFESIONAL */}
+            <div className="flex justify-between items-center border-b-4 border-slate-900 pb-8 mb-10">
+              <div className="flex items-center gap-6">
+                <img src="/logo.png" alt="Logo" className="w-20" />
                 <div>
-                  <h1 className="text-sm font-black uppercase italic">{tipo}</h1>
-                  <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Conjunto Residencial El Parque de las Flores</p>
+                  <h1 className="text-xl font-black uppercase italic leading-none mb-1">Informe de Gestión Contable</h1>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em]">C.R. El Parque de las Flores • NIT 832.011.421-3</p>
                 </div>
               </div>
               <div className="text-right">
-                <p className="text-[9px] font-black text-slate-400 uppercase mb-1">Fecha de Emisión</p>
-                <p className="text-sm font-black uppercase">{new Date().toLocaleDateString()}</p>
-                {mes && <p className="text-[10px] text-slate-500 font-bold uppercase mt-1">Periodo: {mes}</p>}
+                <p className="text-[9px] font-black text-slate-300 uppercase tracking-widest leading-none mb-1">Tipo de Reporte</p>
+                <div className="bg-slate-900 text-white px-3 py-1 rounded text-xs font-black uppercase mb-2 inline-block">{tipo}</div>
+                <p className="text-[10px] font-bold text-slate-500 uppercase">{mes ? `Periodo: ${mes}` : `Corte: ${new Date().toLocaleDateString()}`}</p>
               </div>
             </div>
 
-            {/* KPIs DE REPORTE */}
+            {/* TABLERO DE CIFRAS (KPIs) */}
             {(tipo === "General" || tipo.includes("Solo")) && (
-              <div className="grid grid-cols-3 gap-6 mb-10">
-                <div className="p-5 bg-emerald-50 rounded-xl border border-emerald-100">
-                   <p className="text-[9px] font-black text-emerald-600 uppercase mb-1">Recaudo Total</p>
-                   <p className="text-2xl font-black text-emerald-800 tabular-nums">${totalIng.toLocaleString()}</p>
-                   <div className="mt-2 text-[8px] font-bold text-emerald-700/60 uppercase">Bancos: ${ingBanco.toLocaleString()} | Efec: ${ingEfectivo.toLocaleString()}</div>
+              <div className="grid grid-cols-3 gap-6 mb-12">
+                <div className="p-6 bg-slate-50 border border-slate-200 rounded-3xl">
+                   <div className="flex items-center justify-between mb-4">
+                      <p className="text-[9px] font-black text-emerald-600 uppercase tracking-widest">Recaudo Total</p>
+                      <TrendingUp size={16} className="text-emerald-500"/>
+                   </div>
+                   <p className="text-3xl font-black tabular-nums">${totalIng.toLocaleString()}</p>
+                   <div className="mt-3 flex gap-4 text-[8px] font-bold text-slate-400 uppercase">
+                      <span>Bco: ${banco.toLocaleString()}</span>
+                      <span>Efec: ${efectivo.toLocaleString()}</span>
+                   </div>
                 </div>
-                <div className="p-5 bg-rose-50 rounded-xl border border-rose-100">
-                   <p className="text-[9px] font-black text-rose-600 uppercase mb-1">Gastos Totales</p>
-                   <p className="text-2xl font-black text-rose-800 tabular-nums">-${totalEgr.toLocaleString()}</p>
+                <div className="p-6 bg-slate-50 border border-slate-200 rounded-3xl">
+                   <div className="flex items-center justify-between mb-4">
+                      <p className="text-[9px] font-black text-rose-600 uppercase tracking-widest">Egresos / Gastos</p>
+                      <TrendingDown size={16} className="text-rose-500"/>
+                   </div>
+                   <p className="text-3xl font-black tabular-nums">-${totalEgr.toLocaleString()}</p>
+                   <p className="mt-3 text-[8px] font-bold text-slate-400 uppercase">{reporteData.egresos.length} facturas pagadas</p>
                 </div>
-                <div className="p-5 bg-slate-900 rounded-xl text-white">
-                   <p className="text-[9px] font-black text-slate-400 uppercase mb-1">Saldo Neto Caja</p>
-                   <p className={`text-2xl font-black tabular-nums ${totalIng - totalEgr >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>${(totalIng - totalEgr).toLocaleString()}</p>
+                <div className="p-6 bg-slate-900 rounded-3xl text-white shadow-xl">
+                   <div className="flex items-center justify-between mb-4">
+                      <p className="text-[9px] font-black text-emerald-400 uppercase tracking-widest">Saldo Neto</p>
+                      <Scale size={16} className="text-emerald-400"/>
+                   </div>
+                   <p className="text-3xl font-black tabular-nums">${(totalIng - totalEgr).toLocaleString()}</p>
+                   <p className="mt-3 text-[8px] font-bold text-slate-500 uppercase tracking-widest">Utilidad operativa mes</p>
                 </div>
               </div>
             )}
 
-            {/* TABLA DE INGRESOS */}
+            {/* TABLA: INGRESOS DETALLADOS */}
             {(tipo === "General" || tipo === "Solo Ingresos") && (
-              <div className="mb-10">
-                <h3 className="text-[9px] font-black uppercase bg-slate-100 p-2 inline-block rounded mb-4">Relación de Entradas de Efectivo / Banco</h3>
+              <div className="mb-12">
+                <h3 className="text-[10px] font-black uppercase text-slate-800 mb-4 flex items-center gap-2">
+                   <div className="w-1.5 h-4 bg-emerald-500 rounded-full"></div> Relación Detallada de Ingresos
+                </h3>
                 <table className="w-full">
-                  <thead><tr><th>Recibo</th><th>Unidad</th><th>Concepto Principal</th><th>Medio</th><th className="text-right">Monto</th></tr></thead>
+                  <thead>
+                    <tr><th>Recibo</th><th>Unidad</th><th>Titular</th><th>Concepto Principal</th><th>Medio</th><th className="text-right">Monto</th></tr>
+                  </thead>
                   <tbody>
                     {reporteData.ingresos.map(i => (
                       <tr key={i.id}>
-                        <td className="font-black text-slate-900">RC-{i.numero_recibo}</td>
+                        <td className="font-black">RC-{i.numero_recibo}</td>
                         <td className="font-bold">{i.unidad}</td>
-                        <td className="uppercase text-slate-500">{i.concepto_texto?.split("||")[0].split("|")[0] || "Administración"}</td>
-                        <td className="text-[8px] uppercase">{i.metodo_pago}</td>
+                        <td className="uppercase">{i.residentes?.nombre || 'Residente'}</td>
+                        <td className="uppercase text-slate-400">{i.concepto_texto?.split("||")[0].split("|")[0]}</td>
+                        <td className="text-[8px] font-bold uppercase">{i.metodo_pago}</td>
                         <td className="text-right font-black text-emerald-600">${Number(i.monto_total).toLocaleString()}</td>
                       </tr>
                     ))}
+                    {reporteData.ingresos.length === 0 && <tr><td colSpan={6} className="text-center py-10 italic text-slate-400">No se registraron ingresos en este periodo.</td></tr>}
                   </tbody>
                 </table>
               </div>
             )}
 
-            {/* TABLA DE EGRESOS */}
+            {/* TABLA: EGRESOS DETALLADOS */}
             {(tipo === "General" || tipo === "Solo Egresos") && (
-              <div className="mb-10">
-                <h3 className="text-[9px] font-black uppercase bg-slate-100 p-2 inline-block rounded mb-4">Relación de Gastos y Salidas</h3>
+              <div className="mb-12">
+                <h3 className="text-[10px] font-black uppercase text-slate-800 mb-4 flex items-center gap-2">
+                   <div className="w-1.5 h-4 bg-rose-500 rounded-full"></div> Relación Detallada de Gastos
+                </h3>
                 <table className="w-full">
-                  <thead><tr><th>Egreso No.</th><th>Beneficiario</th><th>Concepto / Descripción</th><th className="text-right">Monto</th></tr></thead>
+                  <thead>
+                    <tr><th>Gasto No.</th><th>Fecha</th><th>Beneficiario (Tercero)</th><th>Descripción / Concepto</th><th className="text-right">Monto</th></tr>
+                  </thead>
                   <tbody>
                     {reporteData.egresos.map(e => (
                       <tr key={e.id}>
-                        <td className="font-black text-slate-900">CE-{e.recibo_n}</td>
+                        <td className="font-black">CE-{e.recibo_n}</td>
+                        <td>{e.fecha}</td>
                         <td className="font-bold uppercase">{e.pagado_a}</td>
                         <td className="italic text-slate-400 uppercase">{e.concepto}</td>
                         <td className="text-right font-black text-rose-600">${Number(e.monto).toLocaleString()}</td>
                       </tr>
                     ))}
+                    {reporteData.egresos.length === 0 && <tr><td colSpan={5} className="text-center py-10 italic text-slate-400">No se registraron gastos en este periodo.</td></tr>}
                   </tbody>
                 </table>
               </div>
             )}
 
-            {/* TABLA DE CARTERA */}
+            {/* TABLA: ESTADO DE CARTERA */}
             {tipo === "Estado Cartera" && (
-              <table className="w-full">
-                <thead><tr><th>Unidad</th><th>Nombre Residente</th><th>Estado</th><th className="text-right">Saldo Hoy</th></tr></thead>
-                <tbody>
-                  {reporteData.cartera.map(r => (
-                    <tr key={r.id}>
-                      <td className="font-black">T{r.torre.slice(-1)}-{r.apartamento}</td>
-                      <td className="uppercase font-medium">{r.nombre}</td>
-                      <td>
-                        <span className={`px-2 py-0.5 rounded text-[8px] font-bold uppercase ${r.deudaTotal > 0 ? 'bg-rose-50 text-rose-600' : 'bg-emerald-50 text-emerald-600'}`}>
-                            {r.deudaTotal > 0 ? 'En Mora' : 'A Paz y Salvo'}
-                        </span>
-                      </td>
-                      <td className={`text-right font-black ${r.deudaTotal < 0 ? 'text-emerald-600' : 'text-slate-900'}`}>
-                        ${Math.abs(r.deudaTotal).toLocaleString()} {r.deudaTotal < 0 ? '(CR)' : ''}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              <div className="mb-12">
+                 <h3 className="text-[10px] font-black uppercase text-slate-800 mb-4 flex items-center gap-2">
+                    <div className="w-1.5 h-4 bg-rose-600 rounded-full"></div> Balance General de Cartera Morosa
+                 </h3>
+                 <table className="w-full">
+                    <thead><tr><th>Unidad</th><th>Titular de la Unidad</th><th>Estado Contable</th><th className="text-right">Saldo a la Fecha</th></tr></thead>
+                    <tbody>
+                      {reporteData.cartera.sort((a,b) => b.total - a.total).map(r => (
+                        <tr key={r.id}>
+                          <td className="font-black">T{r.torre.slice(-1)}-{r.apartamento}</td>
+                          <td className="uppercase font-medium">{r.nombre}</td>
+                          <td>
+                            <span className={`px-2 py-0.5 rounded-[4px] text-[8px] font-black uppercase ${r.total > 0 ? 'bg-rose-50 text-rose-600 border border-rose-100' : 'bg-emerald-50 text-emerald-600 border border-emerald-100'}`}>
+                                {r.total > 0 ? 'En Mora' : 'Anticipo / CR'}
+                            </span>
+                          </td>
+                          <td className={`text-right font-black tabular-nums ${r.total < 0 ? 'text-emerald-600' : 'text-slate-900'}`}>
+                            ${Math.abs(r.total).toLocaleString()} {r.total < 0 ? '(CR)' : ''}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                 </table>
+                 <div className="bg-slate-900 p-6 rounded-2xl mt-6 flex justify-between items-center text-white">
+                    <p className="text-[10px] font-black uppercase tracking-widest">Total Cartera en Calle:</p>
+                    <p className="text-2xl font-black tabular-nums">${reporteData.cartera.reduce((a,b)=> a + (b.total > 0 ? b.total : 0), 0).toLocaleString()}</p>
+                 </div>
+              </div>
             )}
 
-            {/* SECCIÓN DE FIRMAS */}
-            <div className="mt-24 pt-10 border-t flex justify-around gap-20">
-              <div className="text-center w-64"><div className="border-t border-slate-900 mb-2"></div><p className="text-[9px] font-black uppercase">Administración / Tesorería</p></div>
-              <div className="text-center w-64"><div className="border-t border-slate-900 mb-2"></div><p className="text-[9px] font-black uppercase">Revisoría Fiscal / Consejo</p></div>
+            {/* FIRMAS LEGALES */}
+            <div className="mt-32 pt-10 border-t-2 border-slate-900 grid grid-cols-2 gap-24">
+              <div className="text-center">
+                 <p className="text-[10px] font-black uppercase text-slate-900">Administración / Tesorería</p>
+                 <p className="text-[8px] font-bold text-slate-400 mt-1 uppercase tracking-widest">Responsable del Recaudo</p>
+              </div>
+              <div className="text-center">
+                 <p className="text-[10px] font-black uppercase text-slate-900">Consejo de Admón / Revisoría</p>
+                 <p className="text-[8px] font-bold text-slate-400 mt-1 uppercase tracking-widest">Control Interno</p>
+              </div>
+            </div>
+
+            <div className="mt-20 text-center text-[8px] font-bold text-slate-300 uppercase tracking-[0.5em]">
+               Fin del Reporte Administrativo
             </div>
           </div>
         </div>
