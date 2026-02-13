@@ -26,12 +26,9 @@ interface ReporteFinancieroData {
 interface ReporteCarteraData {
   tipo: 'CARTERA';
   enMora: any[];
-  conSaldoAFavor: any[];
   summary: {
     totalEnMora: number;
     unidadesEnMora: number;
-    totalSaldoAFavor: number;
-    unidadesConSaldoAFavor: number;
   };
 }
 
@@ -55,7 +52,7 @@ export default function Reportes() {
   const printRef = useRef<HTMLDivElement>(null);
   const [datosReporte, setDatosReporte] = useState<ReporteData>(null);
 
-  // --- FUNCIÓN DE IMPRESIÓN (SIN CAMBIOS SIGNIFICATIVOS) ---
+  // --- FUNCIÓN DE IMPRESIÓN (SIN CAMBIOS) ---
   const handlePrint = () => {
     const content = printRef.current;
     if (!content) return;
@@ -91,6 +88,8 @@ export default function Reportes() {
   async function generarReporte() {
     setLoading(true);
     setDatosReporte(null);
+    const TORRES_REQUERIDAS = ['Torre 5', 'Torre 6', 'Torre 7', 'Torre 8'];
+
     try {
       // --- BLOQUE PARA REPORTES FINANCIEROS ---
       if (tipoReporte === "General" || tipoReporte === "Solo Ingresos" || tipoReporte === "Solo Egresos") {
@@ -99,7 +98,6 @@ export default function Reportes() {
           setLoading(false);
           return;
         }
-
         const [anio, mesNum] = mes.split("-").map(Number);
         const primerDia = `${mes}-01`;
         const ultimoDiaNum = new Date(anio, mesNum, 0).getDate();
@@ -111,11 +109,8 @@ export default function Reportes() {
         ]);
 
         if (resIng.error || resEgr.error) throw resIng.error || resEgr.error;
-
         const ingresos = resIng.data || [];
         const egresos = resEgr.data || [];
-
-        // Pre-cálculo de métricas
         const totalIngresos = ingresos.reduce((sum, i) => sum + Number(i.monto_total), 0);
         const totalEgresos = egresos.reduce((sum, e) => sum + Number(e.monto), 0);
         const ingresosBanco = ingresos.filter(i => i.metodo_pago === 'Transferencia').reduce((sum, i) => sum + Number(i.monto_total), 0);
@@ -126,54 +121,59 @@ export default function Reportes() {
           ingresos,
           egresos,
           summary: {
-            totalIngresos,
-            totalEgresos,
-            saldoNeto: totalIngresos - totalEgresos,
-            ingresosBanco,
-            ingresosEfectivo,
-            numIngresos: ingresos.length,
-            numEgresos: egresos.length
+            totalIngresos, totalEgresos, saldoNeto: totalIngresos - totalEgresos,
+            ingresosBanco, ingresosEfectivo, numIngresos: ingresos.length, numEgresos: egresos.length
           }
         });
       }
       // --- BLOQUE PARA REPORTE DE ESTADO DE CARTERA ---
       else if (tipoReporte === "Estado Cartera") {
-        const { data: residentesData, error } = await supabase.from("residentes").select("*, pagos(*)");
+        // --- AJUSTE: Se filtra por las torres requeridas (5, 6, 7, 8) ---
+        const { data: residentesData, error } = await supabase.from("residentes")
+          .select("*, pagos(*)")
+          .in('torre', TORRES_REQUERIDAS);
+        
         if (error) throw error;
 
-        const enMora = [];
-        const conSaldoAFavor = [];
+        let enMora = [];
         let totalEnMora = 0;
-        let totalSaldoAFavor = 0;
 
         for (const r of residentesData) {
-          const deuda = calcularValorDeudaHoy(r); // Función externa que calcula la deuda
-          if (deuda > 0) {
+          const deuda = calcularValorDeudaHoy(r);
+          if (deuda > 0) { // Solo nos interesan los que tienen deuda
             enMora.push({ ...r, deuda });
             totalEnMora += deuda;
-          } else if (deuda < 0) {
-            conSaldoAFavor.push({ ...r, deuda });
-            totalSaldoAFavor += deuda;
           }
         }
+        
+        // --- AJUSTE: Se ordena por Torre y luego por Apartamento ---
+        enMora.sort((a, b) => {
+          const torreA = parseInt(a.torre.match(/\d+/)[0]);
+          const torreB = parseInt(b.torre.match(/\d+/)[0]);
+          if (torreA !== torreB) {
+            return torreA - torreB;
+          }
+          return parseInt(a.apartamento) - parseInt(b.apartamento);
+        });
 
         setDatosReporte({
           tipo: 'CARTERA',
-          enMora: enMora.sort((a,b) => b.deuda - a.deuda),
-          conSaldoAFavor: conSaldoAFavor.sort((a,b) => a.deuda - b.deuda),
+          enMora,
           summary: {
             totalEnMora,
             unidadesEnMora: enMora.length,
-            totalSaldoAFavor: Math.abs(totalSaldoAFavor),
-            unidadesConSaldoAFavor: conSaldoAFavor.length,
           }
         });
       }
       // --- BLOQUE PARA REPORTE DE CENSO DE RESIDENTES ---
       else if (tipoReporte === "Directorio Residentes") {
-        const { data: residentes, error } = await supabase.from("residentes").select("*").order('torre').order('apartamento');
-        if (error) throw error;
+        // --- AJUSTE: Se filtra por las torres requeridas y se ordena ---
+        const { data: residentes, error } = await supabase.from("residentes")
+          .select("*")
+          .in('torre', TORRES_REQUERIDAS)
+          .order('torre').order('apartamento');
 
+        if (error) throw error;
         const totalUnidades = residentes.length;
         const unidadesOcupadas = residentes.filter(r => r.habita).length;
 
@@ -223,18 +223,15 @@ export default function Reportes() {
               <option value="Solo Egresos">Libro de Gastos</option>
             </optgroup>
             <optgroup label="ADMINISTRATIVOS" className="font-bold">
-              <option value="Estado Cartera">Estado de Cartera (Mora)</option>
-              <option value="Directorio Residentes">Censo de Residentes</option>
+              <option value="Estado Cartera">Estado de Cartera (Torres 5-8)</option>
+              <option value="Directorio Residentes">Censo de Residentes (Torres 5-8)</option>
             </optgroup>
           </select>
-
           {(tipoReporte === "General" || tipoReporte.includes("Solo")) && (
             <input type="month" className="bg-slate-800 border border-white/10 text-white p-3 rounded-xl text-sm font-black outline-none" onChange={(e) => setMes(e.target.value)} />
           )}
-
           <button
-            onClick={generarReporte}
-            disabled={loading}
+            onClick={generarReporte} disabled={loading}
             className="bg-emerald-500 hover:bg-emerald-400 text-slate-900 px-8 py-3 rounded-xl text-sm font-black uppercase tracking-widest transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center min-w-[120px]"
           >
             {loading ? <Loader2 className="animate-spin" size={20} /> : "GENERAR"}
@@ -245,7 +242,6 @@ export default function Reportes() {
       {/* ÁREA DEL REPORTE VISIBLE */}
       {datosReporte && (
         <div className="bg-white border-2 border-slate-100 shadow-2xl rounded-[2.5rem] overflow-hidden animate-in fade-in duration-500">
-
           <div className="no-print p-6 border-b border-slate-100 flex justify-end">
             <button onClick={handlePrint} className="bg-slate-900 text-white px-6 py-3 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-black transition-all flex items-center gap-2">
               <Printer size={16} /> Imprimir o Guardar PDF
@@ -253,191 +249,86 @@ export default function Reportes() {
           </div>
 
           <div ref={printRef} className="p-10 md:p-14 w-full bg-white text-slate-900">
-            {/* --- CABECERA ESTÁNDAR PARA TODOS LOS REPORTES --- */}
             <header className="flex justify-between items-start border-b-4 border-slate-900 pb-8 mb-10">
-              <div className="flex items-center gap-6">
-                <img src="/logo.png" alt="Logo" className="w-20 h-20 object-contain" />
-                <div>
-                  <h1 className="text-2xl font-black uppercase italic leading-none mb-1">Informe de Gestión Administrativa</h1>
-                  <p className="text-sm font-bold text-slate-400 uppercase tracking-widest">C.R. El Parque de las Flores • NIT 832.011.421-3</p>
+                <div className="flex items-center gap-6">
+                    <img src="/logo.png" alt="Logo" className="w-20 h-20 object-contain" />
+                    <div>
+                        <h1 className="text-2xl font-black uppercase italic leading-none mb-1">Informe de Gestión Administrativa</h1>
+                        <p className="text-sm font-bold text-slate-400 uppercase tracking-widest">C.R. El Parque de las Flores • NIT 832.011.421-3</p>
+                    </div>
                 </div>
-              </div>
-              <div className="text-right flex-shrink-0">
-                <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Tipo de Reporte</p>
-                <div className="bg-slate-900 text-white px-4 py-1.5 rounded-lg text-sm font-black uppercase mb-2 inline-block">{tipoReporte}</div>
-                <p className="text-xs font-bold text-slate-500 uppercase">{mes ? `Periodo: ${mes}` : `Corte a: ${new Date().toLocaleDateString()}`}</p>
-              </div>
+                <div className="text-right flex-shrink-0">
+                    <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Tipo de Reporte</p>
+                    <div className="bg-slate-900 text-white px-4 py-1.5 rounded-lg text-sm font-black uppercase mb-2 inline-block">{tipoReporte}</div>
+                    <p className="text-xs font-bold text-slate-500 uppercase">{mes ? `Periodo: ${mes}` : `Corte a: ${new Date().toLocaleDateString()}`}</p>
+                </div>
             </header>
 
             <main>
-              {/* --- VISTA PARA REPORTES FINANCIEROS --- */}
               {datosReporte.tipo === 'FINANCIERO' && (
                 <>
-                  {/* KPIs Financieros */}
                   <section className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
-                    <div className="p-6 bg-slate-50 border border-slate-200 rounded-3xl">
-                      <div className="flex items-center justify-between mb-4"><p className="text-xs font-black text-emerald-600 uppercase tracking-widest">Recaudo Total</p><TrendingUp size={18} className="text-emerald-500" /></div>
-                      <p className="text-4xl font-black tabular-nums">${datosReporte.summary.totalIngresos.toLocaleString()}</p>
-                      <p className="mt-3 text-xs font-bold text-slate-400 uppercase">{datosReporte.summary.numIngresos} Transacciones</p>
-                    </div>
-                    <div className="p-6 bg-slate-50 border border-slate-200 rounded-3xl">
-                      <div className="flex items-center justify-between mb-4"><p className="text-xs font-black text-rose-600 uppercase tracking-widest">Total Gastos</p><TrendingDown size={18} className="text-rose-500" /></div>
-                      <p className="text-4xl font-black tabular-nums">-${datosReporte.summary.totalEgresos.toLocaleString()}</p>
-                       <p className="mt-3 text-xs font-bold text-slate-400 uppercase">{datosReporte.summary.numEgresos} Facturas Pagadas</p>
-                    </div>
-                    <div className="p-6 bg-slate-900 rounded-3xl text-white shadow-xl">
-                      <div className="flex items-center justify-between mb-4"><p className="text-xs font-black text-emerald-400 uppercase tracking-widest">Saldo Neto del Periodo</p><Scale size={18} className="text-emerald-400" /></div>
-                      <p className="text-4xl font-black tabular-nums">${datosReporte.summary.saldoNeto.toLocaleString()}</p>
-                      <p className="mt-3 text-xs font-bold text-slate-500 uppercase tracking-widest">Utilidad Operativa</p>
-                    </div>
+                    <div className="p-6 bg-slate-50 border border-slate-200 rounded-3xl"><div className="flex items-center justify-between mb-4"><p className="text-xs font-black text-emerald-600 uppercase tracking-widest">Recaudo Total</p><TrendingUp size={18} className="text-emerald-500" /></div><p className="text-4xl font-black tabular-nums">${datosReporte.summary.totalIngresos.toLocaleString()}</p><p className="mt-3 text-xs font-bold text-slate-400 uppercase">{datosReporte.summary.numIngresos} Transacciones</p></div>
+                    <div className="p-6 bg-slate-50 border border-slate-200 rounded-3xl"><div className="flex items-center justify-between mb-4"><p className="text-xs font-black text-rose-600 uppercase tracking-widest">Total Gastos</p><TrendingDown size={18} className="text-rose-500" /></div><p className="text-4xl font-black tabular-nums">-${datosReporte.summary.totalEgresos.toLocaleString()}</p><p className="mt-3 text-xs font-bold text-slate-400 uppercase">{datosReporte.summary.numEgresos} Facturas Pagadas</p></div>
+                    <div className="p-6 bg-slate-900 rounded-3xl text-white shadow-xl"><div className="flex items-center justify-between mb-4"><p className="text-xs font-black text-emerald-400 uppercase tracking-widest">Saldo Neto del Periodo</p><Scale size={18} className="text-emerald-400" /></div><p className="text-4xl font-black tabular-nums">${datosReporte.summary.saldoNeto.toLocaleString()}</p><p className="mt-3 text-xs font-bold text-slate-500 uppercase tracking-widest">Utilidad Operativa</p></div>
                   </section>
-                  
-                  {/* Desglose de Ingresos - SOLICITADO */}
                   {(tipoReporte === "General" || tipoReporte === "Solo Ingresos") && (
                     <section className="mb-12">
-                       <h3 className="text-sm font-black uppercase text-slate-800 mb-4 flex items-center gap-3"><div className="w-2 h-5 bg-emerald-500 rounded-full"></div>Desglose de Ingresos del Periodo</h3>
+                       {/* --- AJUSTE: Encabezado simplificado --- */}
+                       <h3 className="text-xs font-bold uppercase text-slate-600 mb-3 pb-2 border-b border-slate-200">Desglose de Ingresos del Periodo</h3>
                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                          <div className="flex items-center gap-4 p-5 bg-emerald-50 border border-emerald-200 rounded-2xl">
-                            <Banknote size={32} className="text-emerald-600 flex-shrink-0" />
-                            <div>
-                                <p className="text-xs text-emerald-800 font-bold uppercase">Ingreso Total</p>
-                                <p className="text-2xl font-black text-emerald-900">${datosReporte.summary.totalIngresos.toLocaleString()}</p>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-4 p-5 bg-sky-50 border border-sky-200 rounded-2xl">
-                            <Landmark size={32} className="text-sky-600 flex-shrink-0" />
-                            <div>
-                                <p className="text-xs text-sky-800 font-bold uppercase">Ingresos por Banco</p>
-                                <p className="text-2xl font-black text-sky-900">${datosReporte.summary.ingresosBanco.toLocaleString()}</p>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-4 p-5 bg-lime-50 border border-lime-200 rounded-2xl">
-                            <Wallet size={32} className="text-lime-600 flex-shrink-0" />
-                            <div>
-                                <p className="text-xs text-lime-800 font-bold uppercase">Ingresos en Efectivo</p>
-                                <p className="text-2xl font-black text-lime-900">${datosReporte.summary.ingresosEfectivo.toLocaleString()}</p>
-                            </div>
-                          </div>
+                          <div className="flex items-center gap-4 p-5 bg-emerald-50 border border-emerald-200 rounded-2xl"><Banknote size={32} className="text-emerald-600 flex-shrink-0" /><div><p className="text-xs text-emerald-800 font-bold uppercase">Ingreso Total</p><p className="text-2xl font-black text-emerald-900">${datosReporte.summary.totalIngresos.toLocaleString()}</p></div></div>
+                          <div className="flex items-center gap-4 p-5 bg-sky-50 border border-sky-200 rounded-2xl"><Landmark size={32} className="text-sky-600 flex-shrink-0" /><div><p className="text-xs text-sky-800 font-bold uppercase">Ingresos por Banco</p><p className="text-2xl font-black text-sky-900">${datosReporte.summary.ingresosBanco.toLocaleString()}</p></div></div>
+                          <div className="flex items-center gap-4 p-5 bg-lime-50 border border-lime-200 rounded-2xl"><Wallet size={32} className="text-lime-600 flex-shrink-0" /><div><p className="text-xs text-lime-800 font-bold uppercase">Ingresos en Efectivo</p><p className="text-2xl font-black text-lime-900">${datosReporte.summary.ingresosEfectivo.toLocaleString()}</p></div></div>
                        </div>
                     </section>
                   )}
-
-                  {/* Tabla de Ingresos */}
                   {(tipoReporte === "General" || tipoReporte === "Solo Ingresos") && (
                     <section className="mb-12">
-                      <h3 className="text-sm font-black uppercase text-slate-800 mb-4 flex items-center gap-3"><div className="w-2 h-5 bg-emerald-500 rounded-full"></div>Relación Detallada de Ingresos</h3>
-                      <table>
-                        <thead><tr><th>Recibo</th><th>Fecha</th><th>Unidad</th><th>Titular</th><th>Concepto</th><th className="text-right">Monto</th></tr></thead>
-                        <tbody>
-                          {datosReporte.ingresos.map(i => (<tr key={i.id}><td>RC-{i.numero_recibo}</td><td>{i.fecha_pago}</td><td>{i.unidad}</td><td>{i.residentes?.nombre}</td><td>{i.concepto_texto?.split("||")[0]}</td><td className="text-right font-bold text-emerald-700">${Number(i.monto_total).toLocaleString()}</td></tr>))}
-                          {datosReporte.ingresos.length === 0 && <tr><td colSpan={6} className="text-center py-10">No hay ingresos en este periodo.</td></tr>}
-                        </tbody>
-                      </table>
+                      <h3 className="text-xs font-bold uppercase text-slate-600 mb-3 pb-2 border-b border-slate-200">Relación Detallada de Ingresos</h3>
+                      <table><thead><tr><th>Recibo</th><th>Fecha</th><th>Unidad</th><th>Titular</th><th>Concepto</th><th className="text-right">Monto</th></tr></thead><tbody>{datosReporte.ingresos.map(i => (<tr key={i.id}><td>RC-{i.numero_recibo}</td><td>{i.fecha_pago}</td><td>{i.unidad}</td><td>{i.residentes?.nombre}</td><td>{i.concepto_texto?.split("||")[0]}</td><td className="text-right font-bold text-emerald-700">${Number(i.monto_total).toLocaleString()}</td></tr>))}{datosReporte.ingresos.length === 0 && <tr><td colSpan={6} className="text-center py-10">No hay ingresos en este periodo.</td></tr>}</tbody></table>
                     </section>
                   )}
-
-                  {/* Tabla de Egresos */}
                   {(tipoReporte === "General" || tipoReporte === "Solo Egresos") && (
                      <section className="mb-12">
-                      <h3 className="text-sm font-black uppercase text-slate-800 mb-4 flex items-center gap-3"><div className="w-2 h-5 bg-rose-500 rounded-full"></div>Relación Detallada de Egresos</h3>
-                      <table>
-                        <thead><tr><th>Comprobante</th><th>Fecha</th><th>Beneficiario</th><th>Concepto</th><th className="text-right">Monto</th></tr></thead>
-                        <tbody>
-                          {datosReporte.egresos.map(e => (<tr key={e.id}><td>CE-{e.recibo_n}</td><td>{e.fecha}</td><td>{e.pagado_a}</td><td>{e.concepto}</td><td className="text-right font-bold text-rose-700">${Number(e.monto).toLocaleString()}</td></tr>))}
-                          {datosReporte.egresos.length === 0 && <tr><td colSpan={5} className="text-center py-10">No hay egresos en este periodo.</td></tr>}
-                        </tbody>
-                      </table>
+                      <h3 className="text-xs font-bold uppercase text-slate-600 mb-3 pb-2 border-b border-slate-200">Relación Detallada de Egresos</h3>
+                      <table><thead><tr><th>Comprobante</th><th>Fecha</th><th>Beneficiario</th><th>Concepto</th><th className="text-right">Monto</th></tr></thead><tbody>{datosReporte.egresos.map(e => (<tr key={e.id}><td>CE-{e.recibo_n}</td><td>{e.fecha}</td><td>{e.pagado_a}</td><td>{e.concepto}</td><td className="text-right font-bold text-rose-700">${Number(e.monto).toLocaleString()}</td></tr>))}{datosReporte.egresos.length === 0 && <tr><td colSpan={5} className="text-center py-10">No hay egresos en este periodo.</td></tr>}</tbody></table>
                     </section>
                   )}
                 </>
               )}
-
-              {/* --- VISTA PARA REPORTE DE CARTERA --- */}
               {datosReporte.tipo === 'CARTERA' && (
                 <>
-                  <section className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-12">
-                    <div className="p-6 bg-rose-50 border border-rose-200 rounded-3xl">
-                      <div className="flex items-center justify-between mb-4"><p className="text-xs font-black text-rose-600 uppercase tracking-widest">Cartera Total en Mora</p><UserX size={18} className="text-rose-500" /></div>
-                      <p className="text-4xl font-black text-rose-900 tabular-nums">${datosReporte.summary.totalEnMora.toLocaleString()}</p>
-                      <p className="mt-3 text-xs font-bold text-slate-500 uppercase">{datosReporte.summary.unidadesEnMora} Unidades en Mora</p>
-                    </div>
-                    <div className="p-6 bg-emerald-50 border border-emerald-200 rounded-3xl">
-                      <div className="flex items-center justify-between mb-4"><p className="text-xs font-black text-emerald-600 uppercase tracking-widest">Total Saldos a Favor</p><UserCheck size={18} className="text-emerald-500" /></div>
-                      <p className="text-4xl font-black text-emerald-900 tabular-nums">${datosReporte.summary.totalSaldoAFavor.toLocaleString()}</p>
-                      <p className="mt-3 text-xs font-bold text-slate-500 uppercase">{datosReporte.summary.unidadesConSaldoAFavor} Unidades con Anticipo</p>
-                    </div>
+                  <section className="p-6 bg-rose-50 border border-rose-200 rounded-3xl mb-12">
+                    <div className="flex items-center justify-between"><p className="text-xs font-black text-rose-600 uppercase tracking-widest">Cartera en Mora (Torres 5-8)</p><UserX size={18} className="text-rose-500" /></div>
+                    <p className="text-4xl font-black text-rose-900 tabular-nums mt-4">${datosReporte.summary.totalEnMora.toLocaleString()}</p>
+                    <p className="mt-3 text-xs font-bold text-slate-500 uppercase">{datosReporte.summary.unidadesEnMora} Unidades con deuda</p>
                   </section>
-                  
                   <section className="mb-12">
-                     <h3 className="text-sm font-black uppercase text-slate-800 mb-4 flex items-center gap-3"><div className="w-2 h-5 bg-rose-500 rounded-full"></div>Unidades en Mora</h3>
-                     <table>
-                        <thead><tr><th>Unidad</th><th>Titular</th><th>Teléfono</th><th className="text-right">Saldo Deudor</th></tr></thead>
-                        <tbody>
-                          {datosReporte.enMora.map(r => (<tr key={r.id}><td>T{r.torre.slice(-1)}-{r.apartamento}</td><td className="uppercase">{r.nombre}</td><td>{r.telefono || 'N/A'}</td><td className="text-right font-bold text-rose-700 tabular-nums">${r.deuda.toLocaleString()}</td></tr>))}
-                          {datosReporte.enMora.length === 0 && <tr><td colSpan={4} className="text-center py-10">No hay unidades en mora. ¡Excelente gestión!</td></tr>}
-                        </tbody>
-                     </table>
-                  </section>
-                  
-                   <section>
-                     <h3 className="text-sm font-black uppercase text-slate-800 mb-4 flex items-center gap-3"><div className="w-2 h-5 bg-emerald-500 rounded-full"></div>Unidades con Saldo a Favor (Anticipos)</h3>
-                     <table>
-                        <thead><tr><th>Unidad</th><th>Titular</th><th>Teléfono</th><th className="text-right">Saldo a Favor</th></tr></thead>
-                        <tbody>
-                          {datosReporte.conSaldoAFavor.map(r => (<tr key={r.id}><td>T{r.torre.slice(-1)}-{r.apartamento}</td><td className="uppercase">{r.nombre}</td><td>{r.telefono || 'N/A'}</td><td className="text-right font-bold text-emerald-700 tabular-nums">${Math.abs(r.deuda).toLocaleString()}</td></tr>))}
-                          {datosReporte.conSaldoAFavor.length === 0 && <tr><td colSpan={4} className="text-center py-10">Ninguna unidad presenta saldo a favor.</td></tr>}
-                        </tbody>
-                     </table>
+                     <h3 className="text-xs font-bold uppercase text-slate-600 mb-3 pb-2 border-b border-slate-200">Listado de Cartera por Unidad</h3>
+                     <table><thead><tr><th>Unidad</th><th>Titular</th><th>Teléfono</th><th className="text-right">Saldo Deudor</th></tr></thead><tbody>{datosReporte.enMora.map(r => (<tr key={r.id}><td className="font-bold">T{r.torre.slice(-1)}-{r.apartamento}</td><td className="uppercase">{r.nombre}</td><td>{r.telefono || 'N/A'}</td><td className="text-right font-bold text-rose-700 tabular-nums">${r.deuda.toLocaleString()}</td></tr>))}{datosReporte.enMora.length === 0 && <tr><td colSpan={4} className="text-center py-10">No hay unidades en mora en las torres seleccionadas.</td></tr>}</tbody></table>
                   </section>
                 </>
               )}
-
-              {/* --- VISTA PARA REPORTE DE CENSO --- */}
               {datosReporte.tipo === 'CENSO' && (
                 <>
                    <section className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
-                    <div className="flex items-center gap-4 p-5 bg-slate-50 border border-slate-200 rounded-2xl">
-                      <Home size={32} className="text-slate-600" />
-                      <div><p className="text-xs text-slate-800 font-bold uppercase">Total Unidades</p><p className="text-2xl font-black text-slate-900">{datosReporte.summary.totalUnidades}</p></div>
-                    </div>
-                    <div className="flex items-center gap-4 p-5 bg-slate-50 border border-slate-200 rounded-2xl">
-                      <UserCheck size={32} className="text-slate-600" />
-                      <div><p className="text-xs text-slate-800 font-bold uppercase">Unidades Ocupadas</p><p className="text-2xl font-black text-slate-900">{datosReporte.summary.unidadesOcupadas}</p></div>
-                    </div>
-                     <div className="flex items-center gap-4 p-5 bg-slate-50 border border-slate-200 rounded-2xl">
-                      <UserX size={32} className="text-slate-600" />
-                      <div><p className="text-xs text-slate-800 font-bold uppercase">Unidades Vacías</p><p className="text-2xl font-black text-slate-900">{datosReporte.summary.unidadesVacias}</p></div>
-                    </div>
+                    <div className="flex items-center gap-4 p-5 bg-slate-50 border border-slate-200 rounded-2xl"><Home size={32} className="text-slate-600" /><div><p className="text-xs text-slate-800 font-bold uppercase">Total Unidades (T 5-8)</p><p className="text-2xl font-black text-slate-900">{datosReporte.summary.totalUnidades}</p></div></div>
+                    <div className="flex items-center gap-4 p-5 bg-slate-50 border border-slate-200 rounded-2xl"><UserCheck size={32} className="text-slate-600" /><div><p className="text-xs text-slate-800 font-bold uppercase">Unidades Ocupadas</p><p className="text-2xl font-black text-slate-900">{datosReporte.summary.unidadesOcupadas}</p></div></div>
+                    <div className="flex items-center gap-4 p-5 bg-slate-50 border border-slate-200 rounded-2xl"><UserX size={32} className="text-slate-600" /><div><p className="text-xs text-slate-800 font-bold uppercase">Unidades Vacías</p><p className="text-2xl font-black text-slate-900">{datosReporte.summary.unidadesVacias}</p></div></div>
                   </section>
-
                   <section>
-                    <h3 className="text-sm font-black uppercase text-slate-800 mb-4 flex items-center gap-3"><div className="w-2 h-5 bg-sky-500 rounded-full"></div>Directorio General de Residentes</h3>
-                    <table>
-                      <thead><tr><th>Unidad</th><th>Titular</th><th>Cédula</th><th>Teléfono</th><th>Email</th><th>Estado</th></tr></thead>
-                      <tbody>
-                        {datosReporte.residentes.map(r => (
-                          <tr key={r.id}>
-                            <td className="font-bold">T{r.torre.slice(-1)}-{r.apartamento}</td>
-                            <td className="uppercase">{r.nombre}</td>
-                            <td>{r.cedula || 'N/A'}</td>
-                            <td>{r.telefono || 'N/A'}</td>
-                            <td className="lowercase">{r.email || 'N/A'}</td>
-                            <td><span className={`px-2 py-0.5 rounded-md text-xs font-black uppercase ${r.habita ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-500'}`}>{r.habita ? 'Residente' : 'Vacío'}</span></td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                    <h3 className="text-xs font-bold uppercase text-slate-600 mb-3 pb-2 border-b border-slate-200">Directorio de Residentes (Torres 5, 6, 7 y 8)</h3>
+                    <table><thead><tr><th>Unidad</th><th>Titular</th><th>Teléfono</th><th>Email</th><th>Estado</th></tr></thead><tbody>{datosReporte.residentes.map(r => (<tr key={r.id}><td className="font-bold">T{r.torre.slice(-1)}-{r.apartamento}</td><td className="uppercase">{r.nombre}</td><td>{r.telefono || 'N/A'}</td><td className="lowercase">{r.email || 'N/A'}</td><td><span className={`px-2 py-0.5 rounded-md text-xs font-black uppercase ${r.habita ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-500'}`}>{r.habita ? 'Residente' : 'Vacío'}</span></td></tr>))}</tbody></table>
                   </section>
                 </>
               )}
             </main>
-
-            {/* --- PIE DE PÁGINA ESTÁNDAR PARA TODOS LOS REPORTES --- */}
             <footer className="mt-32 pt-10 border-t-2 border-slate-900 grid grid-cols-2 gap-24">
               <div className="border-t-2 border-slate-400 pt-4 text-center"><p className="text-sm font-black uppercase text-slate-900">Firma Administración / Tesorería</p><p className="text-xs font-bold text-slate-400 mt-1 uppercase tracking-widest">Responsable del Recaudo</p></div>
               <div className="border-t-2 border-slate-400 pt-4 text-center"><p className="text-sm font-black uppercase text-slate-900">Firma Consejo de Admón / Revisoría</p><p className="text-xs font-bold text-slate-400 mt-1 uppercase tracking-widest">Función de Control Interno</p></div>
             </footer>
-             <div className="mt-20 text-center text-xs font-bold text-slate-300 uppercase tracking-[0.3em]">Fin del Reporte</div>
+            <div className="mt-20 text-center text-xs font-bold text-slate-300 uppercase tracking-[0.3em]">Fin del Reporte</div>
           </div>
         </div>
       )}
