@@ -1,9 +1,10 @@
 "use client";
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
+import { calcularValorDeudaHoy } from "@/lib/utils"; // Importamos la lógica central
 import {
-  Zap, History, Trash2, Eye, X, Loader2, Search,
-  CheckCircle2, PieChart, RefreshCw, Filter, Settings2
+  Zap, History, Trash2, Eye, X, Loader2, 
+  PieChart, RefreshCw, CheckCircle2
 } from "lucide-react";
 
 export default function Causacion() {
@@ -13,18 +14,15 @@ export default function Causacion() {
   const [loading, setLoading] = useState(true);
   const [generando, setGenerando] = useState(false);
 
-  // Estados de Auditoría
   const [showDetalles, setShowDetalles] = useState(false);
   const [causacionActiva, setCausacionActiva] = useState<any>(null);
   const [deudasDetalle, setDeudasDetalle] = useState<any[]>([]);
   const [loadingDetalle, setLoadingDetalle] = useState(false);
   const [busquedaDetalle, setBusquedaDetalle] = useState("");
 
-  // Estados de Filtros
   const [busquedaHistorial, setBusquedaHistorial] = useState("");
   const [filtroAnio, setFiltroAnio] = useState("TODOS");
 
-  // Estados del Formulario
   const [conceptoId, setConceptoId] = useState("");
   const [mesDeuda, setMesDeuda] = useState("");
   const [fechaLimite, setFechaLimite] = useState("");
@@ -36,7 +34,6 @@ export default function Causacion() {
     setLoading(true);
     const { data: cData } = await supabase.from("conceptos_pago").select("*");
     const { data: rData } = await supabase.from("residentes").select("*").neq("torre", "Torre 1");
-    // Traemos la nueva columna tipo_cobro
     const { data: hData } = await supabase.from("causaciones_globales").select("*").order('created_at', { ascending: false });
 
     if (cData) setConceptos(cData);
@@ -45,53 +42,10 @@ export default function Causacion() {
     setLoading(false);
   }
 
-  // --- NUEVA FUNCIÓN: CAMBIAR TIPO DE COBRO ---
   async function cambiarModo(id: number, nuevoModo: string) {
-    // Actualización optimista (Visual inmediata)
     setHistorial(prev => prev.map(h => h.id === id ? { ...h, tipo_cobro: nuevoModo } : h));
-
-    const { error } = await supabase
-      .from("causaciones_globales")
-      .update({ tipo_cobro: nuevoModo })
-      .eq("id", id);
-
-    if (error) {
-      alert("Error al actualizar");
-      cargarDatos();
-    }
+    await supabase.from("causaciones_globales").update({ tipo_cobro: nuevoModo }).eq("id", id);
   }
-
-  const calcularPrecioActual = (deuda: any) => {
-    const modo = causacionActiva?.tipo_cobro || 'NORMAL';
-    
-    // Mapeo de precios
-    const m1 = deuda.monto_original || 0; // Asumimos monto_original como M1 base
-    const m2 = deuda.precio_m2 || m1;
-    const m3 = deuda.precio_m3 || m1;
-    const pagado = m1 - (deuda.saldo_pendiente || 0); // Lo que ya abonó
-
-    // LÓGICA DE MODOS FORZADOS
-    if (modo === 'M1') return Math.max(0, m1 - pagado);
-    if (modo === 'M2') return Math.max(0, m2 - pagado);
-    if (modo === 'M3') return Math.max(0, m3 - pagado);
-
-    // LÓGICA NORMAL (AUTO)
-    if (!deuda.causaciones_globales?.mes_causado) return deuda.saldo_pendiente || 0;
-    
-    const [yC, mC] = deuda.causaciones_globales.mes_causado.split("-").map(Number);
-    const hoy = new Date();
-    const dia = hoy.getDate();
-    const mesAct = hoy.getMonth() + 1;
-    const anioAct = hoy.getFullYear();
-
-    let precio = m1;
-    if (anioAct > yC || (anioAct === yC && mesAct > mC)) precio = m3;
-    else {
-        if (dia > 10 && dia <= 20) precio = m2;
-        if (dia > 20) precio = m3;
-    }
-    return Math.max(0, precio - pagado);
-  };
 
   async function verDetalles(causacion: any) {
     setCausacionActiva(causacion);
@@ -109,29 +63,30 @@ export default function Causacion() {
   async function generarCausacion() {
     if (!conceptoId || !mesDeuda || !fechaLimite) return;
     const concepto = conceptos.find(c => c.id === parseInt(conceptoId));
-    if (!concepto || !confirm("¿Confirmar generación de cobros masivos?")) return;
+    if (!concepto || !confirm(`¿Generar cobros de ${concepto.nombre} para ${residentesAfectados.length} unidades?`)) return;
 
     setGenerando(true);
     try {
+      // 1. Crear el lote global
       const { data: lote, error: errLote } = await supabase.from("causaciones_globales").insert([{
         mes_causado: mesDeuda,
-        concepto_nombre: concepto.nombre,
+        concepto_nombre: concepto.nombre.trim().toUpperCase(),
         total_residentes: residentesAfectados.length,
         fecha_limite: fechaLimite,
-        tipo_cobro: 'NORMAL' // Por defecto nace en modo Automático
+        tipo_cobro: 'NORMAL'
       }]).select().single();
 
       if (errLote) throw errLote;
 
+      // 2. Preparar deudas individuales
       const deudas = residentesAfectados.map(res => {
         let factor = 1;
-        const nombreConcepto = concepto.nombre.toUpperCase();
+        const nombreC = concepto.nombre.toUpperCase();
 
         if (concepto.cobro_por_vehiculo) {
-          if (nombreConcepto.includes("CARRO")) factor = Number(res.carros) || 0;
-          else if (nombreConcepto.includes("MOTO")) factor = Number(res.motos) || 0;
-          else if (nombreConcepto.includes("BICI")) factor = Number(res.bicis) || 0;
-          else factor = 1;
+          if (nombreC.includes("CARRO")) factor = Number(res.carros) || 0;
+          else if (nombreC.includes("MOTO")) factor = Number(res.motos) || 0;
+          else if (nombreC.includes("BICI")) factor = Number(res.bicis) || 0;
         }
 
         if (factor === 0) return null;
@@ -141,8 +96,8 @@ export default function Causacion() {
         return {
           causacion_id: lote.id,
           residente_id: res.id,
-          unidad: `${res.torre.replace("Torre ", "")}-${res.apartamento}`,
-          concepto_nombre: concepto.nombre,
+          unidad: `T${res.torre.slice(-1)}-${res.apartamento}`,
+          concepto_nombre: nombreC, // Guardado blindado
           monto_original: montoBase,
           precio_m1: montoBase,
           precio_m2: (Number(concepto.monto_11_20) || montoBase) * factor,
@@ -150,18 +105,16 @@ export default function Causacion() {
           saldo_pendiente: montoBase,
           fecha_vencimiento: fechaLimite
         };
-      }).filter(d => d !== null && d.monto_original > 0);
+      }).filter(d => d !== null);
 
       if (deudas.length > 0) {
-        const { error: errIns } = await supabase.from("deudas_residentes").insert(deudas);
-        if (errIns) throw errIns;
+        await supabase.from("deudas_residentes").insert(deudas);
       }
 
       await cargarDatos();
       setConceptoId("");
-      alert("¡Causación generada correctamente!");
+      alert("¡Proceso finalizado con éxito!");
     } catch (err: any) {
-      console.error(err);
       alert("Error: " + err.message);
     } finally {
       setGenerando(false);
@@ -170,9 +123,9 @@ export default function Causacion() {
 
   const residentesAfectados = residentes.filter(r => {
     if (filtroTipo === "TODOS") return true;
-    if (filtroTipo === "CARRO") return r.carros > 0;
-    if (filtroTipo === "MOTO") return r.motos > 0;
-    if (filtroTipo === "BICI") return r.bicis > 0;
+    if (filtroTipo === "CARRO") return (r.carros || 0) > 0;
+    if (filtroTipo === "MOTO") return (r.motos || 0) > 0;
+    if (filtroTipo === "BICI") return (r.bicis || 0) > 0;
     return false;
   });
 
@@ -187,184 +140,118 @@ export default function Causacion() {
     d.unidad?.includes(busquedaDetalle) || d.residentes?.nombre?.toLowerCase().includes(busquedaDetalle.toLowerCase())
   );
 
-  const aniosUnicos = Array.from(new Set(historial.map(h => h.mes_causado.split("-")[0]))).sort().reverse();
-
-  if (loading) return <div className="flex h-96 items-center justify-center"><Loader2 className="animate-spin text-slate-400" size={30} /></div>;
-
   return (
     <div className="max-w-6xl mx-auto space-y-8 pb-20 px-2 md:px-0">
 
-      {/* 1. MÓDULO DE ACCIÓN */}
+      {/* GENERADOR DE COBROS */}
       <section className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
         <div className="bg-slate-50 px-6 py-4 border-b border-slate-200 flex justify-between items-center">
           <h2 className="text-slate-800 font-bold text-sm uppercase tracking-widest flex items-center gap-2">
-            <Zap size={14} className="text-emerald-500" /> Nuevo Proceso de Cobro
+            <Zap size={14} className="text-emerald-500" /> Generar Facturación Masiva
           </h2>
           <span className="bg-white px-3 py-1 rounded-lg border border-slate-200 text-[10px] font-bold text-slate-500 uppercase">
-            Meta: {residentesAfectados.length} Unidades
+            {residentesAfectados.length} Unidades en filtro
           </span>
         </div>
 
         <div className="p-6 grid grid-cols-1 md:grid-cols-4 gap-4 items-center">
-          <select className="bg-slate-50 border border-slate-200 p-3 rounded-lg text-sm font-medium focus:border-emerald-500 outline-none" value={conceptoId} onChange={(e) => setConceptoId(e.target.value)}>
-            <option value="">Elegir Concepto...</option>
+          <select className="bg-slate-50 border p-3 rounded-lg text-sm font-bold outline-none" value={conceptoId} onChange={(e) => setConceptoId(e.target.value)}>
+            <option value="">Seleccionar concepto...</option>
             {conceptos.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
           </select>
-          <input type="month" className="bg-slate-50 border border-slate-200 p-3 rounded-lg text-sm font-medium focus:border-emerald-500 outline-none" onChange={(e) => setMesDeuda(e.target.value)} />
-          <input type="date" className="bg-slate-50 border border-slate-200 p-3 rounded-lg text-sm font-medium focus:border-emerald-500 outline-none" onChange={(e) => setFechaLimite(e.target.value)} />
+          <input type="month" className="bg-slate-50 border p-3 rounded-lg text-sm font-bold outline-none" onChange={(e) => setMesDeuda(e.target.value)} />
+          <input type="date" className="bg-slate-50 border p-3 rounded-lg text-sm font-bold outline-none" onChange={(e) => setFechaLimite(e.target.value)} />
 
-          <button
-            onClick={generarCausacion}
-            disabled={generando || !conceptoId}
-            className="h-full bg-slate-900 text-white p-3 rounded-lg font-bold text-xs uppercase tracking-widest hover:bg-black transition-all flex items-center justify-center gap-2"
-          >
-            {generando ? <Loader2 className="animate-spin" size={14} /> : <><CheckCircle2 size={14} /> Procesar</>}
+          <button onClick={generarCausacion} disabled={generando || !conceptoId} className="h-full bg-slate-900 text-white p-3 rounded-lg font-black text-[10px] uppercase tracking-widest hover:bg-black transition-all flex items-center justify-center gap-2">
+            {generando ? <Loader2 className="animate-spin" size={14} /> : "PROCESAR COBROS"}
           </button>
         </div>
 
         <div className="px-6 pb-6 flex gap-2 overflow-x-auto no-scrollbar">
           {['TODOS', 'CARRO', 'MOTO', 'BICI'].map(f => (
-            <button key={f} onClick={() => setFiltroTipo(f)} className={`px-4 py-1.5 rounded-full text-[9px] font-black uppercase transition-all ${filtroTipo === f ? "bg-emerald-100 text-emerald-700 border-emerald-200" : "bg-white border border-slate-200 text-slate-400"}`}>
-              Filtro: {f}
+            <button key={f} onClick={() => setFiltroTipo(f)} className={`px-4 py-1.5 rounded-full text-[9px] font-black uppercase transition-all ${filtroTipo === f ? "bg-emerald-600 text-white shadow-md" : "bg-white border border-slate-200 text-slate-400"}`}>
+              {f}
             </button>
           ))}
         </div>
       </section>
 
-      {/* 2. HISTORIAL CON BOTONES DE MODO */}
-      <section className="space-y-4">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <History size={18} className="text-slate-400" />
-            <h2 className="text-slate-800 font-bold text-base uppercase tracking-widest">Archivo de Causaciones</h2>
-          </div>
-
-          <div className="flex gap-2">
-            <select className="bg-white border border-slate-200 px-2 py-2 rounded-lg text-[9px] font-black uppercase outline-none" value={filtroAnio} onChange={(e) => setFiltroAnio(e.target.value)}>
-              <option value="TODOS">Año</option>
-              {aniosUnicos.map(a => <option key={a} value={a}>{a}</option>)}
-            </select>
-            <button onClick={cargarDatos} className="p-2 border border-slate-200 rounded-lg text-slate-400 hover:text-emerald-500"><RefreshCw size={14} /></button>
-          </div>
-        </div>
-
-        <div className="bg-white border border-slate-200 rounded-xl overflow-x-auto shadow-sm">
+      {/* ARCHIVO HISTÓRICO */}
+      <section className="bg-white border border-slate-200 rounded-xl overflow-x-auto shadow-sm">
           <table className="w-full text-left text-sm">
-            <thead className="bg-slate-50 border-b border-slate-200 text-slate-400 font-bold text-[10px] uppercase">
+            <thead className="bg-slate-50 border-b text-slate-400 font-bold text-[10px] uppercase">
               <tr>
-                <th className="px-6 py-4">Mes Periodo</th>
+                <th className="px-6 py-4">Mes</th>
                 <th className="px-6 py-4">Concepto</th>
                 <th className="px-6 py-4 text-center">Unidades</th>
-                <th className="px-6 py-4 text-center">Regla de Cobro (Tarifa)</th>
-                <th className="px-6 py-4 text-right">Acciones</th>
+                <th className="px-6 py-4 text-center">Tarifa Activa</th>
+                <th className="px-6 py-4 text-right">Acción</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {historialFiltrado.map(h => (
-                <tr key={h.id} className="hover:bg-slate-50 transition-colors group">
-                  <td className="px-6 py-4 font-black text-slate-900">{h.mes_causado}</td>
-                  <td className="px-6 py-4 uppercase text-xs text-slate-500">{h.concepto_nombre}</td>
-                  <td className="px-6 py-4 text-center text-slate-400 font-medium">{h.total_residentes}</td>
-                  
-                  {/* --- BOTONES DE CONTROL DE PRECIO --- */}
+                <tr key={h.id} className="hover:bg-slate-50 transition-colors">
+                  <td className="px-6 py-4 font-black">{h.mes_causado}</td>
+                  <td className="px-6 py-4 uppercase text-xs font-bold text-slate-500">{h.concepto_nombre}</td>
+                  <td className="px-6 py-4 text-center font-bold text-slate-400">{h.total_residentes}</td>
                   <td className="px-6 py-4">
                     <div className="flex justify-center gap-1 bg-slate-100 p-1 rounded-lg w-fit mx-auto">
                         {['M1', 'M2', 'M3', 'NORMAL'].map((m) => {
                             const active = (h.tipo_cobro || 'NORMAL') === m;
                             return (
-                                <button
-                                    key={m}
-                                    onClick={() => cambiarModo(h.id, m)}
-                                    className={`
-                                        px-3 py-1 rounded-md text-[8px] font-black transition-all
-                                        ${active 
-                                            ? (m === 'NORMAL' ? "bg-slate-800 text-white" : m === 'M1' ? "bg-emerald-500 text-white" : m === 'M2' ? "bg-blue-500 text-white" : "bg-rose-500 text-white")
-                                            : "text-slate-400 hover:bg-white"
-                                        }
-                                    `}
-                                >
+                                <button key={m} onClick={() => cambiarModo(h.id, m)} className={`px-2 py-1 rounded text-[8px] font-black transition-all ${active ? "bg-slate-800 text-white shadow-sm" : "text-slate-400"}`}>
                                     {m === 'NORMAL' ? 'AUTO' : m}
                                 </button>
                             );
                         })}
                     </div>
                   </td>
-
                   <td className="px-6 py-4 text-right">
-                    <div className="flex justify-end gap-3">
-                        <button onClick={() => verDetalles(h)} className="p-2 bg-slate-50 border border-slate-100 rounded-lg text-slate-400 hover:text-emerald-500"><Eye size={18} /></button>
-                        <button onClick={async () => { if (confirm("¿Eliminar lote?")) { await supabase.from("causaciones_globales").delete().eq("id", h.id); cargarDatos(); } }} className="p-2 bg-slate-50 border border-slate-100 rounded-lg text-slate-400 hover:text-rose-500"><Trash2 size={18} /></button>
+                    <div className="flex justify-end gap-2">
+                        <button onClick={() => verDetalles(h)} className="p-2 bg-slate-100 rounded-lg text-slate-400 hover:text-emerald-600 transition-colors"><Eye size={18} /></button>
+                        <button onClick={async () => { if (confirm("¿Borrar lote?")) { await supabase.from("causaciones_globales").delete().eq("id", h.id); cargarDatos(); } }} className="p-2 bg-slate-100 rounded-lg text-slate-300 hover:text-rose-500 transition-colors"><Trash2 size={18} /></button>
                     </div>
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
-        </div>
       </section>
 
-      {/* MODAL DETALLES... (El mismo de antes) */}
+      {/* MODAL AUDITORÍA */}
       {showDetalles && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[300] flex flex-col items-center justify-end md:justify-center">
-          <div className="bg-white w-full max-w-5xl md:h-[80vh] md:rounded-2xl rounded-t-3xl shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-bottom duration-300">
-            <div className="p-6 border-b border-slate-100 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-emerald-100 text-emerald-600 rounded-xl flex items-center justify-center"><PieChart size={20} /></div>
-                    <div>
-                        <h3 className="font-black text-slate-900 text-lg uppercase tracking-tighter">Auditoría en Tiempo Real</h3>
-                        <p className="text-[10px] text-slate-400 uppercase font-bold tracking-widest flex items-center gap-2">
-                            {causacionActiva?.mes_causado} • MODO: {causacionActiva?.tipo_cobro || 'NORMAL'}
-                        </p>
-                    </div>
-                </div>
-                <button onClick={() => setShowDetalles(false)} className="p-3 bg-slate-100 text-slate-400 rounded-xl hover:text-slate-600"><X /></button>
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[300] flex flex-col items-center justify-center p-4">
+          <div className="bg-white w-full max-w-5xl h-[85vh] rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95">
+            <div className="p-6 border-b flex items-center justify-between">
+                <h3 className="font-black text-slate-900 uppercase italic">Auditoría: {causacionActiva?.concepto_nombre} ({causacionActiva?.mes_causado})</h3>
+                <button onClick={() => setShowDetalles(false)} className="p-2 hover:bg-slate-100 rounded-xl"><X /></button>
             </div>
-            {/* ... Resto del modal sigue igual ... */}
-            <div className="p-4 bg-slate-50/50 flex gap-4 overflow-x-auto no-scrollbar border-b border-slate-100">
-              <div className="bg-white p-3 rounded-xl border border-slate-200 flex-1 min-w-[120px]">
-                <p className="text-[8px] font-bold text-slate-400 uppercase">Recaudado</p>
-                <span className="font-black text-emerald-600 text-sm">${deudasDetalle.reduce((acc, d) => acc + ((d.monto_original || 0) - (d.saldo_pendiente || 0)), 0).toLocaleString()}</span>
-              </div>
-              <div className="bg-white p-3 rounded-xl border border-slate-200 flex-1 min-w-[120px]">
-                <p className="text-[8px] font-bold text-slate-400 uppercase">Pendiente</p>
-                <span className="font-black text-rose-500 text-sm">
-                  ${deudasDetalle.reduce((acc, d) => {
-                    const yaPagado = (d.precio_m1 || 0) - (d.saldo_pendiente || 0);
-                    const actual = calcularPrecioActual(d);
-                    return acc + Math.max(0, actual - yaPagado);
-                  }, 0).toLocaleString()}
-                </span>
-              </div>
-              <div className="bg-slate-900 p-3 rounded-xl flex-1 min-w-[120px]">
-                <input placeholder="Busca Apto..." className="bg-transparent border-none text-white text-xs w-full focus:outline-none" onChange={(e) => setBusquedaDetalle(e.target.value)} />
+            
+            <div className="p-4 bg-slate-50 border-b flex gap-4 overflow-x-auto">
+              <input placeholder="Buscar apto..." className="bg-white border border-slate-200 p-3 rounded-xl text-xs font-bold w-full max-w-xs" onChange={(e) => setBusquedaDetalle(e.target.value)} />
+              <div className="flex-1 text-right flex items-center justify-end gap-4">
+                  <div>
+                    <p className="text-[8px] font-black text-slate-400 uppercase">Total Recaudado</p>
+                    <span className="font-black text-emerald-600 text-sm">${deudasDetalle.reduce((acc, d) => acc + (Number(d.monto_original) - Number(d.saldo_pendiente)), 0).toLocaleString()}</span>
+                  </div>
               </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-4 space-y-2 bg-[#F8FAFC]">
-              {loadingDetalle ? <Loader2 className="animate-spin mx-auto mt-20 text-slate-300" /> : deudasFiltradas.map(d => {
-                const pagado = d.saldo_pendiente === 0;
-                return (
-                  <div key={d.id} className="bg-white border border-slate-200 p-4 rounded-xl flex items-center justify-between hover:border-emerald-300 transition-colors">
-                    <div className="flex items-center gap-4">
-                      <span className={`w-10 h-10 rounded-lg flex items-center justify-center font-black text-xs ${pagado ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-100 text-slate-400'}`}>{d.unidad}</span>
-                      <div>
-                        <p className="font-bold text-xs text-slate-900 uppercase truncate max-w-[150px]">{d.residentes?.nombre}</p>
-                        <p className={`text-[9px] font-bold uppercase tracking-widest ${pagado ? 'text-emerald-500' : 'text-rose-400'}`}>{pagado ? 'Al día' : 'Pendiente'}</p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-[10px] font-black text-slate-900 tracking-tighter tabular-nums">
-                        ${(() => {
-                          const yaPagado = (d.precio_m1 || 0) - (d.saldo_pendiente || 0);
-                          const actual = calcularPrecioActual(d);
-                          return Math.max(0, actual - yaPagado);
-                        })().toLocaleString()}
-                      </p>
-                      {!pagado && <p className="text-[7px] font-bold text-slate-300 uppercase tracking-widest mt-1">Saldo</p>}
-                    </div>
+            <div className="flex-1 overflow-y-auto p-4 space-y-2 bg-slate-50/50">
+              {loadingDetalle ? <Loader2 className="animate-spin mx-auto mt-20" /> : deudasFiltradas.map(d => (
+                <div key={d.id} className="bg-white border p-4 rounded-xl flex items-center justify-between hover:shadow-md transition-shadow">
+                  <div className="flex items-center gap-4">
+                    <span className="w-10 h-10 bg-slate-900 text-white rounded-lg flex items-center justify-center font-black text-xs">{d.unidad}</span>
+                    <p className="font-bold text-xs uppercase text-slate-700">{d.residentes?.nombre}</p>
                   </div>
-                )
-              })}
+                  <div className="text-right">
+                    <p className={`text-[10px] font-black tabular-nums ${d.saldo_pendiente === 0 ? 'text-emerald-500' : 'text-rose-600'}`}>
+                      ${calcularValorDeudaHoy(d).toLocaleString()}
+                    </p>
+                    <p className="text-[7px] font-black text-slate-300 uppercase">{d.saldo_pendiente === 0 ? 'Pagado' : 'Pendiente'}</p>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         </div>

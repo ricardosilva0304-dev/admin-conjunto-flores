@@ -2,8 +2,8 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import { 
-  Plus, Trash2, Edit, X, Loader2, 
-  Percent, Info, Settings, MoreVertical 
+  Plus, Edit, X, Loader2, 
+  Percent, Settings 
 } from "lucide-react";
 
 export default function Configuracion() {
@@ -28,12 +28,22 @@ export default function Configuracion() {
     finally { setLoading(false); }
   }
 
+  // Función para guardar la tasa de mora sin saturar la DB
+  async function actualizarTasaMora(valor: string) {
+    setTasaMora(valor);
+    const num = parseFloat(valor);
+    if (isNaN(num)) return;
+    
+    // Actualización silenciosa en Supabase
+    await supabase.from("configuracion_global").update({ tasa_mora: num }).eq("id", 1);
+  }
+
   async function guardarConcepto(e: React.FormEvent) {
     e.preventDefault();
     if (!nuevo.nombre || !nuevo.m1) return;
 
     const datos = {
-      nombre: nuevo.nombre.toUpperCase(),
+      nombre: nuevo.nombre.trim().toUpperCase(), // Limpieza de espacios
       cobro_por_vehiculo: nuevo.porVehiculo === "Si",
       monto_1_10: parseFloat(nuevo.m1),
       monto_11_20: parseFloat(nuevo.m2 || nuevo.m1),
@@ -56,41 +66,40 @@ export default function Configuracion() {
   return (
     <div className="max-w-5xl mx-auto space-y-6 pb-20 font-sans">
       
-      {/* 1. HEADER SECCIÓN */}
+      {/* HEADER SECCIÓN */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-6 rounded-xl border border-slate-200">
         <div>
            <h1 className="text-slate-800 text-xl font-bold flex items-center gap-2">
              <Settings size={18} className="text-slate-400" />
              PARÁMETROS FINANCIEROS
            </h1>
-           <p className="text-slate-400 text-xs mt-1 uppercase tracking-widest font-medium">Control de tarifas y recargos</p>
+           <p className="text-slate-400 text-xs mt-1 uppercase tracking-widest font-medium">Configuración de tarifas base</p>
         </div>
         <button 
           onClick={() => { setEditandoId(null); setNuevo({nombre:"", porVehiculo:"No", m1:"", m2:"", m3:""}); setShowModal(true); }}
-          className="w-full sm:w-auto bg-slate-900 text-white px-5 py-3 rounded-lg text-xs font-black tracking-widest hover:bg-black transition-all flex items-center justify-center gap-2 active:scale-95"
+          className="w-full sm:w-auto bg-slate-900 text-white px-5 py-3 rounded-lg text-xs font-black tracking-widest hover:bg-black transition-all flex items-center justify-center gap-2 active:scale-95 shadow-lg shadow-slate-900/20"
         >
           <Plus size={16} /> NUEVO CONCEPTO
         </button>
       </div>
 
-      {/* 2. CATÁLOGO DE CONCEPTOS */}
+      {/* CATÁLOGO DE CONCEPTOS */}
       <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
         <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
           <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Servicios y Cobranza</span>
           <span className="text-[10px] font-bold text-slate-500">{conceptos.length} Items configurados</span>
         </div>
 
-        {/* VISTA DESKTOP: TABLA LIMPIA */}
-        <div className="hidden md:block overflow-x-auto">
+        <div className="overflow-x-auto">
           <table className="w-full text-left">
             <thead>
               <tr className="text-slate-400 text-[10px] font-bold uppercase border-b border-slate-100 bg-slate-50/20">
                 <th className="px-6 py-4">Concepto</th>
-                <th className="px-6 py-4">Filtro</th>
+                <th className="px-6 py-4">Modo Cobro</th>
                 <th className="px-6 py-4 text-center">Tramo 1-10</th>
                 <th className="px-6 py-4 text-center">Tramo 11-20</th>
                 <th className="px-6 py-4 text-center">Tramo 21+</th>
-                <th className="px-6 py-4 text-right">Editar</th>
+                <th className="px-6 py-4 text-right">Acción</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-sm">
@@ -99,14 +108,14 @@ export default function Configuracion() {
                   <td className="px-6 py-4 font-bold text-slate-700">{c.nombre}</td>
                   <td className="px-6 py-4">
                      <span className={`text-[9px] px-2 py-1 rounded font-black ${c.cobro_por_vehiculo ? "bg-blue-50 text-blue-600" : "bg-slate-100 text-slate-400"}`}>
-                       {c.cobro_por_vehiculo ? "C. VARIABLE" : "C. FIJO"}
+                       {c.cobro_por_vehiculo ? "POR VEHÍCULO" : "VALOR FIJO"}
                      </span>
                   </td>
                   <td className="px-6 py-4 text-center font-medium text-emerald-600 tabular-nums">${Number(c.monto_1_10).toLocaleString()}</td>
                   <td className="px-6 py-4 text-center font-medium text-slate-500 tabular-nums">${Number(c.monto_11_20).toLocaleString()}</td>
                   <td className="px-6 py-4 text-center font-medium text-rose-500 tabular-nums">${Number(c.monto_21_adelante).toLocaleString()}</td>
                   <td className="px-6 py-4 text-right">
-                    <button onClick={() => { setEditandoId(c.id); setNuevo({nombre:c.nombre, porVehiculo: c.cobro_por_vehiculo ? "Si" : "No", m1:c.monto_1_10.toString(), m2:c.monto_11_20.toString(), m3:c.monto_21_adelante.toString()}); setShowModal(true); }} className="p-2 text-slate-400 hover:text-emerald-500 transition-colors">
+                    <button onClick={() => { setEditandoId(c.id); setNuevo({nombre:c.nombre, porVehiculo: c.cobro_por_vehiculo ? "Si" : "No", m1:c.monto_1_10.toString(), m2:c.monto_11_20.toString(), m3:c.monto_21_adelante.toString()}); setShowModal(true); }} className="p-2 text-slate-300 hover:text-emerald-500 transition-colors">
                       <Edit size={16} />
                     </button>
                   </td>
@@ -115,38 +124,9 @@ export default function Configuracion() {
             </tbody>
           </table>
         </div>
-
-        {/* VISTA MÓVIL: TARJETAS CÓMODAS */}
-        <div className="md:hidden divide-y divide-slate-100 bg-[#F8FAFC]">
-           {conceptos.map((c) => (
-              <div key={c.id} className="p-5 flex flex-col gap-4 bg-white">
-                 <div className="flex justify-between items-start">
-                    <div>
-                       <p className="font-black text-slate-900 leading-tight">{c.nombre}</p>
-                       <p className="text-[10px] text-slate-400 mt-1 uppercase font-bold tracking-wider">{c.cobro_por_vehiculo ? "Por unidad de vehículo" : "Monto único fijo"}</p>
-                    </div>
-                    <button onClick={() => { setEditandoId(c.id); setNuevo({nombre:c.nombre, porVehiculo: c.cobro_por_vehiculo ? "Si" : "No", m1:c.monto_1_10.toString(), m2:c.monto_11_20.toString(), m3:c.monto_21_adelante.toString()}); setShowModal(true); }} className="p-3 bg-slate-50 rounded-lg"><Edit size={16}/></button>
-                 </div>
-                 <div className="grid grid-cols-3 gap-2">
-                    <div className="p-2 bg-emerald-50 rounded-lg text-center border border-emerald-100">
-                       <span className="text-[8px] text-emerald-500 font-black block">1-10</span>
-                       <span className="text-xs font-black text-emerald-700 tabular-nums">${Number(c.monto_1_10).toLocaleString()}</span>
-                    </div>
-                    <div className="p-2 bg-slate-50 rounded-lg text-center border border-slate-100">
-                       <span className="text-[8px] text-slate-400 font-black block">11-20</span>
-                       <span className="text-xs font-black text-slate-700 tabular-nums">${Number(c.monto_11_20).toLocaleString()}</span>
-                    </div>
-                    <div className="p-2 bg-rose-50 rounded-lg text-center border border-rose-100">
-                       <span className="text-[8px] text-rose-400 font-black block">21+</span>
-                       <span className="text-xs font-black text-rose-700 tabular-nums">${Number(c.monto_21_adelante).toLocaleString()}</span>
-                    </div>
-                 </div>
-              </div>
-           ))}
-        </div>
       </div>
 
-      {/* 3. TASA DE MORA */}
+      {/* TASA DE MORA */}
       <section className="bg-white p-8 rounded-xl border border-slate-200 flex flex-col md:flex-row items-center gap-10">
           <div className="flex-1 space-y-2">
             <h3 className="text-slate-900 font-bold flex items-center gap-2">
@@ -159,13 +139,14 @@ export default function Configuracion() {
             <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 font-bold">%</span>
             <input 
               type="number" step="0.1" value={tasaMora}
-              onChange={async (e) => { setTasaMora(e.target.value); await supabase.from("configuracion_global").update({ tasa_mora: parseFloat(e.target.value) }).eq("id", 1); }}
+              onBlur={(e) => actualizarTasaMora(e.target.value)}
+              onChange={(e) => setTasaMora(e.target.value)}
               className="w-full bg-slate-50 border-2 border-slate-100 p-4 rounded-xl font-black text-xl text-center outline-none focus:border-amber-400 focus:bg-white transition-all tabular-nums"
             />
           </div>
       </section>
 
-      {/* MODAL CONFIG (FULL RESPONSIVE) */}
+      {/* MODAL CONFIG */}
       {showModal && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-2 z-[110] animate-in fade-in duration-200">
           <div className="bg-white w-full max-w-lg md:rounded-2xl rounded-t-2xl shadow-2xl flex flex-col animate-in zoom-in-95 duration-200">
@@ -181,7 +162,7 @@ export default function Configuracion() {
               <div className="space-y-5">
                 <div>
                   <label className="text-slate-400 text-[9px] font-black uppercase tracking-[0.2em] ml-1">Nombre Concepto</label>
-                  <input className="w-full bg-slate-50 border border-slate-100 p-4 rounded-xl outline-none focus:ring-4 ring-emerald-500/5 font-bold uppercase" value={nuevo.nombre} onChange={(e)=>setNuevo({...nuevo, nombre: e.target.value})} required placeholder="ADMINISTRACIÓN" />
+                  <input className="w-full bg-slate-50 border border-slate-100 p-4 rounded-xl outline-none focus:ring-4 ring-emerald-500/5 font-bold uppercase" value={nuevo.nombre} onChange={(e)=>setNuevo({...nuevo, nombre: e.target.value})} required placeholder="EJ: ADMINISTRACIÓN" />
                 </div>
 
                 <div>

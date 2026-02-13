@@ -2,9 +2,10 @@
 import { useState, useEffect, useMemo } from "react";
 import { supabase } from "@/lib/supabase";
 import ReciboCaja from "./ReciboCaja";
+import { calcularValorDeudaHoy } from "@/lib/utils"; // Importamos lógica central
 import {
   Search, User, Wallet, Loader2, X, Receipt,
-  Landmark, Banknote, Info, Hash, CheckCircle2, ChevronRight
+  Landmark, Banknote, ChevronRight
 } from "lucide-react";
 
 export default function Ingresos() {
@@ -38,13 +39,14 @@ export default function Ingresos() {
     const { data } = await supabase
       .from("pagos")
       .select("numero_recibo")
-      .order("created_at", { ascending: false })
-      .limit(1);
+      .order("created_at", { ascending: false }) // Buscamos por creación para eficiencia
+      .limit(10); // Miramos los últimos 10 por si hay huecos
 
     if (data && data.length > 0) {
-      const ultimo = data[0].numero_recibo.replace(/\D/g, "");
-      const siguiente = (parseInt(ultimo) || 0) + 1;
-      setFormRecibo(prev => ({ ...prev, numero: siguiente.toString() }));
+       // Extraemos solo los números y buscamos el máximo real
+       const numeros = data.map(p => parseInt(p.numero_recibo.replace(/\D/g, "")) || 0);
+       const maximo = Math.max(...numeros);
+       setFormRecibo(prev => ({ ...prev, numero: (maximo + 1).toString() }));
     } else {
       setFormRecibo(prev => ({ ...prev, numero: "1" }));
     }
@@ -55,7 +57,10 @@ export default function Ingresos() {
     setBusqueda("");
     const { data } = await supabase
       .from("deudas_residentes")
-      .select("*, causaciones_globales(mes_causado, concepto_nombre, tipo_cobro)")
+      .select(`
+        *, 
+        causaciones_globales(id, mes_causado, concepto_nombre, tipo_cobro)
+      `)
       .eq("residente_id", res.id)
       .neq("saldo_pendiente", 0);
 
@@ -68,99 +73,83 @@ export default function Ingresos() {
     await sugerirSiguienteRecibo();
   }
 
-  const calcularSaldoRealHoy = (d: any) => {
-    if (!d.causaciones_globales) return d.saldo_pendiente || 0;
-
-    const m1 = d.precio_m1 || d.monto_original || 0;
-    const m2 = d.precio_m2 || m1;
-    const m3 = d.precio_m3 || m1;
-    const pagadoYa = m1 - (d.saldo_pendiente || 0);
-
-    const modo = d.causaciones_globales.tipo_cobro || 'NORMAL';
-    let precioTarifa = m1;
-
-    if (modo === 'M1') precioTarifa = m1;
-    else if (modo === 'M2') precioTarifa = m2;
-    else if (modo === 'M3') precioTarifa = m3;
-    else {
-      const hoy = new Date();
-      const dia = hoy.getDate();
-      const mesAct = hoy.getMonth() + 1;
-      const anioAct = hoy.getFullYear();
-      const [yC, mC] = d.causaciones_globales.mes_causado.split("-").map(Number);
-
-      if (anioAct > yC || (anioAct === yC && mesAct > mC)) precioTarifa = m3;
-      else if (dia > 10 && dia <= 20) precioTarifa = m2;
-      else if (dia > 20) precioTarifa = m3;
-    }
-
-    return precioTarifa - pagadoYa;
-  };
+  // --- CÁLCULO DE SALDO GLOBAL REAL ---
+  const totalDeudaAcumulada = useMemo(() => {
+    return deudas.reduce((acc, d) => acc + calcularValorDeudaHoy(d), 0);
+  }, [deudas]);
 
   const totalAPagarRecibo = deudas.reduce((acc, d) => acc + (Number(abonos[d.id]) || 0), 0);
 
-  // Cálculo acumulado de toda la cuenta del residente
-  const totalDeudaAcumulada = useMemo(() => {
-    return deudas.reduce((acc, d) => {
-      // IMPORTANTE: Sumamos el valor real de cada fila de deuda
-      return acc + calcularSaldoRealHoy(d);
-    }, 0);
-  }, [deudas]);
-
   async function procesarPago() {
-    if (totalAPagarRecibo <= 0 || !formRecibo.numero) return alert("Verifica montos.");
+    if (totalAPagarRecibo <= 0 || !formRecibo.numero) return alert("Verifica montos y número de recibo.");
+    
     setProcesando(true);
-
     try {
-      // Este es el valor clave: Lo que debía el residente el segundo exacto antes de pagar
+      // 1. VALIDAR DUPLICADO ANTES DE EMPEZAR
+      const { data: existe } = await supabase
+        .from("pagos")
+        .select("numero_recibo")
+        .eq("numero_recibo", formRecibo.numero)
+        .single();
+
+      if (existe) {
+        alert("⚠️ Este número de recibo ya existe. Por favor usa el siguiente.");
+        await sugerirSiguienteRecibo();
+        setProcesando(false);
+        return;
+      }
+
+      // 2. CAPTURAR EL SALDO ANTES DE ACTUALIZAR
       const saldoGlobalAntesDelPago = totalDeudaAcumulada;
+      
+      const mesesNombres = ["ENERO", "FEBRERO", "MARZO", "ABRIL", "MAYO", "JUNIO", "JULIO", "AGOSTO", "SEPTIEMBRE", "OCTUBRE", "NOVIEMBRE", "DICIEMBRE"];
+
+      // 3. CONSTRUCCIÓN BLINDADA DEL CONCEPTO
       const conceptoTextoParaDB = deudas
-        .filter(d => Number(abonos[d.id]) !== 0) // Solo tomamos deudas donde se abonó algo
+        .filter(d => Number(abonos[d.id]) !== 0)
         .map(d => {
           const montoInd = Number(abonos[d.id]).toLocaleString('es-CO');
-
-          // CORRECCIÓN AQUÍ: 
-          // Priorizamos el nombre específico de la deuda que viene de la causación
-          const nombreC = d.concepto_nombre || d.causaciones_globales?.concepto_nombre || "CONCEPTO";
+          // PRIORIDAD: Causación Global -> Deuda Local -> Default
+          const nombreC = d.causaciones_globales?.concepto_nombre || d.concepto_nombre || "ADMINISTRACIÓN";
 
           let periodo = "";
-          if (d.causaciones_globales?.mes_causado || d.fecha_vencimiento) {
-            const fechaBase = d.causaciones_globales?.mes_causado || d.fecha_vencimiento;
-            const [anio, mes] = fechaBase.split("-");
-            const mesesNombres = ["ENERO", "FEBRERO", "MARZO", "ABRIL", "MAYO", "JUNIO", "JULIO", "AGOSTO", "SEPTIEMBRE", "OCTUBRE", "NOVIEMBRE", "DICIEMBRE"];
+          const fechaRef = d.causaciones_globales?.mes_causado || d.fecha_vencimiento?.substring(0, 7);
+          if (fechaRef) {
+            const [anio, mes] = fechaRef.split("-");
             periodo = ` (${mesesNombres[parseInt(mes) - 1]} ${anio})`;
           }
-
           return `${nombreC}${periodo}|$${montoInd}`;
         }).join("||");
 
+      // 4. GUARDAR EL PAGO
       const { error: errP } = await supabase.from("pagos").insert([{
         residente_id: resSeleccionado.id,
-        unidad: `${resSeleccionado.torre.replace("Torre ", "T")}-${resSeleccionado.apartamento}`,
+        unidad: `T${resSeleccionado.torre.slice(-1)}-${resSeleccionado.apartamento}`,
         numero_recibo: formRecibo.numero,
         monto_total: totalAPagarRecibo,
         fecha_pago: formRecibo.fecha,
         metodo_pago: formRecibo.metodo,
         comprobante: formRecibo.referencia.toUpperCase(),
         concepto_texto: conceptoTextoParaDB,
-        // GUARDAMOS EL SALDO QUE CALCULAMOS ARRIBA
         saldo_anterior: saldoGlobalAntesDelPago
       }]);
 
       if (errP) throw errP;
 
+      // 5. ACTUALIZAR SALDOS EN DEUDAS_RESIDENTES
       for (const dId in abonos) {
         const valorAbono = Number(abonos[dId]);
         if (valorAbono !== 0) {
           const original = deudas.find(d => d.id === Number(dId));
-          const nuevoSaldo = (original.saldo_pendiente || 0) - valorAbono;
+          const nuevoSaldo = (Number(original.saldo_pendiente) || 0) - valorAbono;
           await supabase.from("deudas_residentes").update({ saldo_pendiente: nuevoSaldo }).eq("id", dId);
         }
       }
 
+      // 6. DISPARAR LA VISTA DEL RECIBO
       setDatosRecibo({
         numero: formRecibo.numero, fecha: formRecibo.fecha,
-        nombre: resSeleccionado.nombre, unidad: `${resSeleccionado.torre.replace("Torre ", "T")}-${resSeleccionado.apartamento}`,
+        nombre: resSeleccionado.nombre, unidad: `T${resSeleccionado.torre.slice(-1)}-${resSeleccionado.apartamento}`,
         valor: totalAPagarRecibo, concepto: conceptoTextoParaDB,
         metodo: formRecibo.metodo, comprobante: formRecibo.referencia,
         saldoAnterior: saldoGlobalAntesDelPago, email: resSeleccionado.email
@@ -168,8 +157,11 @@ export default function Ingresos() {
 
       setResSeleccionado(null);
       setDeudas([]);
-    } catch (e: any) { alert(e.message); }
-    finally { setProcesando(false); }
+    } catch (e: any) { 
+      alert("Error crítico: " + e.message); 
+    } finally { 
+      setProcesando(false); 
+    }
   }
 
   const filteredRes = busqueda.length > 0 ? residentes.filter(r => {
@@ -184,26 +176,24 @@ export default function Ingresos() {
     <div className="max-w-6xl mx-auto space-y-6 pb-20 px-2 md:px-0 font-sans">
       {datosRecibo && <ReciboCaja datos={datosRecibo} onClose={() => setDatosRecibo(null)} />}
 
+      {/* BUSCADOR DE UNIDADES */}
       <section className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm relative z-[30]">
         <div className="relative">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
           <input
             className="w-full bg-slate-50 border border-slate-100 pl-11 pr-4 py-4 rounded-lg outline-none font-bold text-slate-700 focus:bg-white transition-all"
             placeholder="Escribe Apto (Ej: 5-101) o Nombre..."
-            value={resSeleccionado ? `${resSeleccionado.nombre} | ${resSeleccionado.torre.replace("Torre ", "T")}-${resSeleccionado.apartamento}` : busqueda}
+            value={resSeleccionado ? `${resSeleccionado.nombre} | T${resSeleccionado.torre.slice(-1)}-${resSeleccionado.apartamento}` : busqueda}
             onChange={(e) => { setBusqueda(e.target.value); setResSeleccionado(null); }}
           />
           {resSeleccionado && <button onClick={() => setResSeleccionado(null)} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-300 hover:text-rose-500"><X size={18} /></button>}
         </div>
 
         {filteredRes.length > 0 && (
-          <div className="absolute top-[105%] left-0 right-0 bg-white border border-slate-200 rounded-xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 z-[100]">
+          <div className="absolute top-[105%] left-0 right-0 bg-white border border-slate-200 rounded-xl shadow-2xl overflow-hidden z-[100]">
             {filteredRes.map(r => (
-              <button key={r.id} onClick={() => cargarDeudasResidente(r)} className="w-full p-4 text-left border-b border-slate-50 hover:bg-slate-50 flex items-center justify-between group">
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center font-black text-xs uppercase">{r.torre.charAt(r.torre.length - 1)}</div>
-                  <div><p className="font-bold text-sm text-slate-800 uppercase">{r.nombre}</p><p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">{r.torre} - {r.apartamento}</p></div>
-                </div>
+              <button key={r.id} onClick={() => cargarDeudasResidente(r)} className="w-full p-4 text-left border-b border-slate-50 hover:bg-slate-50 flex items-center justify-between group font-bold text-sm text-slate-600">
+                <span>{r.nombre} (T{r.torre.slice(-1)}-{r.apartamento})</span>
                 <ChevronRight size={14} className="text-slate-200 group-hover:text-emerald-500" />
               </button>
             ))}
@@ -215,119 +205,66 @@ export default function Ingresos() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-in slide-in-from-bottom-2 duration-500">
           <div className="lg:col-span-2 space-y-6">
             <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
-              <div className="p-4 bg-slate-50 border-b border-slate-100 flex items-center justify-between uppercase">
-                <span className="text-[10px] font-black text-slate-400 tracking-widest flex items-center gap-2"><Wallet size={12} /> Obligaciones de la Unidad</span>
+              <div className="p-4 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
+                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Estado de Cartera</span>
                 <span className={`text-[10px] font-bold ${totalDeudaAcumulada < 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
-                  Saldo Total: ${Math.abs(totalDeudaAcumulada).toLocaleString('es-CO')} {totalDeudaAcumulada < 0 ? 'A FAVOR' : ''}
+                  DEUDA GLOBAL: ${Math.abs(totalDeudaAcumulada).toLocaleString('es-CO')} {totalDeudaAcumulada < 0 ? 'A FAVOR' : ''}
                 </span>
               </div>
 
-              <div className="hidden md:block">
-                <table className="w-full text-left">
-                  <thead>
-                    <tr className="text-[9px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 bg-slate-50/20">
-                      <th className="p-6">Concepto / Periodo</th>
-                      <th className="p-6 text-right">Saldo Actual</th>
-                      <th className="p-6 text-center">Abonar</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-50">
-                    {deudas.map(d => {
-                      const sHoy = calcularSaldoRealHoy(d);
-                      return (
-                        <tr key={d.id} className="hover:bg-slate-50/50 transition-colors">
-                          <td className="p-6">
-                            <p className="text-slate-800 font-black text-sm">{d.concepto_nombre || d.causaciones_globales?.concepto_nombre}</p>
-                            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tighter">
-                              {d.causaciones_globales?.mes_causado || "CARGO MANUAL"}
-                            </p>
-                          </td>
-                          <td className="p-6 text-right">
-                            <span className={`font-black tabular-nums ${sHoy < 0 ? 'text-emerald-600' : 'text-slate-900'}`}>
-                              ${Math.abs(sHoy).toLocaleString()} {sHoy < 0 ? '(-)' : ''}
-                            </span>
-                          </td>
-                          <td className="p-6">
-                            <div className="relative w-40 mx-auto">
-                              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-emerald-500 font-black">$</span>
-                              <input
-                                type="number"
-                                className="w-full bg-white border border-slate-200 p-3 pl-8 rounded-xl text-right font-black outline-none focus:border-emerald-500"
-                                value={abonos[d.id] || ""}
-                                onChange={(e) => setAbonos({ ...abonos, [d.id]: e.target.value })}
-                                placeholder="0"
-                              />
-                            </div>
-                          </td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
-              </div>
-
-              <div className="md:hidden divide-y divide-slate-100">
-                {deudas.map(d => (
-                  <div key={d.id} className="p-5 flex flex-col gap-4">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <p className="font-black text-slate-900 text-xs uppercase">{d.concepto_nombre || d.causaciones_globales?.concepto_nombre}</p>
-                        <p className="text-[10px] font-bold text-slate-400">{d.causaciones_globales?.mes_causado || "UNICO"}</p>
-                      </div>
-                      <p className={`font-black ${calcularSaldoRealHoy(d) < 0 ? 'text-emerald-600' : 'text-slate-700'}`}>
-                        ${Math.abs(calcularSaldoRealHoy(d)).toLocaleString()}
-                      </p>
-                    </div>
-                    <div className="relative">
-                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-emerald-500 font-black">$</span>
-                      <input type="number" className="w-full bg-slate-50 border border-slate-100 p-4 pl-8 rounded-xl text-right font-black outline-none" value={abonos[d.id] || ""} onChange={(e) => setAbonos({ ...abonos, [d.id]: e.target.value })} />
-                    </div>
-                  </div>
-                ))}
-              </div>
+              <table className="w-full text-left">
+                <thead className="bg-slate-50/50 text-[9px] font-black text-slate-400 uppercase border-b border-slate-100">
+                  <tr><th className="p-6">Concepto / Periodo</th><th className="p-6 text-right">Saldo Hoy</th><th className="p-6 text-center">Abonar</th></tr>
+                </thead>
+                <tbody className="divide-y divide-slate-50">
+                  {deudas.map(d => {
+                    const sHoy = calcularValorDeudaHoy(d);
+                    return (
+                      <tr key={d.id} className="hover:bg-slate-50/50">
+                        <td className="p-6">
+                          <p className="text-slate-800 font-black text-sm">{d.causaciones_globales?.concepto_nombre || d.concepto_nombre}</p>
+                          <p className="text-[10px] text-slate-400 font-bold uppercase">{d.causaciones_globales?.mes_causado || "UNICO"}</p>
+                        </td>
+                        <td className="p-6 text-right font-black tabular-nums">${sHoy.toLocaleString()}</td>
+                        <td className="p-6">
+                          <div className="relative w-32 mx-auto">
+                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-emerald-500 font-black">$</span>
+                            <input type="number" className="w-full bg-white border border-slate-200 p-3 pl-8 rounded-xl text-right font-black outline-none focus:border-emerald-500" value={abonos[d.id] || ""} onChange={(e) => setAbonos({ ...abonos, [d.id]: e.target.value })} placeholder="0" />
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
             </div>
 
             <div className="grid grid-cols-2 gap-3">
-              <div className="bg-emerald-600 p-6 rounded-2xl text-white shadow-lg"><p className="text-emerald-100 text-[9px] font-black uppercase mb-1">Entrada a Caja</p><h4 className="text-3xl font-black tabular-nums">${totalAPagarRecibo.toLocaleString()}</h4></div>
+              <div className="bg-emerald-600 p-6 rounded-2xl text-white shadow-lg"><p className="text-emerald-100 text-[9px] font-black uppercase mb-1">Total a Recibir</p><h4 className="text-3xl font-black tabular-nums">${totalAPagarRecibo.toLocaleString()}</h4></div>
               <div className="bg-slate-900 p-6 rounded-2xl text-white"><p className="text-slate-400 text-[9px] font-black uppercase mb-1">Nuevo Saldo Est.</p><h4 className="text-3xl font-black tabular-nums opacity-60">${Math.abs(totalDeudaAcumulada - totalAPagarRecibo).toLocaleString()}</h4></div>
             </div>
           </div>
 
-          <div className="space-y-6">
-            <div className="bg-white p-8 rounded-2xl border border-slate-200 shadow-sm space-y-6">
-              <div className="flex justify-between border-b border-slate-100 pb-5">
-                <h3 className="font-black text-slate-800 text-sm uppercase">Trámite de Recaudo</h3>
-                <Receipt className="text-slate-200" size={16} />
-              </div>
-
+          <div className="bg-white p-8 rounded-2xl border border-slate-200 shadow-sm space-y-6">
+              <h3 className="font-black text-slate-800 text-xs uppercase tracking-widest border-b pb-4">Detalle de Caja</h3>
               <div className="space-y-4">
                 <div className="space-y-1">
-                  <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">No. Comprobante RC</label>
+                  <label className="text-[9px] font-black text-slate-400 uppercase ml-1">No. Comprobante</label>
                   <input className="w-full bg-slate-50 border border-slate-100 p-4 rounded-xl outline-none font-black text-slate-900" value={formRecibo.numero} onChange={(e) => setFormRecibo({ ...formRecibo, numero: e.target.value })} required />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Fecha Recibo</label>
-                  <input type="date" className="w-full bg-slate-50 border border-slate-100 p-4 rounded-xl outline-none font-bold" value={formRecibo.fecha} onChange={(e) => setFormRecibo({ ...formRecibo, fecha: e.target.value })} />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Medio / Referencia</label>
+                  <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Medio de Pago</label>
                   <div className="flex bg-slate-100 p-1 rounded-xl mb-2 gap-1">
                     {['Transferencia', 'Efectivo'].map(m => (
                       <button key={m} onClick={() => setFormRecibo({ ...formRecibo, metodo: m })} className={`flex-1 py-2 rounded-lg text-[9px] font-black transition-all ${formRecibo.metodo === m ? "bg-white text-slate-900 shadow-sm border border-slate-200" : "text-slate-400"}`}>{m.toUpperCase()}</button>
                     ))}
                   </div>
-                  <input className="w-full bg-slate-50 border border-slate-100 p-4 rounded-xl outline-none font-bold" placeholder="Escribe Ref Bancaria (Opcional)" value={formRecibo.referencia} onChange={(e) => setFormRecibo({ ...formRecibo, referencia: e.target.value })} />
+                  <input className="w-full bg-slate-50 border border-slate-100 p-4 rounded-xl outline-none font-bold" placeholder="Referencia Bancaria" value={formRecibo.referencia} onChange={(e) => setFormRecibo({ ...formRecibo, referencia: e.target.value })} />
                 </div>
               </div>
-
-              <button
-                onClick={procesarPago}
-                disabled={procesando || totalAPagarRecibo <= 0}
-                className="w-full bg-emerald-600 text-white font-black py-6 rounded-2xl shadow-xl shadow-emerald-200/40 uppercase tracking-widest text-[10px] hover:bg-emerald-700 transition-all active:scale-95 disabled:opacity-30"
-              >
-                {procesando ? <Loader2 className="animate-spin mx-auto" /> : "Generar y Guardar Pago"}
+              <button onClick={procesarPago} disabled={procesando || totalAPagarRecibo <= 0} className="w-full bg-emerald-600 text-white font-black py-6 rounded-2xl shadow-xl uppercase tracking-widest text-[10px] hover:bg-emerald-700 transition-all active:scale-95 disabled:opacity-30">
+                {procesando ? <Loader2 className="animate-spin mx-auto" /> : "REGISTRAR PAGO"}
               </button>
-            </div>
           </div>
         </div>
       )}

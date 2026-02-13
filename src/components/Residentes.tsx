@@ -4,7 +4,7 @@ import { supabase } from "@/lib/supabase";
 import {
    UserPlus, Search, Phone, MapPin,
    Car, Bike, Trash2, Edit, X, Loader2,
-   Users, AtSign, ChevronRight, Info,
+   Users, AtSign
 } from "lucide-react";
 
 const ESTRUCTURA_TORRES: any = {
@@ -33,23 +33,11 @@ export default function Residentes() {
    const [filtroTorre, setFiltroTorre] = useState("TODAS");
    const [showModal, setShowModal] = useState(false);
    const [editandoId, setEditandoId] = useState<number | null>(null);
+
    const MotoIcon = ({ className, size = 14 }: { className?: string, size?: number }) => (
-      <svg
-         width={size}
-         height={size}
-         viewBox="0 0 24 24"
-         fill="none"
-         stroke="currentColor"
-         strokeWidth="2"
-         strokeLinecap="round"
-         strokeLinejoin="round"
-         className={className}
-      >
-         <circle cx="7" cy="18" r="3" />
-         <circle cx="17" cy="18" r="3" />
-         <path d="M12 18V9c0-2 1-3 3-3 1 0 2 .5 3 1.5" />
-         <path d="M16 18H8" />
-         <path d="M7 15c-1-2-1-4 1-5l4-2 2 3h4" />
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+         <circle cx="7" cy="18" r="3" /><circle cx="17" cy="18" r="3" />
+         <path d="M12 18V9c0-2 1-3 3-3 1 0 2 .5 3 1.5" /><path d="M16 18H8" /><path d="M7 15c-1-2-1-4 1-5l4-2 2 3h4" />
       </svg>
    );
 
@@ -73,11 +61,20 @@ export default function Residentes() {
       e.preventDefault();
       if (!form.nombre || !form.torre || !form.apto) return alert("Llena los datos obligatorios");
 
+      // --- MEJORA: VALIDACIÓN DE DUPLICADOS ---
+      // Si estamos creando uno nuevo, verificamos que el apto no esté ya registrado
+      if (!editandoId) {
+         const existe = residentes.find(r => r.torre === form.torre && r.apartamento === form.apto);
+         if (existe) {
+            return alert(`⚠️ La unidad ${form.torre} - ${form.apto} ya está registrada a nombre de ${existe.nombre}.`);
+         }
+      }
+
       setGuardando(true);
       const payload = {
-         nombre: form.nombre.toUpperCase(),
+         nombre: form.nombre.trim().toUpperCase(),
          celular: form.celular,
-         email: form.email.toLowerCase(),
+         email: form.email.trim().toLowerCase(),
          torre: form.torre,
          apartamento: form.apto,
          carros: Number(form.carros) || 0,
@@ -95,7 +92,7 @@ export default function Residentes() {
          cargarResidentes();
          setForm({ nombre: "", celular: "", email: "", torre: "", apto: "", carros: 0, motos: 0, bicis: 0 });
       } else {
-         alert("Error al guardar en la nube: " + error.message);
+         alert("Error al guardar: " + error.message);
       }
       setGuardando(false);
    }
@@ -116,7 +113,7 @@ export default function Residentes() {
    return (
       <div className="max-w-6xl mx-auto space-y-6 pb-24 font-sans text-slate-800">
 
-         {/* 1. CABECERA Y RESUMEN TÉCNICO */}
+         {/* CABECERA Y RESUMEN TÉCNICO */}
          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-6 rounded-xl border border-slate-200">
             <div>
                <div className="flex items-center gap-3">
@@ -138,13 +135,13 @@ export default function Residentes() {
             </button>
          </div>
 
-         {/* 2. FILTROS Y BUSQUEDA (FULL MÓVIL) */}
+         {/* FILTROS Y BUSQUEDA */}
          <section className="bg-white p-3 rounded-2xl border border-slate-200 flex flex-col md:flex-row gap-2">
             <div className="relative flex-1 group">
                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
                <input
                   placeholder="Busca por Nombre o Apto (5-101)..."
-                  className="w-full bg-slate-50 border border-slate-100 pl-12 pr-4 py-4 rounded-xl outline-none font-bold text-slate-600 placeholder:text-slate-300 focus:bg-white transition-all"
+                  className="w-full bg-slate-50 border border-slate-100 pl-12 pr-4 py-4 rounded-xl outline-none font-bold text-slate-600 focus:bg-white transition-all"
                   onChange={(e) => setBusqueda(e.target.value)}
                />
             </div>
@@ -163,21 +160,20 @@ export default function Residentes() {
             </div>
          </section>
 
-         {/* 3. LISTADO ORGANIZADO POR TORRE */}
+         {/* LISTADO ORGANIZADO POR TORRE */}
          <div className="space-y-10">
             {Array.from(new Set(residentesFiltrados.map(r => r.torre))).sort().map(torre => (
                <div key={torre} className="space-y-3">
                   <div className="flex items-center gap-4 px-2">
-                     <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">{torre}</span>
+                     <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{torre}</span>
                      <div className="h-px w-full bg-slate-100"></div>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                      {residentesFiltrados.filter(r => r.torre === torre).map(res => (
-                        <div key={res.id} className="bg-white border border-slate-200 p-4 md:p-5 rounded-2xl flex items-center justify-between hover:bg-slate-50 transition-colors">
-
+                        <div key={res.id} className="bg-white border border-slate-200 p-5 rounded-2xl flex items-center justify-between hover:bg-slate-50 transition-colors">
                            <div className="flex items-center gap-5 w-3/5">
-                              <div className="w-12 h-10 bg-slate-100 rounded-lg flex items-center justify-center font-black text-xs text-slate-400 group-hover:bg-emerald-50 transition-colors shrink-0">
+                              <div className="w-12 h-10 bg-slate-100 rounded-lg flex items-center justify-center font-black text-xs text-slate-400 shrink-0">
                                  {res.apartamento}
                               </div>
                               <div className="min-w-0">
@@ -189,7 +185,7 @@ export default function Residentes() {
                               </div>
                            </div>
 
-                           <div className="flex items-center gap-4 border-l border-slate-100 pl-4 md:px-6">
+                           <div className="flex items-center gap-4 border-l border-slate-100 pl-6">
                               <div className="text-center">
                                  <Car size={14} className={res.carros > 0 ? "text-emerald-500" : "text-slate-200"} />
                                  <span className="text-[9px] font-black block mt-0.5 text-slate-900">{res.carros}</span>
@@ -204,11 +200,10 @@ export default function Residentes() {
                               </div>
                            </div>
 
-                           <div className="flex gap-1 pl-4 md:pl-0">
+                           <div className="flex gap-1 pl-4">
                               <button onClick={() => { setEditandoId(res.id); setForm({ nombre: res.nombre, celular: res.celular || "", email: res.email || "", torre: res.torre, apto: res.apartamento, carros: res.carros || 0, motos: res.motos || 0, bicis: res.bicis || 0 }); setShowModal(true); }} className="p-3 text-slate-300 hover:text-emerald-600 transition-colors"><Edit size={16} /></button>
                               <button onClick={async () => { if (confirm("¿Eliminar residente?")) { await supabase.from("residentes").delete().eq("id", res.id); cargarResidentes(); } }} className="p-3 text-slate-300 hover:text-rose-500 transition-colors"><Trash2 size={16} /></button>
                            </div>
-
                         </div>
                      ))}
                   </div>
@@ -216,7 +211,7 @@ export default function Residentes() {
             ))}
          </div>
 
-         {/* MODAL MÓVIL OPTIMIZADO */}
+         {/* MODAL REGISTRO */}
          {showModal && (
             <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[150] flex flex-col items-center justify-end md:justify-center p-0 md:p-4">
                <div className="bg-white w-full max-w-2xl rounded-t-3xl md:rounded-2xl shadow-2xl overflow-hidden flex flex-col animate-in slide-in-from-bottom-6">
@@ -228,24 +223,24 @@ export default function Residentes() {
 
                      <div className="space-y-4">
                         <div className="space-y-1">
-                           <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Nombre Completo Propietario / Residente</label>
-                           <input className="w-full bg-slate-50 border border-slate-100 p-4 rounded-xl outline-none font-bold uppercase" value={form.nombre} onChange={(e) => setForm({ ...form, nombre: e.target.value })} placeholder="JUAN PEREZ" required />
+                           <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Nombre Completo</label>
+                           <input className="w-full bg-slate-50 border border-slate-100 p-4 rounded-xl outline-none font-bold uppercase" value={form.nombre} onChange={(e) => setForm({ ...form, nombre: e.target.value })} placeholder="NOMBRE COMPLETO" required />
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="grid grid-cols-2 gap-4">
                            <div className="space-y-1">
-                              <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Contacto Celular</label>
+                              <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Celular</label>
                               <input type="number" className="w-full bg-slate-50 border border-slate-100 p-4 rounded-xl outline-none font-bold" value={form.celular} onChange={(e) => setForm({ ...form, celular: e.target.value })} placeholder="312 000 0000" />
                            </div>
                            <div className="space-y-1">
-                              <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Email Digital</label>
+                              <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Email</label>
                               <input type="email" className="w-full bg-slate-50 border border-slate-100 p-4 rounded-xl outline-none font-bold" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="usuario@gmail.com" />
                            </div>
                         </div>
 
                         <div className="grid grid-cols-2 gap-4">
                            <div className="space-y-1">
-                              <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Interior / Torre</label>
+                              <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Torre</label>
                               <select className="w-full bg-slate-50 border border-slate-100 p-4 rounded-xl outline-none font-black appearance-none" value={form.torre} onChange={(e) => setForm({ ...form, torre: e.target.value, apto: "" })} required>
                                  <option value="">Seleccione...</option>
                                  {Object.keys(ESTRUCTURA_TORRES).map(t => <option key={t} value={t}>{t}</option>)}
@@ -253,32 +248,26 @@ export default function Residentes() {
                            </div>
                            <div className="space-y-1">
                               <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Apartamento</label>
-                              <select className="w-full bg-slate-50 border border-slate-100 p-4 rounded-xl outline-none font-black appearance-none disabled:opacity-30" value={form.apto} onChange={(e) => setForm({ ...form, apto: e.target.value })} disabled={!form.torre} required>
+                              <select className="w-full bg-slate-50 border border-slate-100 p-4 rounded-xl outline-none font-black appearance-none" value={form.apto} onChange={(e) => setForm({ ...form, apto: e.target.value })} disabled={!form.torre} required>
                                  <option value="">Elegir Apto...</option>
                                  {form.torre && ESTRUCTURA_TORRES[form.torre].map((a: any) => <option key={a} value={a}>{a}</option>)}
                               </select>
                            </div>
                         </div>
 
-                        <div className="bg-slate-50 p-6 rounded-2xl flex items-center justify-around gap-4 text-center border border-slate-100 shadow-inner">
-                           <div>
-                              <p className="text-[8px] font-black text-slate-400 uppercase mb-2">Carros</p>
-                              <input type="number" className="w-20 bg-white border border-slate-200 p-2 rounded-lg text-center font-black" value={form.carros} onChange={(e) => setForm({ ...form, carros: parseInt(e.target.value) || 0 })} />
-                           </div>
-                           <div>
-                              <p className="text-[8px] font-black text-slate-400 uppercase mb-2">Motos</p>
-                              <input type="number" className="w-20 bg-white border border-slate-200 p-2 rounded-lg text-center font-black" value={form.motos} onChange={(e) => setForm({ ...form, motos: parseInt(e.target.value) || 0 })} />
-                           </div>
-                           <div>
-                              <p className="text-[8px] font-black text-slate-400 uppercase mb-2">Bicis</p>
-                              <input type="number" className="w-20 bg-white border border-slate-200 p-2 rounded-lg text-center font-black" value={form.bicis} onChange={(e) => setForm({ ...form, bicis: parseInt(e.target.value) || 0 })} />
-                           </div>
+                        <div className="bg-slate-50 p-6 rounded-2xl flex items-center justify-around gap-4 text-center border border-slate-100">
+                           {['carros', 'motos', 'bicis'].map((tipo) => (
+                              <div key={tipo}>
+                                 <p className="text-[8px] font-black text-slate-400 uppercase mb-2">{tipo}</p>
+                                 <input type="number" className="w-20 bg-white border border-slate-200 p-2 rounded-lg text-center font-black" value={form[tipo as keyof typeof form]} onChange={(e) => setForm({ ...form, [tipo]: parseInt(e.target.value) || 0 })} />
+                              </div>
+                           ))}
                         </div>
                      </div>
 
                      <div className="flex gap-3 pt-6 border-t border-slate-100">
-                        <button type="submit" disabled={guardando} className="flex-1 bg-slate-900 text-white font-black py-4 rounded-xl text-xs uppercase tracking-[0.1em] hover:bg-emerald-600 transition-all flex items-center justify-center gap-2">
-                           {guardando ? <Loader2 className="animate-spin" /> : "PROCESAR REGISTRO"}
+                        <button type="submit" disabled={guardando} className="flex-1 bg-slate-900 text-white font-black py-4 rounded-xl text-xs uppercase tracking-[0.1em] hover:bg-emerald-600 transition-all">
+                           {guardando ? <Loader2 className="animate-spin" /> : "GUARDAR RESIDENTE"}
                         </button>
                         <button type="button" onClick={() => setShowModal(false)} className="px-6 bg-slate-100 text-slate-400 font-bold py-4 rounded-xl text-xs uppercase tracking-widest">Salir</button>
                      </div>
