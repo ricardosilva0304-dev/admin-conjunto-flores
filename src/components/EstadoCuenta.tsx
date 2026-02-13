@@ -36,7 +36,7 @@ export default function EstadoCuenta({ residente, deudas, onClose }: Props) {
     if (!doc) return;
 
     const styles = Array.from(document.querySelectorAll("style, link[rel='stylesheet']")).map((s) => s.outerHTML).join("");
-    
+
     doc.write(`<html><head><title>Estado de Cuenta - ${residente.apartamento}</title>${styles}<style>
       @page { size: letter; margin: 0; }
       body { background: white !important; font-family: 'Inter', system-ui, sans-serif; margin: 0; padding: 0; }
@@ -59,7 +59,7 @@ export default function EstadoCuenta({ residente, deudas, onClose }: Props) {
       {/* BARRA DE ACCIONES */}
       <div className="no-print w-full max-w-4xl bg-white p-4 mb-6 flex justify-between items-center rounded-2xl shadow-2xl">
         <div className="flex items-center gap-4">
-          <div className="w-10 h-10 bg-emerald-500 rounded-xl flex items-center justify-center text-white"><Wallet size={20}/></div>
+          <div className="w-10 h-10 bg-emerald-500 rounded-xl flex items-center justify-center text-white"><Wallet size={20} /></div>
           <div>
             <p className="text-[10px] font-black uppercase text-slate-400">Vista de Impresión</p>
             <h2 className="text-sm font-black uppercase text-slate-800">Unidad {residente.torre} - {residente.apartamento}</h2>
@@ -67,13 +67,13 @@ export default function EstadoCuenta({ residente, deudas, onClose }: Props) {
         </div>
         <div className="flex gap-2">
           <button onClick={handlePrint} className="bg-slate-900 text-white px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-black transition-all">IMPRIMIR PDF</button>
-          <button onClick={onClose} className="p-2.5 text-slate-300 hover:text-rose-500 transition-colors"><X size={24}/></button>
+          <button onClick={onClose} className="p-2.5 text-slate-300 hover:text-rose-500 transition-colors"><X size={24} /></button>
         </div>
       </div>
 
       {/* DOCUMENTO REDISEÑADO */}
       <div ref={printRef} className="w-full max-w-4xl bg-white md:rounded-3xl shadow-2xl p-8 md:p-16 text-slate-800 animate-in zoom-in-95 duration-500 min-h-[1056px] flex flex-col border border-slate-100">
-        
+
         {/* HEADER LIMPIO */}
         <div className="flex justify-between items-start border-b-2 border-slate-900 pb-6 mb-10">
           <div className="flex items-center gap-6">
@@ -94,22 +94,22 @@ export default function EstadoCuenta({ residente, deudas, onClose }: Props) {
         <div className="grid grid-cols-1 md:grid-cols-12 gap-4 mb-12">
           {/* Lado Residente */}
           <div className="md:col-span-7 border border-slate-200 rounded-2xl p-6 bg-slate-50/30 flex items-center gap-5">
-             <div className="w-12 h-12 bg-white border border-slate-100 rounded-full flex items-center justify-center text-slate-300"><UserCircle size={32}/></div>
-             <div>
-                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Responsable</p>
-                <h2 className="text-base font-black text-slate-900 uppercase">{residente.nombre || 'PROPIETARIO'}</h2>
-                <span className="text-[10px] font-bold text-emerald-600">Unidad T{residente.torre.slice(-1)}-{residente.apartamento}</span>
-             </div>
+            <div className="w-12 h-12 bg-white border border-slate-100 rounded-full flex items-center justify-center text-slate-300"><UserCircle size={32} /></div>
+            <div>
+              <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Responsable</p>
+              <h2 className="text-base font-black text-slate-900 uppercase">{residente.nombre || 'PROPIETARIO'}</h2>
+              <span className="text-[10px] font-bold text-emerald-600">Unidad T{residente.torre.slice(-1)}-{residente.apartamento}</span>
+            </div>
           </div>
 
           {/* Lado Saldo (AHORA CLARO) */}
           <div className="md:col-span-5 border-2 border-slate-900 rounded-2xl p-6 bg-white flex flex-col justify-center items-end text-right">
-             <p className={`text-[9px] font-black uppercase tracking-widest mb-1 ${totalDeuda < 0 ? 'text-emerald-500' : 'text-slate-400'}`}>
-                {totalDeuda < 0 ? 'Crédito a Favor' : 'Saldo Total a Pagar'}
-             </p>
-             <h3 className={`text-4xl font-black tabular-nums tracking-tighter ${totalDeuda < 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
-                ${Math.abs(totalDeuda).toLocaleString()}
-             </h3>
+            <p className={`text-[9px] font-black uppercase tracking-widest mb-1 ${totalDeuda < 0 ? 'text-emerald-500' : 'text-slate-400'}`}>
+              {totalDeuda < 0 ? 'Crédito a Favor' : 'Saldo Total a Pagar'}
+            </p>
+            <h3 className={`text-4xl font-black tabular-nums tracking-tighter ${totalDeuda < 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+              ${Math.abs(totalDeuda).toLocaleString()}
+            </h3>
           </div>
         </div>
 
@@ -128,7 +128,7 @@ export default function EstadoCuenta({ residente, deudas, onClose }: Props) {
                       <tr key={d.id}>
                         <td className="py-4 uppercase font-bold text-slate-700">{d.concepto_nombre}</td>
                         <td className={`py-4 text-right font-black tabular-nums ${valor < 0 ? 'text-emerald-600' : 'text-slate-900'}`}>
-                           ${Math.abs(valor).toLocaleString()} {valor < 0 ? 'CR' : ''}
+                          ${Math.abs(valor).toLocaleString()} {valor < 0 ? 'CR' : ''}
                         </td>
                       </tr>
                     );
@@ -136,7 +136,7 @@ export default function EstadoCuenta({ residente, deudas, onClose }: Props) {
                   <tr className="bg-slate-50">
                     <td className="text-right py-4 font-black text-slate-400 uppercase text-[9px]">Gran Total Consolidado:</td>
                     <td className={`text-right py-4 font-black text-base ${totalDeuda < 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
-                       ${Math.abs(totalDeuda).toLocaleString()}
+                      ${Math.abs(totalDeuda).toLocaleString()}
                     </td>
                   </tr>
                 </tbody>
@@ -150,23 +150,36 @@ export default function EstadoCuenta({ residente, deudas, onClose }: Props) {
             </div>
           )}
 
-          {/* HISTORIAL BREVE */}
+          {/* HISTORIAL BREVE DE PAGOS REFINADO */}
           {pagos.length > 0 && (
             <div className="mb-10">
               <h3 className="text-[10px] font-black uppercase text-slate-300 mb-3 flex items-center gap-2">
-                 <History size={14}/> Últimos Pagos Registrados
+                <History size={14} /> Últimos Pagos Registrados
               </h3>
-              <table className="w-full opacity-60">
+              <table className="w-full opacity-70">
                 <thead>
-                  <tr className="border-b border-slate-100"><th className="bg-transparent! py-2">RC No.</th><th>Fecha</th><th>Método</th><th className="text-right">Monto</th></tr>
+                  <tr className="border-b border-slate-100">
+                    <th className="bg-transparent! py-2 w-20">Recibo</th>
+                    <th className="bg-transparent! py-2 w-24">Fecha</th>
+                    <th className="bg-transparent! py-2">Conceptos Pagados</th> {/* Cambio de nombre */}
+                    <th className="bg-transparent! py-2 text-right w-24">Monto</th>
+                  </tr>
                 </thead>
-                <tbody className="text-[10px]">
+                <tbody className="text-[9px]">
                   {pagos.slice(0, 5).map((p) => (
                     <tr key={p.id}>
-                      <td className="font-bold py-2">RC-{p.numero_recibo}</td>
-                      <td>{p.fecha_pago}</td>
-                      <td className="uppercase">{p.metodo_pago}</td>
-                      <td className="text-right font-black text-emerald-600">${Number(p.monto_total).toLocaleString()}</td>
+                      <td className="font-bold py-2 text-slate-900">RC-{p.numero_recibo}</td>
+                      <td className="text-slate-500">{p.fecha_pago}</td>
+                      <td className="uppercase text-slate-600 font-medium">
+                        {/* LIMPIAMOS EL CONCEPTO PARA QUITAR PRECIOS Y SEPARADORES */}
+                        {p.concepto_texto
+                          ? p.concepto_texto.split("||").map((c: string) => c.split("|")[0]).join(" + ")
+                          : "Pago de Cartera"
+                        }
+                      </td>
+                      <td className="text-right font-black text-emerald-600">
+                        ${Number(p.monto_total).toLocaleString()}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -177,15 +190,15 @@ export default function EstadoCuenta({ residente, deudas, onClose }: Props) {
 
         {/* PIE DE PÁGINA */}
         <div className="mt-auto pt-8 border-t-2 border-slate-100 flex flex-col md:flex-row justify-between items-end gap-6">
-           <div className="text-[9px] text-slate-400 uppercase font-bold space-y-1">
-              <p>Entidad: <b>Banco Caja Social</b> • Cta Ahorros: <b>24511819298</b></p>
-              <p>Convenio: <b>15939402</b> • Referencia: <b>{residente.apartamento}</b></p>
-           </div>
-           <div className="text-right">
-              <div className="w-40 border-t border-slate-300 mb-1 ml-auto"></div>
-              <p className="text-[10px] font-black uppercase text-slate-900 leading-none">Administración</p>
-              <p className="text-[8px] font-bold text-slate-300 uppercase tracking-tighter">Parque de las Flores</p>
-           </div>
+          <div className="text-[9px] text-slate-400 uppercase font-bold space-y-1">
+            <p>Entidad: <b>Banco Caja Social</b> • Cta Ahorros: <b>24511819298</b></p>
+            <p>Convenio: <b>15939402</b> • Referencia: <b>{residente.apartamento}</b></p>
+          </div>
+          <div className="text-right">
+            <div className="w-40 border-t border-slate-300 mb-1 ml-auto"></div>
+            <p className="text-[10px] font-black uppercase text-slate-900 leading-none">Administración</p>
+            <p className="text-[8px] font-bold text-slate-300 uppercase tracking-tighter">Parque de las Flores</p>
+          </div>
         </div>
 
       </div>

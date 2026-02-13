@@ -72,16 +72,34 @@ export default function Deudores() {
     e.preventDefault();
     if (!formManual.residente_id || !formManual.valor) return;
     setLoading(true);
+
+    // --- LÓGICA PARA CONVERTIR MES A LETRAS ---
+    const [anio, mesNum] = formManual.mes.split("-");
+    const mesesNombres = ["ENERO", "FEBRERO", "MARZO", "ABRIL", "MAYO", "JUNIO", "JULIO", "AGOSTO", "SEPTIEMBRE", "OCTUBRE", "NOVIEMBRE", "DICIEMBRE"];
+    const periodoTexto = `${mesesNombres[parseInt(mesNum) - 1]} ${anio}`;
+
+    // Concepto final: MULTA (FEBRERO 2026)
+    const conceptoFinal = `${formManual.concepto.toUpperCase()} (${periodoTexto})`;
+
     const monto = parseFloat(formManual.valor);
-    await supabase.from("deudas_residentes").insert([{
+
+    const { error } = await supabase.from("deudas_residentes").insert([{
       residente_id: parseInt(formManual.residente_id),
-      concepto_nombre: `${formManual.concepto.toUpperCase()} (${formManual.mes})`,
-      monto_original: monto, saldo_pendiente: monto,
-      precio_m1: monto, precio_m2: monto, precio_m3: monto,
+      concepto_nombre: conceptoFinal, // Guardamos con el mes en letras
+      monto_original: monto,
+      saldo_pendiente: monto,
+      precio_m1: monto,
+      precio_m2: monto,
+      precio_m3: monto,
       fecha_vencimiento: `${formManual.mes}-01`
     }]);
-    setShowManualModal(false);
-    cargarInformacion();
+
+    if (!error) {
+      setShowManualModal(false);
+      cargarInformacion();
+      setFormManual({ residente_id: "", concepto: "", mes: formManual.mes, valor: "" });
+      setBusquedaManual("");
+    }
     setLoading(false);
   }
 

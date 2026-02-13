@@ -5,7 +5,8 @@ import ReciboCaja from "./ReciboCaja";
 import { calcularValorDeudaHoy, formatPeriodo } from "@/lib/utils";
 import {
   Search, Wallet, Loader2, X, Receipt,
-  Calendar, ChevronRight, Hash, CreditCard
+  Calendar, ChevronRight, Hash, CreditCard,
+  CheckCircle2 // <-- Agregado este import
 } from "lucide-react";
 
 export default function Ingresos() {
@@ -20,12 +21,12 @@ export default function Ingresos() {
 
   const [formRecibo, setFormRecibo] = useState({
     numero: "",
-    fecha: new Date().toISOString().split('T')[0], // Fecha por defecto: Hoy
+    fecha: new Date().toISOString().split('T')[0],
     metodo: "Transferencia",
     referencia: ""
   });
 
-  const [abonos, setAbonos] = useState<any>({});
+  const [abonos, setAbonos] = useState<{ [key: string]: string }>({});
 
   useEffect(() => { cargarResidentes(); }, []);
 
@@ -36,10 +37,10 @@ export default function Ingresos() {
   }
 
   async function sugerirSiguienteRecibo() {
-    const { data } = await supabase.from("pagos").select("numero_recibo").order("created_at", { ascending: false }).limit(10);
+    const { data } = await supabase.from("pagos").select("numero_recibo").order("created_at", { ascending: false }).limit(20);
     if (data && data.length > 0) {
-       const numeros = data.map(p => parseInt(p.numero_recibo.replace(/\D/g, "")) || 0);
-       setFormRecibo(prev => ({ ...prev, numero: (Math.max(...numeros) + 1).toString() }));
+      const numeros = data.map(p => parseInt(p.numero_recibo.replace(/\D/g, "")) || 0);
+      setFormRecibo(prev => ({ ...prev, numero: (Math.max(...numeros) + 1).toString() }));
     } else {
       setFormRecibo(prev => ({ ...prev, numero: "1" }));
     }
@@ -52,12 +53,12 @@ export default function Ingresos() {
       .from("deudas_residentes")
       .select(`*, causaciones_globales(id, mes_causado, concepto_nombre, tipo_cobro)`)
       .eq("residente_id", res.id)
-      .neq("saldo_pendiente", 0);
+      .gt("saldo_pendiente", 0);
 
     if (data) {
       setDeudas(data);
       const initialAbonos: any = {};
-      data.forEach((d: any) => initialAbonos[d.id] = ""); // Iniciamos vacíos para mejor UX
+      data.forEach((d: any) => initialAbonos[d.id] = "");
       setAbonos(initialAbonos);
     }
     await sugerirSiguienteRecibo();
@@ -67,15 +68,14 @@ export default function Ingresos() {
     return deudas.reduce((acc, d) => acc + calcularValorDeudaHoy(d), 0);
   }, [deudas]);
 
-  const totalAPagarRecibo = deudas.reduce((acc, d) => acc + (Number(abonos[d.id]) || 0), 0);
+  const totalAPagarRecibo = Object.values(abonos).reduce((acc, val) => acc + (Number(val) || 0), 0);
 
   async function procesarPago() {
     if (totalAPagarRecibo <= 0 || !formRecibo.numero) return alert("Verifica montos y número de recibo.");
     setProcesando(true);
 
     try {
-      // Validar duplicado
-      const { data: existe } = await supabase.from("pagos").select("numero_recibo").eq("numero_recibo", formRecibo.numero).single();
+      const { data: existe } = await supabase.from("pagos").select("numero_recibo").eq("numero_recibo", formRecibo.numero).maybeSingle();
       if (existe) {
         alert("⚠️ Este número de recibo ya existe.");
         await sugerirSiguienteRecibo();
@@ -84,7 +84,7 @@ export default function Ingresos() {
       }
 
       const saldoPrevio = totalDeudaAcumulada;
-      
+
       const conceptoTextoParaDB = deudas
         .filter(d => Number(abonos[d.id]) > 0)
         .map(d => {
@@ -98,7 +98,7 @@ export default function Ingresos() {
         unidad: `T${resSeleccionado.torre.slice(-1)}-${resSeleccionado.apartamento}`,
         numero_recibo: formRecibo.numero,
         monto_total: totalAPagarRecibo,
-        fecha_pago: formRecibo.fecha, // USAMOS LA FECHA SELECCIONADA
+        fecha_pago: formRecibo.fecha,
         metodo_pago: formRecibo.metodo,
         comprobante: formRecibo.referencia.toUpperCase(),
         concepto_texto: conceptoTextoParaDB,
@@ -107,10 +107,11 @@ export default function Ingresos() {
 
       if (errP) throw errP;
 
-      for (const dId in abonos) {
-        if (Number(abonos[dId]) > 0) {
+      // Actualizar saldos en deudas_residentes
+      for (const [dId, montoAbono] of Object.entries(abonos)) {
+        if (Number(montoAbono) > 0) {
           const original = deudas.find(d => d.id === Number(dId));
-          const nuevoSaldo = (Number(original.saldo_pendiente) || 0) - Number(abonos[dId]);
+          const nuevoSaldo = (Number(original.saldo_pendiente) || 0) - Number(montoAbono);
           await supabase.from("deudas_residentes").update({ saldo_pendiente: nuevoSaldo }).eq("id", dId);
         }
       }
@@ -168,121 +169,126 @@ export default function Ingresos() {
       {resSeleccionado && (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 animate-in slide-in-from-bottom-2 duration-500">
           
-          {/* COLUMNA IZQUIERDA: LISTA DE COBROS COMPACTA */}
+          {/* COLUMNA IZQUIERDA */}
           <div className="lg:col-span-8 space-y-4">
             <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
               <div className="p-4 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
-                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2"><Receipt size={14}/> Obligaciones de la Unidad</span>
+                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2"><Receipt size={14} /> Obligaciones de la Unidad</span>
                 <span className={`text-[11px] font-black ${totalDeudaAcumulada < 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
                   DEUDA TOTAL: ${Math.abs(totalDeudaAcumulada).toLocaleString('es-CO')} {totalDeudaAcumulada < 0 ? '(CR)' : ''}
                 </span>
               </div>
 
-              {/* LISTA SENCILLA (MÁS COMPACTA) */}
-              <div className="divide-y divide-slate-50">
-                {deudas.map(d => {
-                  const sHoy = calcularValorDeudaHoy(d);
-                  return (
-                    <div key={d.id} className="p-4 flex flex-col sm:flex-row items-center justify-between gap-4 hover:bg-slate-50/50 transition-colors">
-                      <div className="flex-1 min-w-0">
-                         <h4 className="text-sm font-black text-slate-700 uppercase truncate">
-                           {d.causaciones_globales?.concepto_nombre || d.concepto_nombre}
-                         </h4>
-                         <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tight">
+              {deudas.length === 0 ? (
+                <div className="p-20 text-center flex flex-col items-center gap-3">
+                  <div className="w-16 h-16 bg-emerald-50 text-emerald-500 rounded-full flex items-center justify-center">
+                    <CheckCircle2 size={32} />
+                  </div>
+                  <h4 className="text-sm font-black text-slate-800 uppercase tracking-tight">Unidad al día</h4>
+                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">No registra deudas pendientes.</p>
+                </div>
+              ) : (
+                <div className="divide-y divide-slate-50">
+                  {deudas.map(d => {
+                    const sHoy = calcularValorDeudaHoy(d);
+                    return (
+                      <div key={d.id} className="p-4 flex flex-col sm:flex-row items-center justify-between gap-4 hover:bg-slate-50/50 transition-colors">
+                        <div className="flex-1 min-w-0">
+                          <h4 className="text-sm font-black text-slate-700 uppercase truncate">
+                            {d.causaciones_globales?.concepto_nombre || d.concepto_nombre}
+                          </h4>
+                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tight">
                             {formatPeriodo(d)}
-                         </p>
-                      </div>
-                      
-                      <div className="flex items-center gap-8">
-                         <div className="text-right">
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-8">
+                          <div className="text-right">
                             <p className="text-[8px] font-black text-slate-300 uppercase leading-none mb-1">Saldo</p>
                             <p className="font-black text-sm tabular-nums">${sHoy.toLocaleString()}</p>
-                         </div>
-                         
-                         <div className="relative w-32">
+                          </div>
+                          <div className="relative w-32">
                             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-emerald-500 font-black text-xs">$</span>
-                            <input 
-                              type="number" 
-                              className="w-full bg-white border border-slate-200 p-2.5 pl-7 rounded-xl text-right font-black text-sm outline-none focus:border-emerald-500 shadow-inner" 
-                              value={abonos[d.id] || ""} 
-                              onChange={(e) => setAbonos({ ...abonos, [d.id]: e.target.value })} 
-                              placeholder="0" 
+                            <input
+                              type="number"
+                              className="w-full bg-white border border-slate-200 p-2.5 pl-7 rounded-xl text-right font-black text-sm outline-none focus:border-emerald-500 shadow-inner"
+                              value={abonos[d.id] || ""}
+                              onChange={(e) => setAbonos({ ...abonos, [d.id]: e.target.value })}
+                              placeholder="0"
                             />
-                         </div>
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                  )
-                })}
-              </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
 
-            {/* RESUMEN DE PAGO INFERIOR */}
+            {/* RESUMEN INFERIOR */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="bg-emerald-600 p-6 rounded-3xl text-white shadow-xl flex items-center justify-between">
                 <div>
                   <p className="text-emerald-100 text-[9px] font-black uppercase tracking-widest mb-1">Total a Recibir</p>
                   <h4 className="text-3xl font-black tabular-nums">${totalAPagarRecibo.toLocaleString()}</h4>
                 </div>
-                <div className="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center"><Wallet size={24}/></div>
+                <div className="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center"><Wallet size={24} /></div>
               </div>
               <div className="bg-slate-900 p-6 rounded-3xl text-white shadow-xl flex items-center justify-between">
                 <div>
                   <p className="text-slate-400 text-[9px] font-black uppercase tracking-widest mb-1">Nuevo Saldo Est.</p>
                   <h4 className="text-3xl font-black tabular-nums opacity-60">${Math.abs(totalDeudaAcumulada - totalAPagarRecibo).toLocaleString()}</h4>
                 </div>
-                <div className="text-slate-700 font-black text-2xl italic tracking-tighter">FLORES</div>
               </div>
             </div>
           </div>
 
-          {/* COLUMNA DERECHA: DETALLE DE CAJA (PANEL) */}
+          {/* COLUMNA DERECHA: PANEL DE CAJA */}
           <div className="lg:col-span-4">
             <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-xl space-y-6 sticky top-6">
-                <div className="flex items-center gap-3 border-b pb-4">
-                   <div className="w-8 h-8 bg-slate-100 rounded-lg flex items-center justify-center text-slate-500"><CreditCard size={18}/></div>
-                   <h3 className="font-black text-slate-800 text-xs uppercase tracking-widest">Trámite de Caja</h3>
-                </div>
+              <div className="flex items-center gap-3 border-b pb-4">
+                <div className="w-8 h-8 bg-slate-100 rounded-lg flex items-center justify-center text-slate-500"><CreditCard size={18} /></div>
+                <h3 className="font-black text-slate-800 text-xs uppercase tracking-widest">Trámite de Caja</h3>
+              </div>
 
-                <div className="space-y-4">
-                  {/* FECHA DE PAGO (NUEVO CAMPO SOLICITADO) */}
-                  <div className="space-y-1">
-                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Fecha del Recibo</label>
-                    <div className="relative">
-                       <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={16}/>
-                       <input type="date" className="w-full bg-slate-50 border border-slate-100 p-4 pl-12 rounded-2xl outline-none font-bold text-sm focus:bg-white" value={formRecibo.fecha} onChange={(e) => setFormRecibo({ ...formRecibo, fecha: e.target.value })} />
-                    </div>
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">No. Comprobante RC</label>
-                    <div className="relative">
-                       <Hash className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={16}/>
-                       <input className="w-full bg-slate-50 border border-slate-100 p-4 pl-12 rounded-2xl outline-none font-black text-slate-900" value={formRecibo.numero} onChange={(e) => setFormRecibo({ ...formRecibo, numero: e.target.value })} required />
-                    </div>
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Medio de Pago</label>
-                    <div className="flex bg-slate-100 p-1 rounded-2xl gap-1">
-                      {['Transferencia', 'Efectivo'].map(m => (
-                        <button key={m} onClick={() => setFormRecibo({ ...formRecibo, metodo: m })} className={`flex-1 py-2.5 rounded-xl text-[9px] font-black transition-all ${formRecibo.metodo === m ? "bg-white text-slate-900 shadow-md border" : "text-slate-400"}`}>{m.toUpperCase()}</button>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Referencia / Comprobante</label>
-                    <input className="w-full bg-slate-50 border border-slate-100 p-4 rounded-2xl outline-none font-bold text-sm focus:bg-white" placeholder="Ej: Ref Bancaria" value={formRecibo.referencia} onChange={(e) => setFormRecibo({ ...formRecibo, referencia: e.target.value })} />
+              <div className="space-y-4">
+                <div className="space-y-1">
+                  <label className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Fecha del Recibo</label>
+                  <div className="relative">
+                    <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={16} />
+                    <input type="date" className="w-full bg-slate-50 border border-slate-100 p-4 pl-12 rounded-2xl outline-none font-bold text-sm focus:bg-white" value={formRecibo.fecha} onChange={(e) => setFormRecibo({ ...formRecibo, fecha: e.target.value })} />
                   </div>
                 </div>
 
-                <button 
-                  onClick={procesarPago} 
-                  disabled={procesando || totalAPagarRecibo <= 0} 
-                  className="w-full bg-emerald-600 text-white font-black py-6 rounded-2xl shadow-xl shadow-emerald-600/20 uppercase tracking-widest text-[10px] hover:bg-emerald-700 transition-all active:scale-95 disabled:opacity-30 flex items-center justify-center gap-2"
-                >
-                  {procesando ? <Loader2 className="animate-spin" /> : "PROCESAR Y GUARDAR"}
-                </button>
+                <div className="space-y-1">
+                  <label className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">No. Comprobante RC</label>
+                  <div className="relative">
+                    <Hash className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={16} />
+                    <input className="w-full bg-slate-50 border border-slate-100 p-4 pl-12 rounded-2xl outline-none font-black text-slate-900" value={formRecibo.numero} onChange={(e) => setFormRecibo({ ...formRecibo, numero: e.target.value })} required />
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Medio de Pago</label>
+                  <div className="flex bg-slate-100 p-1 rounded-2xl gap-1">
+                    {['Transferencia', 'Efectivo'].map(m => (
+                      <button key={m} onClick={() => setFormRecibo({ ...formRecibo, metodo: m })} className={`flex-1 py-2.5 rounded-xl text-[9px] font-black transition-all ${formRecibo.metodo === m ? "bg-white text-slate-900 shadow-md border" : "text-slate-400"}`}>{m.toUpperCase()}</button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Referencia</label>
+                  <input className="w-full bg-slate-50 border border-slate-100 p-4 rounded-2xl outline-none font-bold text-sm focus:bg-white" placeholder="Ej: Ref Bancaria" value={formRecibo.referencia} onChange={(e) => setFormRecibo({ ...formRecibo, referencia: e.target.value })} />
+                </div>
+              </div>
+
+              <button
+                onClick={procesarPago}
+                disabled={procesando || totalAPagarRecibo <= 0}
+                className="w-full bg-emerald-600 text-white font-black py-6 rounded-2xl shadow-xl shadow-emerald-600/20 uppercase tracking-widest text-[10px] hover:bg-emerald-700 transition-all active:scale-95 disabled:opacity-30 flex items-center justify-center gap-2"
+              >
+                {procesando ? <Loader2 className="animate-spin" /> : "PROCESAR Y GUARDAR"}
+              </button>
             </div>
           </div>
         </div>

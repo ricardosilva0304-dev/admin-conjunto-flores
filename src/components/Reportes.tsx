@@ -63,29 +63,30 @@ export default function Reportes() {
     try {
       if (tipo === "General" || tipo === "Solo Ingresos" || tipo === "Solo Egresos") {
         if (!mes) return alert("Selecciona un mes");
+
+        // --- CORRECCIÓN DE FECHAS DINÁMICAS ---
+        const [anio, mesNum] = mes.split("-").map(Number);
         const primerDia = `${mes}-01`;
-        const ultimoDia = `${mes}-31`;
+
+        // Esta línea calcula el último día real del mes (28, 30 o 31)
+        const ultimoDiaNum = new Date(anio, mesNum, 0).getDate();
+        const ultimoDia = `${mes}-${ultimoDiaNum.toString().padStart(2, '0')}`;
+        // ---------------------------------------
 
         const [resIng, resEgr] = await Promise.all([
-          supabase.from("pagos").select("*").gte("fecha_pago", primerDia).lte("fecha_pago", ultimoDia).order('fecha_pago'),
-          supabase.from("egresos").select("*").gte("fecha", primerDia).lte("fecha", ultimoDia).order('fecha')
+          supabase.from("pagos")
+            .select("*")
+            .gte("fecha_pago", primerDia)
+            .lte("fecha_pago", ultimoDia)
+            .order('fecha_pago'),
+          supabase.from("egresos")
+            .select("*")
+            .gte("fecha", primerDia)
+            .lte("fecha", ultimoDia)
+            .order('fecha')
         ]);
+
         setReporteData({ ingresos: resIng.data || [], egresos: resEgr.data || [], residentes: [], cartera: [] });
-      }
-      else if (tipo === "Directorio Residentes") {
-        const { data } = await supabase.from("residentes").select("*").neq("torre", "Torre 1").order("torre").order("apartamento");
-        setReporteData({ ingresos: [], egresos: [], cartera: [], residentes: data || [] });
-      }
-      else if (tipo === "Estado Cartera") {
-        const [resRes, deudasRes] = await Promise.all([
-          supabase.from("residentes").select("*").neq("torre", "Torre 1").order("torre").order("apartamento"),
-          supabase.from("deudas_residentes").select("*, causaciones_globales(mes_causado, tipo_cobro)").gt("saldo_pendiente", 0)
-        ]);
-        const cartera = (resRes.data || []).map(r => {
-            const dUnidad = (deudasRes.data || []).filter((d:any) => d.residente_id === r.id);
-            return { ...r, total: dUnidad.reduce((acc, d) => acc + calcularValorDeudaHoy(d), 0) };
-        }).filter(r => r.total !== 0);
-        setReporteData({ ingresos: [], egresos: [], residentes: [], cartera });
       }
     } catch (e) { console.error(e); } finally { setLoading(false); }
   }
@@ -98,12 +99,12 @@ export default function Reportes() {
 
   return (
     <div className="max-w-6xl mx-auto space-y-6 pb-24 font-sans text-slate-800">
-      
+
       {/* SECCIÓN DE FILTROS (MÓVIL-FIRST) */}
       <section className="no-print bg-slate-900 p-6 rounded-[2rem] shadow-2xl flex flex-col md:flex-row items-center gap-6 border border-white/5">
         <div className="flex items-center gap-4 flex-1">
           <div className="w-12 h-12 bg-emerald-500 rounded-2xl flex items-center justify-center text-slate-900 shadow-lg shadow-emerald-500/20">
-            <PieChart size={24} strokeWidth={2.5}/>
+            <PieChart size={24} strokeWidth={2.5} />
           </div>
           <div>
             <h2 className="text-white font-black text-sm uppercase tracking-widest leading-none">Módulo de Auditoría</h2>
@@ -112,9 +113,9 @@ export default function Reportes() {
         </div>
 
         <div className="flex flex-wrap gap-3 w-full md:w-auto">
-          <select 
-            className="flex-1 md:w-56 bg-slate-800 border border-white/10 text-white p-3 rounded-xl text-xs font-black outline-none focus:ring-2 ring-emerald-500/50" 
-            value={tipo} 
+          <select
+            className="flex-1 md:w-56 bg-slate-800 border border-white/10 text-white p-3 rounded-xl text-xs font-black outline-none focus:ring-2 ring-emerald-500/50"
+            value={tipo}
             onChange={(e) => { setTipo(e.target.value); setReporteData(null); }}
           >
             <optgroup label="FINANCIEROS" className="bg-slate-900">
@@ -131,10 +132,10 @@ export default function Reportes() {
           {(tipo === "General" || tipo.includes("Solo")) && (
             <input type="month" className="bg-slate-800 border border-white/10 text-white p-3 rounded-xl text-xs font-black outline-none" onChange={(e) => setMes(e.target.value)} />
           )}
-          
-          <button 
-            onClick={generarReporte} 
-            disabled={loading} 
+
+          <button
+            onClick={generarReporte}
+            disabled={loading}
             className="bg-emerald-500 hover:bg-emerald-400 text-slate-900 px-8 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all active:scale-95 disabled:opacity-20"
           >
             {loading ? <Loader2 className="animate-spin" /> : "GENERAR"}
@@ -145,15 +146,15 @@ export default function Reportes() {
       {/* ÁREA DEL REPORTE */}
       {reporteData && (
         <div className="bg-white border-2 border-slate-100 shadow-2xl rounded-[2.5rem] overflow-hidden animate-in slide-in-from-bottom-4 duration-700">
-          
+
           <div className="no-print p-6 border-b border-slate-50 flex justify-end">
-             <button onClick={handlePrint} className="bg-slate-900 text-white px-6 py-3 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-black transition-all flex items-center gap-2">
-                <Printer size={16}/> Imprimir en PDF
-             </button>
+            <button onClick={handlePrint} className="bg-slate-900 text-white px-6 py-3 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-black transition-all flex items-center gap-2">
+              <Printer size={16} /> Imprimir en PDF
+            </button>
           </div>
 
           <div ref={printRef} className="p-12 md:p-16 w-full bg-white text-slate-900">
-            
+
             {/* CABEZOTE PROFESIONAL */}
             <div className="flex justify-between items-center border-b-4 border-slate-900 pb-8 mb-10">
               <div className="flex items-center gap-6">
@@ -174,31 +175,31 @@ export default function Reportes() {
             {(tipo === "General" || tipo.includes("Solo")) && (
               <div className="grid grid-cols-3 gap-6 mb-12">
                 <div className="p-6 bg-slate-50 border border-slate-200 rounded-3xl">
-                   <div className="flex items-center justify-between mb-4">
-                      <p className="text-[9px] font-black text-emerald-600 uppercase tracking-widest">Recaudo Total</p>
-                      <TrendingUp size={16} className="text-emerald-500"/>
-                   </div>
-                   <p className="text-3xl font-black tabular-nums">${totalIng.toLocaleString()}</p>
-                   <div className="mt-3 flex gap-4 text-[8px] font-bold text-slate-400 uppercase">
-                      <span>Bco: ${banco.toLocaleString()}</span>
-                      <span>Efec: ${efectivo.toLocaleString()}</span>
-                   </div>
+                  <div className="flex items-center justify-between mb-4">
+                    <p className="text-[9px] font-black text-emerald-600 uppercase tracking-widest">Recaudo Total</p>
+                    <TrendingUp size={16} className="text-emerald-500" />
+                  </div>
+                  <p className="text-3xl font-black tabular-nums">${totalIng.toLocaleString()}</p>
+                  <div className="mt-3 flex gap-4 text-[8px] font-bold text-slate-400 uppercase">
+                    <span>Bco: ${banco.toLocaleString()}</span>
+                    <span>Efec: ${efectivo.toLocaleString()}</span>
+                  </div>
                 </div>
                 <div className="p-6 bg-slate-50 border border-slate-200 rounded-3xl">
-                   <div className="flex items-center justify-between mb-4">
-                      <p className="text-[9px] font-black text-rose-600 uppercase tracking-widest">Egresos / Gastos</p>
-                      <TrendingDown size={16} className="text-rose-500"/>
-                   </div>
-                   <p className="text-3xl font-black tabular-nums">-${totalEgr.toLocaleString()}</p>
-                   <p className="mt-3 text-[8px] font-bold text-slate-400 uppercase">{reporteData.egresos.length} facturas pagadas</p>
+                  <div className="flex items-center justify-between mb-4">
+                    <p className="text-[9px] font-black text-rose-600 uppercase tracking-widest">Egresos / Gastos</p>
+                    <TrendingDown size={16} className="text-rose-500" />
+                  </div>
+                  <p className="text-3xl font-black tabular-nums">-${totalEgr.toLocaleString()}</p>
+                  <p className="mt-3 text-[8px] font-bold text-slate-400 uppercase">{reporteData.egresos.length} facturas pagadas</p>
                 </div>
                 <div className="p-6 bg-slate-900 rounded-3xl text-white shadow-xl">
-                   <div className="flex items-center justify-between mb-4">
-                      <p className="text-[9px] font-black text-emerald-400 uppercase tracking-widest">Saldo Neto</p>
-                      <Scale size={16} className="text-emerald-400"/>
-                   </div>
-                   <p className="text-3xl font-black tabular-nums">${(totalIng - totalEgr).toLocaleString()}</p>
-                   <p className="mt-3 text-[8px] font-bold text-slate-500 uppercase tracking-widest">Utilidad operativa mes</p>
+                  <div className="flex items-center justify-between mb-4">
+                    <p className="text-[9px] font-black text-emerald-400 uppercase tracking-widest">Saldo Neto</p>
+                    <Scale size={16} className="text-emerald-400" />
+                  </div>
+                  <p className="text-3xl font-black tabular-nums">${(totalIng - totalEgr).toLocaleString()}</p>
+                  <p className="mt-3 text-[8px] font-bold text-slate-500 uppercase tracking-widest">Utilidad operativa mes</p>
                 </div>
               </div>
             )}
@@ -207,7 +208,7 @@ export default function Reportes() {
             {(tipo === "General" || tipo === "Solo Ingresos") && (
               <div className="mb-12">
                 <h3 className="text-[10px] font-black uppercase text-slate-800 mb-4 flex items-center gap-2">
-                   <div className="w-1.5 h-4 bg-emerald-500 rounded-full"></div> Relación Detallada de Ingresos
+                  <div className="w-1.5 h-4 bg-emerald-500 rounded-full"></div> Relación Detallada de Ingresos
                 </h3>
                 <table className="w-full">
                   <thead>
@@ -234,7 +235,7 @@ export default function Reportes() {
             {(tipo === "General" || tipo === "Solo Egresos") && (
               <div className="mb-12">
                 <h3 className="text-[10px] font-black uppercase text-slate-800 mb-4 flex items-center gap-2">
-                   <div className="w-1.5 h-4 bg-rose-500 rounded-full"></div> Relación Detallada de Gastos
+                  <div className="w-1.5 h-4 bg-rose-500 rounded-full"></div> Relación Detallada de Gastos
                 </h3>
                 <table className="w-full">
                   <thead>
@@ -259,49 +260,49 @@ export default function Reportes() {
             {/* TABLA: ESTADO DE CARTERA */}
             {tipo === "Estado Cartera" && (
               <div className="mb-12">
-                 <h3 className="text-[10px] font-black uppercase text-slate-800 mb-4 flex items-center gap-2">
-                    <div className="w-1.5 h-4 bg-rose-600 rounded-full"></div> Balance General de Cartera Morosa
-                 </h3>
-                 <table className="w-full">
-                    <thead><tr><th>Unidad</th><th>Titular de la Unidad</th><th>Estado Contable</th><th className="text-right">Saldo a la Fecha</th></tr></thead>
-                    <tbody>
-                      {reporteData.cartera.sort((a,b) => b.total - a.total).map(r => (
-                        <tr key={r.id}>
-                          <td className="font-black">T{r.torre.slice(-1)}-{r.apartamento}</td>
-                          <td className="uppercase font-medium">{r.nombre}</td>
-                          <td>
-                            <span className={`px-2 py-0.5 rounded-[4px] text-[8px] font-black uppercase ${r.total > 0 ? 'bg-rose-50 text-rose-600 border border-rose-100' : 'bg-emerald-50 text-emerald-600 border border-emerald-100'}`}>
-                                {r.total > 0 ? 'En Mora' : 'Anticipo / CR'}
-                            </span>
-                          </td>
-                          <td className={`text-right font-black tabular-nums ${r.total < 0 ? 'text-emerald-600' : 'text-slate-900'}`}>
-                            ${Math.abs(r.total).toLocaleString()} {r.total < 0 ? '(CR)' : ''}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                 </table>
-                 <div className="bg-slate-900 p-6 rounded-2xl mt-6 flex justify-between items-center text-white">
-                    <p className="text-[10px] font-black uppercase tracking-widest">Total Cartera en Calle:</p>
-                    <p className="text-2xl font-black tabular-nums">${reporteData.cartera.reduce((a,b)=> a + (b.total > 0 ? b.total : 0), 0).toLocaleString()}</p>
-                 </div>
+                <h3 className="text-[10px] font-black uppercase text-slate-800 mb-4 flex items-center gap-2">
+                  <div className="w-1.5 h-4 bg-rose-600 rounded-full"></div> Balance General de Cartera Morosa
+                </h3>
+                <table className="w-full">
+                  <thead><tr><th>Unidad</th><th>Titular de la Unidad</th><th>Estado Contable</th><th className="text-right">Saldo a la Fecha</th></tr></thead>
+                  <tbody>
+                    {reporteData.cartera.sort((a, b) => b.total - a.total).map(r => (
+                      <tr key={r.id}>
+                        <td className="font-black">T{r.torre.slice(-1)}-{r.apartamento}</td>
+                        <td className="uppercase font-medium">{r.nombre}</td>
+                        <td>
+                          <span className={`px-2 py-0.5 rounded-[4px] text-[8px] font-black uppercase ${r.total > 0 ? 'bg-rose-50 text-rose-600 border border-rose-100' : 'bg-emerald-50 text-emerald-600 border border-emerald-100'}`}>
+                            {r.total > 0 ? 'En Mora' : 'Anticipo / CR'}
+                          </span>
+                        </td>
+                        <td className={`text-right font-black tabular-nums ${r.total < 0 ? 'text-emerald-600' : 'text-slate-900'}`}>
+                          ${Math.abs(r.total).toLocaleString()} {r.total < 0 ? '(CR)' : ''}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                <div className="bg-slate-900 p-6 rounded-2xl mt-6 flex justify-between items-center text-white">
+                  <p className="text-[10px] font-black uppercase tracking-widest">Total Cartera en Calle:</p>
+                  <p className="text-2xl font-black tabular-nums">${reporteData.cartera.reduce((a, b) => a + (b.total > 0 ? b.total : 0), 0).toLocaleString()}</p>
+                </div>
               </div>
             )}
 
             {/* FIRMAS LEGALES */}
             <div className="mt-32 pt-10 border-t-2 border-slate-900 grid grid-cols-2 gap-24">
               <div className="text-center">
-                 <p className="text-[10px] font-black uppercase text-slate-900">Administración / Tesorería</p>
-                 <p className="text-[8px] font-bold text-slate-400 mt-1 uppercase tracking-widest">Responsable del Recaudo</p>
+                <p className="text-[10px] font-black uppercase text-slate-900">Administración / Tesorería</p>
+                <p className="text-[8px] font-bold text-slate-400 mt-1 uppercase tracking-widest">Responsable del Recaudo</p>
               </div>
               <div className="text-center">
-                 <p className="text-[10px] font-black uppercase text-slate-900">Consejo de Admón / Revisoría</p>
-                 <p className="text-[8px] font-bold text-slate-400 mt-1 uppercase tracking-widest">Control Interno</p>
+                <p className="text-[10px] font-black uppercase text-slate-900">Consejo de Admón / Revisoría</p>
+                <p className="text-[8px] font-bold text-slate-400 mt-1 uppercase tracking-widest">Control Interno</p>
               </div>
             </div>
 
             <div className="mt-20 text-center text-[8px] font-bold text-slate-300 uppercase tracking-[0.5em]">
-               Fin del Reporte Administrativo
+              Fin del Reporte Administrativo
             </div>
           </div>
         </div>
