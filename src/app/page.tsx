@@ -35,6 +35,7 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [adminName, setAdminName] = useState("");
   const [currentTime, setCurrentTime] = useState(new Date());
+  const [userRole, setUserRole] = useState("");
 
   // Control de menú lateral para celular
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -62,10 +63,11 @@ export default function App() {
         setError("La cédula o la contraseña no coinciden.");
       } else {
         setAdminName(data.nombre);
+        setUserRole(data.rol || "admin"); // <--- CAPTURAMOS EL ROL
         setIsLoggedIn(true);
       }
     } catch (err) {
-      setError("Error de conexión al servidor.");
+      setError("Error de conexión.");
     } finally {
       setLoading(false);
     }
@@ -151,6 +153,7 @@ export default function App() {
         isOpen={isSidebarOpen}
         setIsOpen={setIsSidebarOpen}
         onLogout={handleLogout} // <--- AÑADE ESTA LÍNEA
+        role={userRole}
       />
 
       <main className="flex-1 overflow-y-auto relative scroll-smooth flex flex-col">
@@ -233,7 +236,7 @@ export default function App() {
 
           {activeTab === "egresos" && <Egresos />}
 
-          {activeTab === "deudores" && <Deudores />}
+          {activeTab === "deudores" && <Deudores role={userRole} />}
 
           {activeTab === "residentes" && <Residentes />}
 

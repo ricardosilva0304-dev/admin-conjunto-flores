@@ -24,10 +24,20 @@ interface SidebarProps {
   setActiveTab: (tab: string) => void;
   isOpen: boolean;
   setIsOpen: (open: boolean) => void;
-  onLogout: () => void; // Añadimos esta prop
+  onLogout: () => void;
+  role: string; 
 }
 
-export default function Sidebar({ activeTab, setActiveTab, isOpen, setIsOpen, onLogout }: SidebarProps) {
+export default function Sidebar({ activeTab, setActiveTab, isOpen, setIsOpen, onLogout, role }: SidebarProps) {
+  
+  // 1. Filtrar los items aquí
+  const filteredMenuItems = menuItems.filter(item => {
+    if (role === 'contador') {
+      return ['resumen', 'balance', 'deudores', 'reportes'].includes(item.id);
+    }
+    return true; 
+  });
+  
   return (
     <>
       {isOpen && (
@@ -51,9 +61,9 @@ export default function Sidebar({ activeTab, setActiveTab, isOpen, setIsOpen, on
           </div>
         </div>
 
-        {/* NAVEGACIÓN PLANA Y COMPACTA */}
+        {/* NAVEGACIÓN - AQUÍ USAMOS filteredMenuItems */}
         <nav className="flex-1 px-3 space-y-0.5 overflow-y-auto no-scrollbar">
-          {menuItems.map((item) => {
+          {filteredMenuItems.map((item) => { // <--- CAMBIO AQUÍ
             const isActive = activeTab === item.id;
             return (
               <button
@@ -64,8 +74,8 @@ export default function Sidebar({ activeTab, setActiveTab, isOpen, setIsOpen, on
                 }}
                 className={`
                   w-full flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-200 group relative
-                  ${isActive 
-                    ? "bg-emerald-500/10 text-emerald-400" 
+                  ${isActive
+                    ? "bg-emerald-500/10 text-emerald-400"
                     : "text-zinc-500 hover:text-zinc-200 hover:bg-white/[0.03]"
                   }
                 `}
@@ -87,7 +97,7 @@ export default function Sidebar({ activeTab, setActiveTab, isOpen, setIsOpen, on
 
         {/* BOTÓN CERRAR SESIÓN */}
         <div className="p-4 border-t border-white/5">
-          <button 
+          <button
             onClick={onLogout}
             className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-rose-500 hover:bg-rose-500/10 transition-all group"
           >

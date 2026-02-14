@@ -11,7 +11,7 @@ import {
 import EstadoCuenta from "./EstadoCuenta";
 import CuentaCobro from "./CuentaCobro";
 
-export default function Deudores() {
+export default function Deudores({ role }: { role?: string }) {
   const [residentes, setResidentes] = useState<any[]>([]);
   const [deudas, setDeudas] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -152,9 +152,14 @@ export default function Deudores() {
           ))}
         </div>
 
-        <button onClick={() => setShowManualModal(true)} className="bg-emerald-600 text-white px-8 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-emerald-700 transition-all shadow-lg active:scale-95">
-          CARGO MANUAL
-        </button>
+        {role !== 'contador' && (
+          <button
+            onClick={() => setShowManualModal(true)}
+            className="bg-emerald-600 text-white px-8 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-emerald-700 transition-all shadow-lg active:scale-95"
+          >
+            CARGO MANUAL
+          </button>
+        )}
       </div>
 
       {/* LISTADO POR UNIDADES */}
