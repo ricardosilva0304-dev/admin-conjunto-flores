@@ -16,7 +16,8 @@ interface ReporteFinancieroData {
     totalEgresos: number;
     saldoNeto: number;
     ingresosBanco: number;
-    ingresosEfectivo: number;
+    ingresosEfectivo: number; // Este ahora será el saldo NETO de efectivo
+    ingresosEfectivoBruto: number; // <-- ¡NUEVO CAMPO! Para mostrar el ingreso de efectivo antes de gastos
     numIngresos: number;
     numEgresos: number;
   };
@@ -90,15 +91,29 @@ export default function Reportes() {
         ]);
         const ingresos = resIng.data || [];
         const egresos = resEgr.data || [];
+
+        const totalIngresos = ingresos.reduce((s, i) => s + Number(i.monto_total), 0);
+        const totalEgresos = egresos.reduce((s, e) => s + Number(e.monto), 0);
+        const ingresosBanco = ingresos.filter(i => i.metodo_pago === 'Transferencia').reduce((s, i) => s + Number(i.monto_total), 0);
+
+        // Calculamos el ingreso de efectivo ANTES de restar los gastos
+        const ingresosEfectivoBruto = ingresos.filter(i => i.metodo_pago === 'Efectivo').reduce((s, i) => s + Number(i.monto_total), 0);
+
+        // --- ¡AQUÍ ESTÁ EL CAMBIO CLAVE! ---
+        // El saldo de efectivo ahora resta todos los egresos
+        const saldoEfectivoNeto = ingresosEfectivoBruto - totalEgresos;
+
         setDatosReporte({
           tipo: 'FINANCIERO', ingresos, egresos,
           summary: {
-            totalIngresos: ingresos.reduce((s, i) => s + Number(i.monto_total), 0),
-            totalEgresos: egresos.reduce((s, e) => s + Number(e.monto), 0),
-            saldoNeto: ingresos.reduce((s, i) => s + Number(i.monto_total), 0) - egresos.reduce((s, e) => s + Number(e.monto), 0),
-            ingresosBanco: ingresos.filter(i => i.metodo_pago === 'Transferencia').reduce((s, i) => s + Number(i.monto_total), 0),
-            ingresosEfectivo: ingresos.filter(i => i.metodo_pago === 'Efectivo').reduce((s, i) => s + Number(i.monto_total), 0),
-            numIngresos: ingresos.length, numEgresos: egresos.length
+            totalIngresos: totalIngresos,
+            totalEgresos: totalEgresos,
+            saldoNeto: totalIngresos - totalEgresos,
+            ingresosBanco: ingresosBanco,
+            ingresosEfectivo: saldoEfectivoNeto, // Este es el valor NETO
+            ingresosEfectivoBruto: ingresosEfectivoBruto, // Guardamos el bruto para el desglose
+            numIngresos: ingresos.length,
+            numEgresos: egresos.length
           }
         });
       } else if (tipoReporte === "Estado Cartera") {
@@ -186,26 +201,35 @@ export default function Reportes() {
                     {/* KPIs */}
                     <section className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
                       {(tipoReporte === "General" || tipoReporte === "Solo Ingresos") && (
-                        <div className="p-4 border border-slate-200 rounded-lg bg-white">
-                          <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Recaudo Total (Bruto)</p>
-                          <p className="text-xl font-black text-slate-900 tabular-nums">
-                            ${datosReporte.summary.totalIngresos.toLocaleString()}
-                          </p>
+                        <div className="p-4 border border-slate-200 rounded-lg bg-white flex flex-col justify-between">
+                          <div>
+                            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Recaudo Total (Bruto)</p>
+                            <p className="text-xl font-black text-slate-900 tabular-nums">
+                              ${datosReporte.summary.totalIngresos.toLocaleString()}
+                            </p>
+                          </div>
 
-                          {/* Desglose pequeño y sencillo */}
                           <div className="mt-3 pt-2 border-t border-slate-100 space-y-1">
                             <div className="flex justify-between items-center text-[9px] font-bold">
                               <span className="text-slate-400 uppercase">En Bancos:</span>
                               <span className="text-emerald-600">${datosReporte.summary.ingresosBanco.toLocaleString()}</span>
                             </div>
                             <div className="flex justify-between items-center text-[9px] font-bold">
-                              <span className="text-slate-400 uppercase">En Efectivo:</span>
-                              <span className="text-emerald-600">${datosReporte.summary.ingresosEfectivo.toLocaleString()}</span>
+                              {/* Saldo de efectivo NETO */}
+                              <span className="text-slate-400 uppercase">Saldo en Efectivo:</span>
+                              <span className={`font-black ${datosReporte.summary.ingresosEfectivo < 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
+                                ${datosReporte.summary.ingresosEfectivo.toLocaleString()}
+                              </span>
                             </div>
+                            {/* Desglose aclaratorio de la operación */}
                             <p className="text-[8px] text-slate-300 uppercase mt-1 italic text-right">
-                              {datosReporte.summary.numIngresos} transacciones
+                              (Ingresos: ${datosReporte.summary.ingresosEfectivoBruto.toLocaleString()} - Gastos: ${datosReporte.summary.totalEgresos.toLocaleString()})
                             </p>
                           </div>
+                          {/* Número de transacciones al final */}
+                          <p className="text-[8px] text-slate-300 uppercase mt-auto text-right">
+                            {datosReporte.summary.numIngresos} transacciones
+                          </p>
                         </div>
                       )}
                       {(tipoReporte === "General" || tipoReporte === "Solo Egresos") && (
