@@ -126,7 +126,7 @@ export default function Reportes() {
 
   return (
     <div className="max-w-6xl mx-auto space-y-6 pb-24 font-sans text-slate-800">
-      
+
       {/* SECCIÓN DE CONTROLES (NO SE IMPRIME) */}
       <section className="no-print bg-slate-900 p-6 rounded-3xl shadow-2xl flex flex-col md:flex-row items-center gap-6">
         <div className="flex items-center gap-4 flex-1">
@@ -157,13 +157,13 @@ export default function Reportes() {
           `}</style>
 
           <div className="w-full max-w-[216mm] bg-white shadow-2xl rounded-sm overflow-hidden border border-slate-200">
-            
+
             <div className="no-print p-4 bg-slate-50 border-b border-slate-200 flex justify-end">
               <button onClick={handlePrint} className="bg-slate-900 text-white px-6 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-black transition-all flex items-center gap-2">
                 <Printer size={14} /> IMPRIMIR PDF
               </button>
             </div>
-            
+
             <div ref={printRef} className="report-content p-12 w-full bg-white text-slate-900 min-h-[279mm]">
               {/* ENCABEZADO */}
               <header className="flex justify-between items-center border-b-2 border-slate-900 pb-4 mb-8">
@@ -186,24 +186,55 @@ export default function Reportes() {
                     {/* KPIs */}
                     <section className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
                       {(tipoReporte === "General" || tipoReporte === "Solo Ingresos") && (
-                        <div className="p-5 border border-slate-200 rounded-lg">
-                          <p className="text-[10px] font-black text-emerald-600 uppercase mb-1">Recaudo Total</p>
-                          <p className="text-2xl font-black tabular-nums">${datosReporte.summary.totalIngresos.toLocaleString()}</p>
-                          <p className="text-[8px] text-slate-400 uppercase mt-1">{datosReporte.summary.numIngresos} Transacciones</p>
+                        <div className="p-4 border border-slate-200 rounded-lg bg-white">
+                          <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Recaudo Total (Bruto)</p>
+                          <p className="text-xl font-black text-slate-900 tabular-nums">
+                            ${datosReporte.summary.totalIngresos.toLocaleString()}
+                          </p>
+
+                          {/* Desglose pequeño y sencillo */}
+                          <div className="mt-3 pt-2 border-t border-slate-100 space-y-1">
+                            <div className="flex justify-between items-center text-[9px] font-bold">
+                              <span className="text-slate-400 uppercase">En Bancos:</span>
+                              <span className="text-emerald-600">${datosReporte.summary.ingresosBanco.toLocaleString()}</span>
+                            </div>
+                            <div className="flex justify-between items-center text-[9px] font-bold">
+                              <span className="text-slate-400 uppercase">En Efectivo:</span>
+                              <span className="text-emerald-600">${datosReporte.summary.ingresosEfectivo.toLocaleString()}</span>
+                            </div>
+                            <p className="text-[8px] text-slate-300 uppercase mt-1 italic text-right">
+                              {datosReporte.summary.numIngresos} transacciones
+                            </p>
+                          </div>
                         </div>
                       )}
                       {(tipoReporte === "General" || tipoReporte === "Solo Egresos") && (
-                        <div className="p-5 border border-slate-200 rounded-lg">
-                          <p className="text-[10px] font-black text-rose-600 uppercase mb-1">Gastos Totales</p>
-                          <p className="text-2xl font-black tabular-nums">-${datosReporte.summary.totalEgresos.toLocaleString()}</p>
-                          <p className="text-[8px] text-slate-400 uppercase mt-1">{datosReporte.summary.numEgresos} Facturas</p>
+                        <div className="p-4 border border-slate-200 rounded-lg bg-white">
+                          <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Gastos Totales</p>
+                          <p className="text-xl font-black text-rose-600 tabular-nums">
+                            -${datosReporte.summary.totalEgresos.toLocaleString()}
+                          </p>
+                          <div className="mt-3 pt-2 border-t border-slate-100">
+                            <p className="text-[9px] font-bold text-slate-400 uppercase">
+                              Salidas de Caja: <span className="text-slate-700">${datosReporte.summary.totalEgresos.toLocaleString()}</span>
+                            </p>
+                            <p className="text-[8px] text-slate-300 uppercase mt-2 italic text-right">
+                              {datosReporte.summary.numEgresos} facturas
+                            </p>
+                          </div>
                         </div>
                       )}
                       {tipoReporte === "General" && (
-                        <div className="p-5 bg-slate-900 text-white rounded-lg">
-                          <p className="text-[10px] font-black text-emerald-400 uppercase mb-1">Saldo Neto</p>
-                          <p className="text-2xl font-black tabular-nums">${datosReporte.summary.saldoNeto.toLocaleString()}</p>
-                          <p className="text-[8px] text-slate-500 uppercase mt-1">Utilidad Operativa</p>
+                        <div className="p-4 bg-slate-900 rounded-lg shadow-sm border border-slate-800">
+                          <p className="text-[9px] font-black text-emerald-400 uppercase tracking-widest mb-1">Saldo Neto (Utilidad)</p>
+                          <p className="text-xl font-black text-white tabular-nums">
+                            ${datosReporte.summary.saldoNeto.toLocaleString()}
+                          </p>
+                          <div className="mt-3 pt-2 border-t border-white/10">
+                            <p className="text-[8px] text-slate-400 uppercase font-bold tracking-tighter">
+                              Disponibilidad final del periodo
+                            </p>
+                          </div>
                         </div>
                       )}
                     </section>
