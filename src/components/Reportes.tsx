@@ -3,10 +3,10 @@ import { useState, useRef } from "react";
 import { supabase } from "@/lib/supabase";
 import { calcularValorDeudaHoy } from "@/lib/utils";
 import {
-  FileText, Printer, Loader2, Scale, TrendingDown, TrendingUp,
-  Wallet, Landmark, Banknote, Users, PieChart, Car
+  Printer, Loader2, PieChart
 } from "lucide-react";
 
+// --- INTERFACES ---
 interface ReporteFinancieroData {
   tipo: 'FINANCIERO';
   ingresos: any[];
@@ -35,13 +35,6 @@ interface ReporteCensoData {
 
 type ReporteData = ReporteFinancieroData | ReporteCarteraData | ReporteCensoData | null;
 
-const MotoIcon = ({ className, size = 14 }: { className?: string, size?: number }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
-     <circle cx="7" cy="18" r="3" /><circle cx="17" cy="18" r="3" />
-     <path d="M12 18V9c0-2 1-3 3-3 1 0 2 .5 3 1.5" /><path d="M16 18H8" /><path d="M7 15c-1-2-1-4 1-5l4-2 2 3h4" />
-  </svg>
-);
-
 export default function Reportes() {
   const [tipoReporte, setTipoReporte] = useState("General");
   const [mes, setMes] = useState("");
@@ -49,6 +42,7 @@ export default function Reportes() {
   const printRef = useRef<HTMLDivElement>(null);
   const [datosReporte, setDatosReporte] = useState<ReporteData>(null);
 
+  // --- MOTOR DE IMPRESIÓN (SIN CAMBIOS) ---
   const handlePrint = () => {
     const content = printRef.current;
     if (!content) return;
@@ -58,15 +52,18 @@ export default function Reportes() {
     const doc = iframe.contentWindow?.document;
     if (!doc) return;
     const styles = Array.from(document.querySelectorAll("style, link[rel='stylesheet']")).map((s) => s.outerHTML).join("");
-    
+
     doc.write(`<html><head><title>Reporte Administrativo</title>${styles}
       <style>
         @page { size: letter; margin: 0; }
         body { margin: 0; padding: 0; background: white !important; }
         .print-page { width: 216mm; padding: 15mm; box-sizing: border-box; }
-        table { width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 9.5px; }
+        
+        /* ESTILOS EXACTOS DE IMPRESIÓN */
+        table { width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 9.5px; font-family: sans-serif; }
         th { background: #f8fafc !important; padding: 8px; text-align: left; border-bottom: 2px solid #1e293b; color: #475569; font-weight: 800; text-transform: uppercase; }
         td { padding: 8px; border-bottom: 1px solid #e2e8f0; vertical-align: top; color: #1e293b; }
+        
         .no-print { display: none !important; }
         * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
       </style>
@@ -93,27 +90,32 @@ export default function Reportes() {
         ]);
         const ingresos = resIng.data || [];
         const egresos = resEgr.data || [];
-        setDatosReporte({ 
-          tipo: 'FINANCIERO', ingresos, egresos, 
-          summary: { 
+        setDatosReporte({
+          tipo: 'FINANCIERO', ingresos, egresos,
+          summary: {
             totalIngresos: ingresos.reduce((s, i) => s + Number(i.monto_total), 0),
             totalEgresos: egresos.reduce((s, e) => s + Number(e.monto), 0),
             saldoNeto: ingresos.reduce((s, i) => s + Number(i.monto_total), 0) - egresos.reduce((s, e) => s + Number(e.monto), 0),
             ingresosBanco: ingresos.filter(i => i.metodo_pago === 'Transferencia').reduce((s, i) => s + Number(i.monto_total), 0),
             ingresosEfectivo: ingresos.filter(i => i.metodo_pago === 'Efectivo').reduce((s, i) => s + Number(i.monto_total), 0),
-            numIngresos: ingresos.length, numEgresos: egresos.length 
-          } 
+            numIngresos: ingresos.length, numEgresos: egresos.length
+          }
         });
       } else if (tipoReporte === "Estado Cartera") {
         const [resRes, deudasRes] = await Promise.all([
           supabase.from("residentes").select("*").in('torre', TORRES_REQUERIDAS),
-          supabase.from("deudas_residentes").select("*").neq("saldo_pendiente", 0)
+          // CORRECCIÓN INCLUIDA: Pedimos causaciones_globales para el cálculo exacto
+          supabase.from("deudas_residentes")
+            .select("*, causaciones_globales(mes_causado, tipo_cobro)")
+            .neq("saldo_pendiente", 0)
         ]);
+
         let enMora = (resRes.data || []).map(r => {
-            const deudasUnidad = (deudasRes.data || []).filter(d => d.residente_id === r.id);
-            const saldoReal = deudasUnidad.reduce((acc, d) => acc + calcularValorDeudaHoy(d), 0);
-            return { ...r, saldoReal };
-        }).filter(r => r.saldoReal > 0).sort((a,b) => a.torre.localeCompare(b.torre) || parseInt(a.apartamento) - parseInt(b.apartamento));
+          const deudasUnidad = (deudasRes.data || []).filter(d => d.residente_id === r.id);
+          const saldoReal = deudasUnidad.reduce((acc, d) => acc + calcularValorDeudaHoy(d), 0);
+          return { ...r, saldoReal };
+        }).filter(r => r.saldoReal > 0).sort((a, b) => a.torre.localeCompare(b.torre) || parseInt(a.apartamento) - parseInt(b.apartamento));
+
         setDatosReporte({ tipo: 'CARTERA', enMora, summary: { totalEnMora: enMora.reduce((acc, r) => acc + r.saldoReal, 0), unidadesEnMora: enMora.length } });
       } else if (tipoReporte === "Directorio Residentes") {
         const { data } = await supabase.from("residentes").select("*").in('torre', TORRES_REQUERIDAS).order('torre').order('apartamento');
@@ -124,6 +126,8 @@ export default function Reportes() {
 
   return (
     <div className="max-w-6xl mx-auto space-y-6 pb-24 font-sans text-slate-800">
+      
+      {/* SECCIÓN DE CONTROLES (NO SE IMPRIME) */}
       <section className="no-print bg-slate-900 p-6 rounded-3xl shadow-2xl flex flex-col md:flex-row items-center gap-6">
         <div className="flex items-center gap-4 flex-1">
           <div className="w-12 h-12 bg-emerald-500 rounded-2xl flex items-center justify-center text-slate-900 shadow-lg shadow-emerald-500/20"><PieChart size={24} strokeWidth={2.5} /></div>
@@ -142,99 +146,115 @@ export default function Reportes() {
         </div>
       </section>
 
+      {/* VISTA PREVIA DEL REPORTE */}
       {datosReporte && (
-        <div className="bg-white border-2 border-slate-100 shadow-2xl rounded-[2.5rem] overflow-hidden">
-          <div className="no-print p-6 border-b border-slate-100 flex justify-end"><button onClick={handlePrint} className="bg-slate-900 text-white px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-black transition-all flex items-center gap-2"><Printer size={14} /> IMPRIMIR PDF</button></div>
-          <div ref={printRef} className="p-10 w-full bg-white text-slate-900">
-            {/* ENCABEZADO SIMPLIFICADO */}
-            <header className="flex justify-between items-center border-b-2 border-slate-900 pb-4 mb-8">
+        <div className="flex justify-center">
+          {/* ESTILOS ESPECÍFICOS PARA LA PREVISUALIZACIÓN IGUAL A IMPRESIÓN */}
+          <style jsx>{`
+            .report-content table { width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 10px; font-family: sans-serif; }
+            .report-content th { background: #f8fafc; padding: 8px; text-align: left; border-bottom: 2px solid #1e293b; color: #475569; font-weight: 800; text-transform: uppercase; }
+            .report-content td { padding: 8px; border-bottom: 1px solid #e2e8f0; vertical-align: top; color: #1e293b; font-size: 10px; }
+          `}</style>
+
+          <div className="w-full max-w-[216mm] bg-white shadow-2xl rounded-sm overflow-hidden border border-slate-200">
+            
+            <div className="no-print p-4 bg-slate-50 border-b border-slate-200 flex justify-end">
+              <button onClick={handlePrint} className="bg-slate-900 text-white px-6 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-black transition-all flex items-center gap-2">
+                <Printer size={14} /> IMPRIMIR PDF
+              </button>
+            </div>
+            
+            <div ref={printRef} className="report-content p-12 w-full bg-white text-slate-900 min-h-[279mm]">
+              {/* ENCABEZADO */}
+              <header className="flex justify-between items-center border-b-2 border-slate-900 pb-4 mb-8">
                 <div className="flex items-center gap-4">
-                    <img src="/logo.png" alt="Logo" className="w-14 h-14 object-contain" />
-                    <div>
-                        <h1 className="text-base font-black uppercase leading-tight tracking-tight">C.R. EL PARQUE DE LAS FLORES</h1>
-                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">NIT 832.011.421-3 • Soacha</p>
-                    </div>
+                  <img src="/logo.png" alt="Logo" className="w-14 h-14 object-contain" />
+                  <div>
+                    <h1 className="text-base font-black uppercase leading-tight tracking-tight">C.R. EL PARQUE DE LAS FLORES</h1>
+                    <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">NIT 832.011.421-3 • Soacha</p>
+                  </div>
                 </div>
                 <div className="text-right">
-                    <span className="bg-slate-900 text-white px-3 py-1 rounded text-[10px] font-black uppercase mb-1 inline-block">{tipoReporte}</span>
-                    <p className="text-[9px] font-bold text-slate-400 uppercase leading-none">{mes ? `Periodo: ${mes}` : `Fecha: ${new Date().toLocaleDateString()}`}</p>
+                  <span className="bg-slate-900 text-white px-3 py-1 rounded text-[10px] font-black uppercase mb-1 inline-block">{tipoReporte}</span>
+                  <p className="text-[9px] font-bold text-slate-400 uppercase leading-none">{mes ? `Periodo: ${mes}` : `Fecha: ${new Date().toLocaleDateString()}`}</p>
                 </div>
-            </header>
+              </header>
 
-            <main>
-              {datosReporte.tipo === 'FINANCIERO' && (
-                <>
-                  {/* KPIs CONDICIONALES */}
-                  <section className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+              <main>
+                {datosReporte.tipo === 'FINANCIERO' && (
+                  <>
+                    {/* KPIs */}
+                    <section className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+                      {(tipoReporte === "General" || tipoReporte === "Solo Ingresos") && (
+                        <div className="p-5 border border-slate-200 rounded-lg">
+                          <p className="text-[10px] font-black text-emerald-600 uppercase mb-1">Recaudo Total</p>
+                          <p className="text-2xl font-black tabular-nums">${datosReporte.summary.totalIngresos.toLocaleString()}</p>
+                          <p className="text-[8px] text-slate-400 uppercase mt-1">{datosReporte.summary.numIngresos} Transacciones</p>
+                        </div>
+                      )}
+                      {(tipoReporte === "General" || tipoReporte === "Solo Egresos") && (
+                        <div className="p-5 border border-slate-200 rounded-lg">
+                          <p className="text-[10px] font-black text-rose-600 uppercase mb-1">Gastos Totales</p>
+                          <p className="text-2xl font-black tabular-nums">-${datosReporte.summary.totalEgresos.toLocaleString()}</p>
+                          <p className="text-[8px] text-slate-400 uppercase mt-1">{datosReporte.summary.numEgresos} Facturas</p>
+                        </div>
+                      )}
+                      {tipoReporte === "General" && (
+                        <div className="p-5 bg-slate-900 text-white rounded-lg">
+                          <p className="text-[10px] font-black text-emerald-400 uppercase mb-1">Saldo Neto</p>
+                          <p className="text-2xl font-black tabular-nums">${datosReporte.summary.saldoNeto.toLocaleString()}</p>
+                          <p className="text-[8px] text-slate-500 uppercase mt-1">Utilidad Operativa</p>
+                        </div>
+                      )}
+                    </section>
+
+                    {/* TABLAS */}
                     {(tipoReporte === "General" || tipoReporte === "Solo Ingresos") && (
-                      <div className="p-5 bg-slate-50 border border-slate-200 rounded-2xl">
-                        <p className="text-[10px] font-black text-emerald-600 uppercase mb-1">Recaudo Total</p>
-                        <p className="text-2xl font-black tabular-nums">${datosReporte.summary.totalIngresos.toLocaleString()}</p>
-                        <p className="text-[8px] text-slate-400 uppercase mt-1">{datosReporte.summary.numIngresos} Transacciones</p>
-                      </div>
+                      <section className="mb-10">
+                        <h3 className="text-[10px] font-bold uppercase text-slate-500 mb-2 border-b pb-1">Relación de Ingresos</h3>
+                        <table><thead><tr><th>Recibo</th><th>Unidad</th><th>Titular</th><th>Concepto</th><th>Medio</th><th className="text-right">Monto</th></tr></thead>
+                          <tbody>{datosReporte.ingresos.map(i => (<tr key={i.id}><td>RC-{i.numero_recibo}</td><td className="font-bold">{i.unidad}</td><td className="uppercase">{i.residentes?.nombre}</td><td className="uppercase text-slate-400">{i.concepto_texto?.split("||")[0].split("|")[0]}</td><td className="text-[8px] font-bold uppercase">{i.metodo_pago}</td><td className="text-right font-black text-emerald-700">${Number(i.monto_total).toLocaleString()}</td></tr>))}</tbody>
+                        </table>
+                      </section>
                     )}
                     {(tipoReporte === "General" || tipoReporte === "Solo Egresos") && (
-                      <div className="p-5 bg-slate-50 border border-slate-200 rounded-2xl">
-                        <p className="text-[10px] font-black text-rose-600 uppercase mb-1">Gastos Totales</p>
-                        <p className="text-2xl font-black tabular-nums">-${datosReporte.summary.totalEgresos.toLocaleString()}</p>
-                        <p className="text-[8px] text-slate-400 uppercase mt-1">{datosReporte.summary.numEgresos} Facturas</p>
-                      </div>
+                      <section className="mb-10">
+                        <h3 className="text-[10px] font-bold uppercase text-slate-500 mb-2 border-b pb-1">Relación de Gastos</h3>
+                        <table><thead><tr><th>Gasto No.</th><th>Fecha</th><th>Tercero</th><th>Descripción</th><th className="text-right">Monto</th></tr></thead>
+                          <tbody>{datosReporte.egresos.map(e => (<tr key={e.id}><td>CE-{e.recibo_n}</td><td>{e.fecha}</td><td className="font-bold uppercase">{e.pagado_a}</td><td className="italic text-slate-400 uppercase">{e.concepto.split("||")[0].split("|")[0]}</td><td className="text-right font-black text-rose-700">${Number(e.monto).toLocaleString()}</td></tr>))}</tbody>
+                        </table>
+                      </section>
                     )}
-                    {tipoReporte === "General" && (
-                      <div className="p-5 bg-slate-900 text-white rounded-2xl shadow-xl">
-                        <p className="text-[10px] font-black text-emerald-400 uppercase mb-1">Saldo Neto</p>
-                        <p className="text-2xl font-black tabular-nums">${datosReporte.summary.saldoNeto.toLocaleString()}</p>
-                        <p className="text-[8px] text-slate-500 uppercase mt-1">Utilidad Operativa</p>
-                      </div>
-                    )}
+                  </>
+                )}
+
+                {datosReporte.tipo === 'CARTERA' && (
+                  <section>
+                    <div className="bg-rose-50 border border-rose-200 p-6 rounded-xl mb-8 flex justify-between items-center">
+                      <div><p className="text-[10px] font-black text-rose-600 uppercase mb-1">Cartera Morosa Global</p><p className="text-3xl font-black text-rose-900 tabular-nums">${datosReporte.summary.totalEnMora.toLocaleString()}</p></div>
+                      <div className="text-right"><p className="text-[10px] font-bold text-rose-400 uppercase">Unidades en Mora</p><p className="text-2xl font-black text-rose-900">{datosReporte.summary.unidadesEnMora}</p></div>
+                    </div>
+                    <table><thead><tr><th>Unidad</th><th>Titular</th><th>Teléfono</th><th className="text-right">Deuda</th></tr></thead>
+                      <tbody>{datosReporte.enMora.map(r => (<tr key={r.id}><td className="font-bold">T{r.torre.slice(-1)}-{r.apartamento}</td><td className="uppercase">{r.nombre}</td><td>{r.celular || '--'}</td><td className="text-right font-black text-rose-700">${r.saldoReal.toLocaleString()}</td></tr>))}</tbody>
+                    </table>
                   </section>
+                )}
 
-                  {/* TABLAS DETALLADAS */}
-                  {(tipoReporte === "General" || tipoReporte === "Solo Ingresos") && (
-                    <section className="mb-10">
-                      <h3 className="text-[10px] font-bold uppercase text-slate-500 mb-2 border-b pb-1">Relación de Ingresos</h3>
-                      <table><thead><tr><th>Recibo</th><th>Unidad</th><th>Titular</th><th>Concepto</th><th>Medio</th><th className="text-right">Monto</th></tr></thead>
-                        <tbody>{datosReporte.ingresos.map(i => (<tr key={i.id}><td>RC-{i.numero_recibo}</td><td className="font-bold">{i.unidad}</td><td className="uppercase">{i.residentes?.nombre}</td><td className="uppercase text-slate-400">{i.concepto_texto?.split("||")[0].split("|")[0]}</td><td className="text-[8px] font-bold uppercase">{i.metodo_pago}</td><td className="text-right font-black text-emerald-700">${Number(i.monto_total).toLocaleString()}</td></tr>))}</tbody>
-                      </table>
-                    </section>
-                  )}
-                  {(tipoReporte === "General" || tipoReporte === "Solo Egresos") && (
-                    <section className="mb-10">
-                      <h3 className="text-[10px] font-bold uppercase text-slate-500 mb-2 border-b pb-1">Relación de Gastos</h3>
-                      <table><thead><tr><th>Gasto No.</th><th>Fecha</th><th>Tercero</th><th>Descripción</th><th className="text-right">Monto</th></tr></thead>
-                        <tbody>{datosReporte.egresos.map(e => (<tr key={e.id}><td>CE-{e.recibo_n}</td><td>{e.fecha}</td><td className="font-bold uppercase">{e.pagado_a}</td><td className="italic text-slate-400 uppercase">{e.concepto.split("||")[0].split("|")[0]}</td><td className="text-right font-black text-rose-700">${Number(e.monto).toLocaleString()}</td></tr>))}</tbody>
-                      </table>
-                    </section>
-                  )}
-                </>
-              )}
+                {datosReporte.tipo === 'CENSO' && (
+                  <section>
+                    <h3 className="text-[10px] font-bold uppercase text-slate-500 mb-2 border-b pb-1">Directorio de Residentes</h3>
+                    <table><thead><tr><th>Unidad</th><th>Nombre</th><th>Celular</th><th>Activos</th></tr></thead>
+                      <tbody>{datosReporte.residentes.map(r => (<tr key={r.id}><td className="font-bold">T{r.torre.slice(-1)}-{r.apartamento}</td><td className="uppercase">{r.nombre}</td><td>{r.celular || '--'}</td><td><div className="flex gap-3"><span className="flex items-center gap-1">Car: <b>{r.carros}</b></span><span className="flex items-center gap-1">Mot: <b>{r.motos}</b></span></div></td></tr>))}</tbody>
+                    </table>
+                  </section>
+                )}
+              </main>
 
-              {datosReporte.tipo === 'CARTERA' && (
-                <section>
-                  <div className="bg-rose-50 border border-rose-200 p-6 rounded-2xl mb-8 flex justify-between items-center">
-                    <div><p className="text-[10px] font-black text-rose-600 uppercase mb-1">Cartera Morosa Global</p><p className="text-3xl font-black text-rose-900 tabular-nums">${datosReporte.summary.totalEnMora.toLocaleString()}</p></div>
-                    <div className="text-right"><p className="text-[10px] font-bold text-rose-400 uppercase">Unidades en Mora</p><p className="text-2xl font-black text-rose-900">{datosReporte.summary.unidadesEnMora}</p></div>
-                  </div>
-                  <table><thead><tr><th>Unidad</th><th>Titular</th><th>Teléfono</th><th className="text-right">Deuda</th></tr></thead>
-                    <tbody>{datosReporte.enMora.map(r => (<tr key={r.id}><td className="font-bold">T{r.torre.slice(-1)}-{r.apartamento}</td><td className="uppercase">{r.nombre}</td><td>{r.celular || '--'}</td><td className="text-right font-black text-rose-700">${r.saldoReal.toLocaleString()}</td></tr>))}</tbody>
-                  </table>
-                </section>
-              )}
-
-              {datosReporte.tipo === 'CENSO' && (
-                <section>
-                  <h3 className="text-[10px] font-bold uppercase text-slate-500 mb-2 border-b pb-1">Directorio de Residentes</h3>
-                  <table><thead><tr><th>Unidad</th><th>Nombre</th><th>Celular</th><th>Activos</th></tr></thead>
-                    <tbody>{datosReporte.residentes.map(r => (<tr key={r.id}><td className="font-bold">T{r.torre.slice(-1)}-{r.apartamento}</td><td className="uppercase">{r.nombre}</td><td>{r.celular || '--'}</td><td><div className="flex gap-3"><span className="flex items-center gap-1">Car: <b>{r.carros}</b></span><span className="flex items-center gap-1">Mot: <b>{r.motos}</b></span></div></td></tr>))}</tbody>
-                  </table>
-                </section>
-              )}
-            </main>
-
-            <footer className="mt-20 pt-8 border-t-2 border-slate-900 grid grid-cols-2 gap-20">
+              <footer className="mt-20 pt-8 border-t-2 border-slate-900 grid grid-cols-2 gap-20">
                 <div className="text-center"><div className="w-full border-t border-slate-300 mb-2"></div><p className="text-[9px] font-black uppercase text-slate-900">Administración</p></div>
                 <div className="text-center"><div className="w-full border-t border-slate-300 mb-2"></div><p className="text-[9px] font-black uppercase text-slate-900">Revisoría / Consejo</p></div>
-            </footer>
+              </footer>
+            </div>
           </div>
         </div>
       )}

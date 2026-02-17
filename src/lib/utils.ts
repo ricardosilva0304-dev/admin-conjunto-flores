@@ -36,6 +36,9 @@ export function numeroALetras(num: number): string {
  * Centralizamos esto aquí para que todos los componentes calculen lo mismo.
  */
 export function calcularValorDeudaHoy(deuda: any) {
+  if (Number(deuda.saldo_pendiente) <= 0) {
+    return Number(deuda.saldo_pendiente) || 0;
+  }
   // Si es un cargo manual sin causación programada, devolvemos el saldo directo
   if (!deuda.causaciones_globales) return Number(deuda.saldo_pendiente) || 0;
 
