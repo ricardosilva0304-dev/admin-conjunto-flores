@@ -79,7 +79,7 @@ export default function Reportes() {
     const TORRES_REQUERIDAS = ['Torre 5', 'Torre 6', 'Torre 7', 'Torre 8'];
 
     try {
-      if (tipoReporte === "General" || tipoReporte === "Solo Ingresos" || tipoReporte === "Solo Egresos") {
+      if (tipoReporte === "General" || tipoReporte === "Reporte Ingresos" || tipoReporte === "Reporte Egresos") {
         if (!mes) return alert("Selecciona un mes");
         const [anio, mesNum] = mes.split("-").map(Number);
         const primerDia = `${mes}-01`;
@@ -149,8 +149,8 @@ export default function Reportes() {
         <div className="flex gap-2">
           <select className="bg-slate-800 border border-white/10 text-white p-3 rounded-xl text-xs font-black outline-none focus:ring-2 ring-emerald-500/50" value={tipoReporte} onChange={(e) => { setTipoReporte(e.target.value); setDatosReporte(null); }}>
             <option value="General">Balance General</option>
-            <option value="Solo Ingresos">Reporte de Ingresos</option>
-            <option value="Solo Egresos">Reporte de Egresos</option>
+            <option value="Reporte Ingresos">Reporte de Ingresos</option>
+            <option value="Reporte Egresos">Reporte de Egresos</option>
             <option value="Estado Cartera">Listado de Deudores</option>
             <option value="Directorio Residentes">Listado de Residentes</option>
           </select>
