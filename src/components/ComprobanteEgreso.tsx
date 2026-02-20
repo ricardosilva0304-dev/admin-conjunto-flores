@@ -55,12 +55,13 @@ export default function ComprobanteEgreso({ datos, onClose }: any) {
 
             <div className="flex-1 text-center px-4">
               <h2 className="font-black text-[11px] uppercase leading-none mb-1">Agrupación Res. El Parque de las Flores</h2>
-              <h2 className="font-black text-[11px] uppercase leading-none mb-1">NIT. 832.011.421-3 </h2>
-              <p className="font-bold text-[10px] text-slate-600">Diagonal 9 # 4B-90 • Soacha, Cundinamarca</p>
-              <p className="font-bold text-[9px] text-slate-600">Cuenta de Ahorros 24511819298 Banco Caja Social</p>
-              <p className="font-bold text-[9px] text-slate-600">Convenio 15939402 Torre - Apto</p>
-              <p className="font-bold text-[9px] text-slate-600">Celular: 315 340 0657</p>
-              <p className="font-bold text-[9px] text-slate-600">e-mail: cr.parquedelasflores@gmail.com</p>
+              <h2 className="font-black text-[10px] uppercase leading-none mb-1">NIT. 832.011.421-3 </h2>
+              <p className="font-bold text-[10px] text-slate-500">Diagonal 9 # 4B-90 • Soacha, Cundinamarca</p>
+              <p className="font-bold text-[10px] text-slate-500">Celular: 315 340 0657</p>
+              <p className="font-bold text-[10px] text-slate-500">Banco Caja Social</p>
+              <p className="font-bold text-[10px] text-slate-500">Cuenta de Ahorros 24511819298</p>
+              <p className="font-bold text-[10px] text-slate-500">Convenio 15939402 • Ref.: Torre y Apat.</p>
+              <p className="font-bold text-[10px] text-slate-500">E-MAIL: cr.parquedelasflores@gmail.com</p>
             </div>
 
             <div className="w-[160px] border-2 border-slate-900 p-2 text-center rounded-sm bg-slate-50 shadow-inner">

@@ -17,7 +17,7 @@ interface ReporteFinancieroData {
     saldoNeto: number;
     ingresosBanco: number;
     ingresosEfectivo: number; // Este ahora será el saldo NETO de efectivo
-    ingresosEfectivoBruto: number; // <-- ¡NUEVO CAMPO! Para mostrar el ingreso de efectivo antes de gastos
+    ingresosEfectivoBruto: number; // Para mostrar el ingreso de efectivo antes de gastos
     numIngresos: number;
     numEgresos: number;
   };
@@ -43,7 +43,7 @@ export default function Reportes() {
   const printRef = useRef<HTMLDivElement>(null);
   const [datosReporte, setDatosReporte] = useState<ReporteData>(null);
 
-  // --- MOTOR DE IMPRESIÓN (SIN CAMBIOS) ---
+  // --- MOTOR DE IMPRESIÓN ---
   const handlePrint = () => {
     const content = printRef.current;
     if (!content) return;
@@ -99,7 +99,6 @@ export default function Reportes() {
         // Calculamos el ingreso de efectivo ANTES de restar los gastos
         const ingresosEfectivoBruto = ingresos.filter(i => i.metodo_pago === 'Efectivo').reduce((s, i) => s + Number(i.monto_total), 0);
 
-        // --- ¡AQUÍ ESTÁ EL CAMBIO CLAVE! ---
         // El saldo de efectivo ahora resta todos los egresos
         const saldoEfectivoNeto = ingresosEfectivoBruto - totalEgresos;
 
@@ -110,8 +109,8 @@ export default function Reportes() {
             totalEgresos: totalEgresos,
             saldoNeto: totalIngresos - totalEgresos,
             ingresosBanco: ingresosBanco,
-            ingresosEfectivo: saldoEfectivoNeto, // Este es el valor NETO
-            ingresosEfectivoBruto: ingresosEfectivoBruto, // Guardamos el bruto para el desglose
+            ingresosEfectivo: saldoEfectivoNeto,
+            ingresosEfectivoBruto: ingresosEfectivoBruto, 
             numIngresos: ingresos.length,
             numEgresos: egresos.length
           }
@@ -119,7 +118,6 @@ export default function Reportes() {
       } else if (tipoReporte === "Estado Cartera") {
         const [resRes, deudasRes] = await Promise.all([
           supabase.from("residentes").select("*").in('torre', TORRES_REQUERIDAS),
-          // CORRECCIÓN INCLUIDA: Pedimos causaciones_globales para el cálculo exacto
           supabase.from("deudas_residentes")
             .select("*, causaciones_globales(mes_causado, tipo_cobro)")
             .neq("saldo_pendiente", 0)
@@ -164,7 +162,6 @@ export default function Reportes() {
       {/* VISTA PREVIA DEL REPORTE */}
       {datosReporte && (
         <div className="flex justify-center">
-          {/* ESTILOS ESPECÍFICOS PARA LA PREVISUALIZACIÓN IGUAL A IMPRESIÓN */}
           <style jsx>{`
             .report-content table { width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 10px; font-family: sans-serif; }
             .report-content th { background: #f8fafc; padding: 8px; text-align: left; border-bottom: 2px solid #1e293b; color: #475569; font-weight: 800; text-transform: uppercase; }
@@ -185,8 +182,8 @@ export default function Reportes() {
                 <div className="flex items-center gap-4">
                   <img src="/logo.png" alt="Logo" className="w-14 h-14 object-contain" />
                   <div>
-                    <h1 className="text-base font-black uppercase leading-tight tracking-tight">C.R. EL PARQUE DE LAS FLORES</h1>
-                    <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">NIT 832.011.421-3 • Soacha</p>
+                    <h1 className="text-base font-black uppercase leading-tight tracking-tight">AGRUPACIÓN RESIDENCIAL EL PARQUE DE LAS FLORES</h1>
+                    <h1 className="text-base font-black uppercase leading-tight tracking-tight">NIT 832.011.421-3 • Soacha</h1>
                   </div>
                 </div>
                 <div className="text-right">
@@ -215,18 +212,15 @@ export default function Reportes() {
                               <span className="text-emerald-600">${datosReporte.summary.ingresosBanco.toLocaleString()}</span>
                             </div>
                             <div className="flex justify-between items-center text-[9px] font-bold">
-                              {/* Saldo de efectivo NETO */}
                               <span className="text-slate-400 uppercase">Saldo en Efectivo:</span>
                               <span className={`font-black ${datosReporte.summary.ingresosEfectivo < 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
                                 ${datosReporte.summary.ingresosEfectivo.toLocaleString()}
                               </span>
                             </div>
-                            {/* Desglose aclaratorio de la operación */}
                             <p className="text-[8px] text-slate-300 uppercase mt-1 italic text-right">
                               (Ingresos: ${datosReporte.summary.ingresosEfectivoBruto.toLocaleString()} - Gastos: ${datosReporte.summary.totalEgresos.toLocaleString()})
                             </p>
                           </div>
-                          {/* Número de transacciones al final */}
                           <p className="text-[8px] text-slate-300 uppercase mt-auto text-right">
                             {datosReporte.summary.numIngresos} transacciones
                           </p>
@@ -266,12 +260,39 @@ export default function Reportes() {
                     {/* TABLAS */}
                     {(tipoReporte === "General" || tipoReporte === "Solo Ingresos") && (
                       <section className="mb-10">
-                        <h3 className="text-[10px] font-bold uppercase text-slate-500 mb-2 border-b pb-1">Relación de Ingresos</h3>
-                        <table><thead><tr><th>Recibo</th><th>Unidad</th><th>Titular</th><th>Concepto</th><th>Medio</th><th className="text-right">Monto</th></tr></thead>
-                          <tbody>{datosReporte.ingresos.map(i => (<tr key={i.id}><td>RC-{i.numero_recibo}</td><td className="font-bold">{i.unidad}</td><td className="uppercase">{i.residentes?.nombre}</td><td className="uppercase text-slate-400">{i.concepto_texto?.split("||")[0].split("|")[0]}</td><td className="text-[8px] font-bold uppercase">{i.metodo_pago}</td><td className="text-right font-black text-emerald-700">${Number(i.monto_total).toLocaleString()}</td></tr>))}</tbody>
+                        {/* Aclaración en el título para evitar confusiones */}
+                        <h3 className="text-[10px] font-bold uppercase text-slate-500 mb-2 border-b pb-1">
+                          Relación de Ingresos <span className="text-slate-400 font-normal italic">(Caja en Efectivo)</span>
+                        </h3>
+                        <table>
+                          <thead>
+                            <tr><th>Recibo</th><th>Unidad</th><th>Titular</th><th>Concepto</th><th>Medio</th><th className="text-right">Monto</th></tr>
+                          </thead>
+                          <tbody>
+                            {/* --- AQUÍ ESTÁ EL CAMBIO: FILTRO POR EFECTIVO --- */}
+                            {datosReporte.ingresos
+                              .filter(i => i.metodo_pago === 'Efectivo')
+                              .map(i => (
+                                <tr key={i.id}>
+                                  <td>RC-{i.numero_recibo}</td>
+                                  <td className="font-bold">{i.unidad}</td>
+                                  <td className="uppercase">{i.residentes?.nombre}</td>
+                                  <td className="uppercase text-slate-400">{i.concepto_texto?.split("||")[0].split("|")[0]}</td>
+                                  <td className="text-[8px] font-bold uppercase">{i.metodo_pago}</td>
+                                  <td className="text-right font-black text-emerald-700">${Number(i.monto_total).toLocaleString()}</td>
+                                </tr>
+                              ))
+                            }
+                            {datosReporte.ingresos.filter(i => i.metodo_pago === 'Efectivo').length === 0 && (
+                              <tr>
+                                <td colSpan={6} className="text-center py-4 text-slate-400 italic text-xs">No hay ingresos en efectivo registrados en este periodo.</td>
+                              </tr>
+                            )}
+                          </tbody>
                         </table>
                       </section>
                     )}
+                    
                     {(tipoReporte === "General" || tipoReporte === "Solo Egresos") && (
                       <section className="mb-10">
                         <h3 className="text-[10px] font-bold uppercase text-slate-500 mb-2 border-b pb-1">Relación de Gastos</h3>

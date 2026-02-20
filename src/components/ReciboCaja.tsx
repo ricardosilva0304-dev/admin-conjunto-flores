@@ -26,14 +26,18 @@ const ReciboContenido = ({ datos }: { datos: any }) => {
 
       {/* HEADER */}
       <div className="flex justify-between items-center mb-6 border-b-2 border-slate-900 pb-4">
-        <div className="w-[160px]">
+        <div className="w-[200px]">
           <img src="/logo.png" alt="Logo" className="w-full h-auto object-contain" />
         </div>
         <div className="flex-1 text-center px-4">
           <h2 className="font-black text-[11px] uppercase leading-none mb-1">Agrupación Res. El Parque de las Flores</h2>
           <h2 className="font-black text-[10px] uppercase leading-none mb-1">NIT. 832.011.421-3 </h2>
-          <p className="font-bold text-[9px] text-slate-500">Diagonal 9 # 4B-90 • Soacha, Cundinamarca</p>
-          <p className="font-bold text-[8px] text-slate-500">Convenio 15939402 • Celular: 315 340 0657</p>
+          <p className="font-bold text-[10px] text-slate-500">Diagonal 9 # 4B-90 • Soacha, Cundinamarca</p>
+          <p className="font-bold text-[10px] text-slate-500">Celular: 315 340 0657</p>
+          <p className="font-bold text-[10px] text-slate-500">Banco Caja Social</p>
+          <p className="font-bold text-[10px] text-slate-500">Cuenta de Ahorros 24511819298</p>
+          <p className="font-bold text-[10px] text-slate-500">Convenio 15939402 • Ref.: Torre y Apat.</p>
+          <p className="font-bold text-[10px] text-slate-500">E-MAIL: cr.parquedelasflores@gmail.com</p>
         </div>
         <div className="w-[140px] border-2 border-slate-900 p-2 text-center rounded-sm bg-slate-50">
           <p className="font-black text-[8px] uppercase text-slate-400 mb-0.5 tracking-widest">Recibo de Caja</p>
