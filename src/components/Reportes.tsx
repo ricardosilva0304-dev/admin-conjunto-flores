@@ -79,7 +79,7 @@ export default function Reportes() {
     const TORRES_REQUERIDAS = ['Torre 5', 'Torre 6', 'Torre 7', 'Torre 8'];
 
     try {
-      if (tipoReporte === "General" || tipoReporte === "Reporte Ingresos" || tipoReporte === "Reporte Egresos") {
+      if (tipoReporte === "General" || tipoReporte === "Solo Ingresos" || tipoReporte === "Solo Egresos") {
         if (!mes) return alert("Selecciona un mes");
         const [anio, mesNum] = mes.split("-").map(Number);
         const primerDia = `${mes}-01`;
@@ -148,11 +148,11 @@ export default function Reportes() {
         </div>
         <div className="flex gap-2">
           <select className="bg-slate-800 border border-white/10 text-white p-3 rounded-xl text-xs font-black outline-none focus:ring-2 ring-emerald-500/50" value={tipoReporte} onChange={(e) => { setTipoReporte(e.target.value); setDatosReporte(null); }}>
-            <option value="General">Balance General</option>
-            <option value="Reporte Ingresos">Reporte de Ingresos</option>
-            <option value="Reporte Egresos">Reporte de Egresos</option>
-            <option value="Estado Cartera">Listado de Deudores</option>
-            <option value="Directorio Residentes">Listado de Residentes</option>
+            <option value="General">Balance Consolidado</option>
+            <option value="Solo Ingresos">Libro de Ingresos</option>
+            <option value="Solo Egresos">Libro de Gastos</option>
+            <option value="Estado Cartera">Estado de Cartera</option>
+            <option value="Directorio Residentes">Censo Residentes</option>
           </select>
           {(tipoReporte === "General" || tipoReporte.includes("Solo")) && (<input type="month" className="bg-slate-800 border border-white/10 text-white p-3 rounded-xl text-xs font-black outline-none" onChange={(e) => setMes(e.target.value)} />)}
           <button onClick={generarReporte} disabled={loading} className="bg-emerald-500 text-slate-900 px-8 py-3 rounded-xl text-xs font-black uppercase tracking-widest active:scale-95 disabled:opacity-30">{loading ? <Loader2 className="animate-spin" size={16} /> : "GENERAR"}</button>
@@ -197,7 +197,7 @@ export default function Reportes() {
                   <>
                     {/* KPIs */}
                     <section className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-                      {(tipoReporte === "General" || tipoReporte === "Reporte Ingresos") && (
+                      {(tipoReporte === "General" || tipoReporte === "Solo Ingresos") && (
                         <div className="p-4 border border-slate-200 rounded-lg bg-white flex flex-col justify-between">
                           <div>
                             <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Recaudo Total (Bruto)</p>
@@ -226,7 +226,7 @@ export default function Reportes() {
                           </p>
                         </div>
                       )}
-                      {(tipoReporte === "General" || tipoReporte === "Reporte Egresos") && (
+                      {(tipoReporte === "General" || tipoReporte === "Solo Egresos") && (
                         <div className="p-4 border border-slate-200 rounded-lg bg-white">
                           <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Gastos Totales</p>
                           <p className="text-xl font-black text-rose-600 tabular-nums">
@@ -258,7 +258,7 @@ export default function Reportes() {
                     </section>
 
                     {/* TABLAS */}
-                    {(tipoReporte === "General" || tipoReporte === "Reporte Ingresos") && (
+                    {(tipoReporte === "General" || tipoReporte === "Solo Ingresos") && (
                       <section className="mb-10">
                         {/* Aclaración en el título para evitar confusiones */}
                         <h3 className="text-[10px] font-bold uppercase text-slate-500 mb-2 border-b pb-1">
@@ -282,7 +282,7 @@ export default function Reportes() {
                                   <td className="text-right font-black text-emerald-700">${Number(i.monto_total).toLocaleString()}</td>
                                 </tr>
                               ))
-                            } 
+                            }
                             {datosReporte.ingresos.filter(i => i.metodo_pago === 'Efectivo').length === 0 && (
                               <tr>
                                 <td colSpan={6} className="text-center py-4 text-slate-400 italic text-xs">No hay ingresos en efectivo registrados en este periodo.</td>
@@ -293,7 +293,7 @@ export default function Reportes() {
                       </section>
                     )}
                     
-                    {(tipoReporte === "General" || tipoReporte === "Reporte Egresos") && (
+                    {(tipoReporte === "General" || tipoReporte === "Solo Egresos") && (
                       <section className="mb-10">
                         <h3 className="text-[10px] font-bold uppercase text-slate-500 mb-2 border-b pb-1">Relación de Gastos</h3>
                         <table><thead><tr><th>Gasto No.</th><th>Fecha</th><th>Tercero</th><th>Descripción</th><th className="text-right">Monto</th></tr></thead>
