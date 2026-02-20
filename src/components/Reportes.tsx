@@ -258,7 +258,7 @@ export default function Reportes() {
                     </section>
 
                     {/* TABLAS */}
-                    {(tipoReporte === "General" || tipoReporte === "Solo Ingresos") && (
+                    {(tipoReporte === "General" || tipoReporte === "Reporte Ingresos") && (
                       <section className="mb-10">
                         {/* Aclaración en el título para evitar confusiones */}
                         <h3 className="text-[10px] font-bold uppercase text-slate-500 mb-2 border-b pb-1">
@@ -293,7 +293,7 @@ export default function Reportes() {
                       </section>
                     )}
                     
-                    {(tipoReporte === "General" || tipoReporte === "Solo Egresos") && (
+                    {(tipoReporte === "General" || tipoReporte === "Reporte Egresos") && (
                       <section className="mb-10">
                         <h3 className="text-[10px] font-bold uppercase text-slate-500 mb-2 border-b pb-1">Relación de Gastos</h3>
                         <table><thead><tr><th>Gasto No.</th><th>Fecha</th><th>Tercero</th><th>Descripción</th><th className="text-right">Monto</th></tr></thead>

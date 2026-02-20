@@ -120,20 +120,10 @@ export default function ComprobanteEgreso({ datos, onClose }: any) {
             <div className="flex-1 text-[9px] text-slate-400 text-right italic font-bold uppercase">Soporte original debe adjuntarse a este folio</div>
           </div>
 
-          {/* FIRMAS LEGALES (3 Columnas como pediste) */}
-          <div className="flex justify-between items-end mt-auto gap-12 px-4 pb-6">
-            <div className="flex-1 flex flex-col items-center">
-              <div className="w-full border-t-2 border-slate-900 mb-1"></div>
-              <p className="text-[9px] font-black uppercase text-slate-400 tracking-widest italic">Elaboró (Tesorería)</p>
-            </div>
-            <div className="flex-1 flex flex-col items-center">
-              <div className="w-full border-t-2 border-slate-900 mb-1"></div>
-              <p className="text-[9px] font-black uppercase text-slate-400 tracking-widest italic">Aprobó (Consejo)</p>
-            </div>
-            <div className="flex-1 flex flex-col items-center">
-              <div className="w-full border-t-2 border-slate-900 mb-1"></div>
-              <p className="text-[9px] font-black uppercase text-slate-400 tracking-widest italic">C.C. / Firma Recibido</p>
-            </div>
+          {/* FIRMAS */}
+          <div className="flex justify-between items-end mt-auto gap-20 px-4 pb-2">
+            <div className="flex-1 border-t border-slate-900 pt-1 text-[8px] font-black uppercase text-slate-400 text-center italic">Firma Administración</div>
+            <div className="flex-1 border-t border-slate-900 pt-1 text-[8px] font-black uppercase text-slate-400 text-center italic">Firma Contador</div>
           </div>
 
           <div className="text-center mt-6">

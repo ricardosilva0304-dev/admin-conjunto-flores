@@ -125,8 +125,8 @@ const ReciboContenido = ({ datos }: { datos: any }) => {
 
       {/* FIRMAS */}
       <div className="flex justify-between items-end mt-auto gap-20 px-4 pb-2">
-        <div className="flex-1 border-t border-slate-900 pt-1 text-[8px] font-black uppercase text-slate-400 text-center italic">Tesorería / Elaboró</div>
-        <div className="flex-1 border-t border-slate-900 pt-1 text-[8px] font-black uppercase text-slate-400 text-center italic">Firma del Residente</div>
+        <div className="flex-1 border-t border-slate-900 pt-1 text-[8px] font-black uppercase text-slate-400 text-center italic">Firma Administración</div>
+        <div className="flex-1 border-t border-slate-900 pt-1 text-[8px] font-black uppercase text-slate-400 text-center italic">Firma Contador</div>
       </div>
     </div>
   );
@@ -188,9 +188,6 @@ export default function ReciboCaja({ datos, onClose }: ReciboProps) {
       <div className="no-print w-full max-w-4xl bg-white p-4 rounded-2xl mb-6 flex justify-between items-center shadow-2xl border border-white/20">
         <div className="flex gap-2">
           <button onClick={handlePrint} className="bg-slate-900 text-white px-8 py-3 rounded-xl font-black text-[11px] uppercase tracking-widest hover:bg-black transition-all">IMPRIMIR SOPORTE</button>
-          <button onClick={enviarPorEmail} disabled={enviando || !datos.email} className={`px-8 py-3 rounded-xl font-black text-[11px] tracking-widest flex items-center gap-2 transition-all uppercase ${enviado ? 'bg-emerald-500 text-white' : 'bg-blue-600 text-white'}`}>
-            {enviando ? <Loader2 className="animate-spin" size={16} /> : enviado ? "ENVIADO CON ÉXITO" : "ENVIAR EMAIL"}
-          </button>
         </div>
         <button onClick={onClose} className="p-3 bg-slate-100 text-slate-400 hover:text-rose-500 rounded-xl transition-all"><X size={24} /></button>
       </div>
