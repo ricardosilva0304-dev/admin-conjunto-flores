@@ -282,7 +282,7 @@ export default function Reportes() {
                                   <td className="text-right font-black text-emerald-700">${Number(i.monto_total).toLocaleString()}</td>
                                 </tr>
                               ))
-                            }
+                            } 
                             {datosReporte.ingresos.filter(i => i.metodo_pago === 'Efectivo').length === 0 && (
                               <tr>
                                 <td colSpan={6} className="text-center py-4 text-slate-400 italic text-xs">No hay ingresos en efectivo registrados en este periodo.</td>
