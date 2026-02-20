@@ -148,11 +148,11 @@ export default function Reportes() {
         </div>
         <div className="flex gap-2">
           <select className="bg-slate-800 border border-white/10 text-white p-3 rounded-xl text-xs font-black outline-none focus:ring-2 ring-emerald-500/50" value={tipoReporte} onChange={(e) => { setTipoReporte(e.target.value); setDatosReporte(null); }}>
-            <option value="General">Balance Consolidado</option>
-            <option value="Solo Ingresos">Libro de Ingresos</option>
-            <option value="Solo Egresos">Libro de Gastos</option>
-            <option value="Estado Cartera">Estado de Cartera</option>
-            <option value="Directorio Residentes">Censo Residentes</option>
+            <option value="General">Balance General</option>
+            <option value="Solo Ingresos">Reporte de Ingresos</option>
+            <option value="Solo Egresos">Reporte de Egresos</option>
+            <option value="Estado Cartera">Listado de Deudores</option>
+            <option value="Directorio Residentes">Listado de Residentes</option>
           </select>
           {(tipoReporte === "General" || tipoReporte.includes("Solo")) && (<input type="month" className="bg-slate-800 border border-white/10 text-white p-3 rounded-xl text-xs font-black outline-none" onChange={(e) => setMes(e.target.value)} />)}
           <button onClick={generarReporte} disabled={loading} className="bg-emerald-500 text-slate-900 px-8 py-3 rounded-xl text-xs font-black uppercase tracking-widest active:scale-95 disabled:opacity-30">{loading ? <Loader2 className="animate-spin" size={16} /> : "GENERAR"}</button>
@@ -197,7 +197,7 @@ export default function Reportes() {
                   <>
                     {/* KPIs */}
                     <section className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-                      {(tipoReporte === "General" || tipoReporte === "Solo Ingresos") && (
+                      {(tipoReporte === "General" || tipoReporte === "Reporte Ingresos") && (
                         <div className="p-4 border border-slate-200 rounded-lg bg-white flex flex-col justify-between">
                           <div>
                             <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Recaudo Total (Bruto)</p>
@@ -226,7 +226,7 @@ export default function Reportes() {
                           </p>
                         </div>
                       )}
-                      {(tipoReporte === "General" || tipoReporte === "Solo Egresos") && (
+                      {(tipoReporte === "General" || tipoReporte === "Reporte Egresos") && (
                         <div className="p-4 border border-slate-200 rounded-lg bg-white">
                           <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Gastos Totales</p>
                           <p className="text-xl font-black text-rose-600 tabular-nums">
