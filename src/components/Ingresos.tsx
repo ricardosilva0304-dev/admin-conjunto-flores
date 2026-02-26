@@ -6,7 +6,7 @@ import { calcularValorDeudaHoy, formatPeriodo } from "@/lib/utils";
 import {
   Search, Wallet, Loader2, X, Receipt,
   Calendar, ChevronRight, Hash, CreditCard,
-  CheckCircle2 // <-- Agregado este import
+  CheckCircle2, Plus, DollarSign
 } from "lucide-react";
 
 export default function Ingresos() {
@@ -28,6 +28,13 @@ export default function Ingresos() {
   });
 
   const [abonos, setAbonos] = useState<{ [key: string]: string }>({});
+  const [showManualModal, setShowManualModal] = useState(false);
+  const [guardandoManual, setGuardandoManual] = useState(false);
+  const [formManual, setFormManual] = useState({
+    concepto: "",
+    mes: new Date().toISOString().split('-').slice(0, 2).join('-'),
+    valor: ""
+  });
 
   useEffect(() => { cargarResidentes(); }, []);
 
@@ -71,6 +78,40 @@ export default function Ingresos() {
 
   const totalAPagarRecibo = Object.values(abonos).reduce((acc, val) => acc + (Number(val) || 0), 0);
 
+  async function guardarCargoManual(e: React.FormEvent) {
+    e.preventDefault();
+    if (!resSeleccionado || !formManual.valor || !formManual.concepto) return;
+    setGuardandoManual(true);
+
+    const [anio, mesNum] = formManual.mes.split("-");
+    const mesesNombres = ["ENERO", "FEBRERO", "MARZO", "ABRIL", "MAYO", "JUNIO", "JULIO", "AGOSTO", "SEPTIEMBRE", "OCTUBRE", "NOVIEMBRE", "DICIEMBRE"];
+    const periodoTexto = `${mesesNombres[parseInt(mesNum) - 1]} ${anio}`;
+    const conceptoFinal = `${formManual.concepto.toUpperCase()} (${periodoTexto})`;
+    const monto = parseFloat(formManual.valor);
+
+    const { error } = await supabase.from("deudas_residentes").insert([{
+      residente_id: resSeleccionado.id,
+      unidad: `T${resSeleccionado.torre.slice(-1)}-${resSeleccionado.apartamento}`,
+      concepto_nombre: conceptoFinal,
+      monto_original: monto,
+      saldo_pendiente: monto,
+      precio_m1: monto,
+      precio_m2: monto,
+      precio_m3: monto,
+      fecha_vencimiento: `${formManual.mes}-01`
+    }]);
+
+    if (!error) {
+      setShowManualModal(false);
+      setFormManual({ concepto: "", mes: formManual.mes, valor: "" });
+      // Recargamos las deudas del residente para que aparezca el nuevo cobro de inmediato
+      await cargarDeudasResidente(resSeleccionado);
+    } else {
+      alert("Error al guardar cargo: " + error.message);
+    }
+    setGuardandoManual(false);
+  }
+
   async function procesarPago() {
     if (totalAPagarRecibo <= 0 || !formRecibo.numero) return alert("Verifica montos y número de recibo.");
     setProcesando(true);
@@ -102,7 +143,7 @@ export default function Ingresos() {
         fecha_pago: formRecibo.fecha,
         metodo_pago: formRecibo.metodo,
         comprobante: formRecibo.referencia.toUpperCase(),
-        fecha_transaccion: formRecibo.fechaTransaccion, 
+        fecha_transaccion: formRecibo.fechaTransaccion,
         concepto_texto: conceptoTextoParaDB,
         saldo_anterior: saldoPrevio
       }]);
@@ -234,9 +275,20 @@ export default function Ingresos() {
           <div className="lg:col-span-8 space-y-4">
             <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
               <div className="p-4 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
-                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2"><Receipt size={14} /> Obligaciones de la Unidad</span>
+                <div className="flex items-center gap-4">
+                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                    <Receipt size={14} /> Obligaciones
+                  </span>
+                  {/* BOTÓN DE CARGO MANUAL RÁPIDO */}
+                  <button
+                    onClick={() => setShowManualModal(true)}
+                    className="bg-slate-900 hover:bg-emerald-600 text-white px-3 py-1.5 rounded-lg text-[9px] font-black uppercase flex items-center gap-1 transition-all shadow-sm active:scale-95"
+                  >
+                    <Plus size={12} /> Cargo Extra
+                  </button>
+                </div>
                 <span className={`text-[11px] font-black ${totalDeudaAcumulada < 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
-                  DEUDA TOTAL: ${Math.abs(totalDeudaAcumulada).toLocaleString('es-CO')} {totalDeudaAcumulada < 0 ? '(CR)' : ''}
+                  TOTAL: ${Math.abs(totalDeudaAcumulada).toLocaleString('es-CO')} {totalDeudaAcumulada < 0 ? '(CR)' : ''}
                 </span>
               </div>
 
@@ -359,6 +411,82 @@ export default function Ingresos() {
                 {procesando ? <Loader2 className="animate-spin" /> : "PROCESAR Y GUARDAR"}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+      {/* MODAL CARGO MANUAL (VERSIÓN RÁPIDA INGRESOS) */}
+      {showManualModal && resSeleccionado && (
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-md z-[500] flex items-center justify-center p-4 animate-in fade-in duration-300">
+          <div className="bg-white w-full max-w-md rounded-[2.5rem] shadow-2xl overflow-hidden border border-slate-100 animate-in zoom-in-95 duration-300">
+
+            <div className="bg-slate-50 px-8 py-6 border-b border-slate-100 flex justify-between items-center">
+              <div>
+                <h3 className="font-black text-slate-900 uppercase text-xs tracking-[0.2em] flex items-center gap-2">
+                  <div className="w-1.5 h-4 bg-emerald-500 rounded-full"></div>
+                  Cargo Extraordinario
+                </h3>
+                {/* Mostramos el residente ya fijado */}
+                <p className="text-[9px] font-bold text-slate-400 uppercase mt-1">
+                  Cargando a: T{resSeleccionado.torre.slice(-1)}-{resSeleccionado.apartamento} | {resSeleccionado.nombre}
+                </p>
+              </div>
+              <button onClick={() => setShowManualModal(false)} className="p-2 hover:bg-white hover:shadow-sm rounded-xl text-slate-300 hover:text-rose-500 transition-all">
+                <X size={20} />
+              </button>
+            </div>
+
+            <form onSubmit={guardarCargoManual} className="p-8 space-y-5">
+              <div>
+                <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-1.5 block">Descripción del Cargo</label>
+                <input
+                  className="w-full bg-slate-50 border border-slate-100 p-4 rounded-2xl outline-none font-bold text-sm uppercase focus:bg-white transition-all placeholder:text-slate-300"
+                  placeholder="EJ: MULTA, DAÑO, SALÓN..."
+                  value={formManual.concepto}
+                  onChange={(e) => setFormManual({ ...formManual, concepto: e.target.value })}
+                  required
+                  autoFocus
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1 block">Periodo</label>
+                  <div className="relative">
+                    <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={14} />
+                    <input
+                      type="month"
+                      className="w-full bg-slate-50 border border-slate-100 p-4 pl-10 rounded-2xl font-bold text-xs outline-none focus:bg-white"
+                      value={formManual.mes}
+                      onChange={(e) => setFormManual({ ...formManual, mes: e.target.value })}
+                    />
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-[9px] font-black text-rose-400 uppercase tracking-widest ml-1 block">Valor a Cobrar</label>
+                  <div className="relative">
+                    <DollarSign className="absolute left-4 top-1/2 -translate-y-1/2 text-rose-300" size={14} />
+                    <input
+                      type="number"
+                      className="w-full bg-rose-50 border border-rose-100 p-4 pl-10 rounded-2xl font-black text-sm text-rose-600 outline-none focus:bg-white focus:border-rose-300 transition-all"
+                      placeholder="0.00"
+                      value={formManual.valor}
+                      onChange={(e) => setFormManual({ ...formManual, valor: e.target.value })}
+                      required
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="pt-4">
+                <button
+                  type="submit"
+                  disabled={guardandoManual}
+                  className="w-full bg-slate-900 text-white font-black py-5 rounded-[1.5rem] uppercase text-[10px] tracking-[0.2em] shadow-xl hover:bg-emerald-600 active:scale-[0.98] disabled:opacity-50 transition-all flex items-center justify-center gap-3"
+                >
+                  {guardandoManual ? <Loader2 className="animate-spin" size={16} /> : <>AGREGAR Y RECARGAR <ChevronRight size={14} /></>}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
