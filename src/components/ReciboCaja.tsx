@@ -9,6 +9,7 @@ interface ReciboProps {
     numero: string; fecha: string; nombre: string; unidad: string;
     valor: number; concepto: string; metodo: string; comprobante: string;
     saldoAnterior: number; email: string;
+    fechaTransaccion?: string; // <-- NUEVA PROPIEDAD
   };
   onClose: () => void;
 }
@@ -36,7 +37,7 @@ const ReciboContenido = ({ datos }: { datos: any }) => {
           <p className="font-bold text-[10px] text-slate-500">Celular: 315 340 0657</p>
           <p className="font-bold text-[10px] text-slate-500">Banco Caja Social</p>
           <p className="font-bold text-[10px] text-slate-500">Cuenta de Ahorros 24511819298</p>
-          <p className="font-bold text-[10px] text-slate-500">Convenio 15939402 • Ref.: Torre y Apat.</p>
+          <p className="font-bold text-[10px] text-red-600">Convenio 15939402 • Ref.: Torre y Apat.</p>
           <p className="font-bold text-[10px] text-slate-500">E-MAIL: cr.parquedelasflores@gmail.com</p>
         </div>
         <div className="w-[140px] border-2 border-slate-900 p-2 text-center rounded-sm bg-slate-50">
@@ -98,7 +99,14 @@ const ReciboContenido = ({ datos }: { datos: any }) => {
           <div className="w-3 h-3 border border-slate-900 flex items-center justify-center">{datos.metodo !== 'Efectivo' ? 'X' : ''}</div>
           <span>TRANSFERENCIA</span>
         </div>
-        <div className="flex-1 text-[8px] text-slate-400 text-right italic font-bold">Ref: {datos.comprobante || 'Digital'}</div>
+
+        {/* AQUÍ SE MUESTRA LA REF Y LA NUEVA FECHA */}
+        <div className="flex-1 text-[8px] text-slate-400 text-right italic font-bold">
+          Ref: {datos.comprobante || 'N/A'}
+          {datos.fechaTransaccion && (
+            <span className="text-slate-600 ml-2"> • Fecha Trx: {datos.fechaTransaccion}</span>
+          )}
+        </div>
       </div>
 
       {/* OPERACIÓN DE SALDO */}
@@ -149,7 +157,7 @@ export default function ReciboCaja({ datos, onClose }: ReciboProps) {
     if (!doc) return;
 
     const styles = Array.from(document.querySelectorAll("style, link[rel='stylesheet']")).map((s) => s.outerHTML).join("");
-    
+
     doc.write(`<html><head><title>RC-${datos.numero}</title>${styles}
       <style>
         @page { size: letter; margin: 15mm; }
@@ -177,13 +185,13 @@ export default function ReciboCaja({ datos, onClose }: ReciboProps) {
       await emailjs.send('service_t8z6itp', 'template_5qlyv0i', templateParams, 'Gq_mBsh8eCSiYQk33');
       setEnviado(true);
       setTimeout(() => setEnviado(false), 4000);
-    } catch (error) { alert("Fallo al enviar."); } 
+    } catch (error) { alert("Fallo al enviar."); }
     finally { setEnviando(false); }
   };
 
   return (
     <div className="fixed inset-0 bg-slate-900/90 backdrop-blur-md z-[500] flex flex-col items-center p-4 md:p-8 overflow-y-auto no-scrollbar">
-      
+
       {/* BARRA ACCIONES */}
       <div className="no-print w-full max-w-4xl bg-white p-4 rounded-2xl mb-6 flex justify-between items-center shadow-2xl border border-white/20">
         <div className="flex gap-2">

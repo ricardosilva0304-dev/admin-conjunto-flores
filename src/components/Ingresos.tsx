@@ -23,7 +23,8 @@ export default function Ingresos() {
     numero: "",
     fecha: new Date().toISOString().split('T')[0],
     metodo: "Transferencia",
-    referencia: ""
+    referencia: "",
+    fechaTransaccion: new Date().toISOString().split('T')[0] // <-- NUEVO CAMPO
   });
 
   const [abonos, setAbonos] = useState<{ [key: string]: string }>({});
@@ -101,6 +102,7 @@ export default function Ingresos() {
         fecha_pago: formRecibo.fecha,
         metodo_pago: formRecibo.metodo,
         comprobante: formRecibo.referencia.toUpperCase(),
+        fecha_transaccion: formRecibo.fechaTransaccion, 
         concepto_texto: conceptoTextoParaDB,
         saldo_anterior: saldoPrevio
       }]);
@@ -121,6 +123,7 @@ export default function Ingresos() {
         nombre: resSeleccionado.nombre, unidad: `T${resSeleccionado.torre.slice(-1)}-${resSeleccionado.apartamento}`,
         valor: totalAPagarRecibo, concepto: conceptoTextoParaDB,
         metodo: formRecibo.metodo, comprobante: formRecibo.referencia,
+        fechaTransaccion: formRecibo.fechaTransaccion,
         saldoAnterior: saldoPrevio, email: resSeleccionado.email
       });
 
@@ -337,6 +340,14 @@ export default function Ingresos() {
                 <div className="space-y-1">
                   <label className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Referencia</label>
                   <input className="w-full bg-slate-50 border border-slate-100 p-4 rounded-2xl outline-none font-bold text-sm focus:bg-white" placeholder="Ej: Ref Bancaria" value={formRecibo.referencia} onChange={(e) => setFormRecibo({ ...formRecibo, referencia: e.target.value })} />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Fecha de Consignación / Transferencia</label>
+                  <div className="relative">
+                    <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={16} />
+                    <input type="date" className="w-full bg-slate-50 border border-slate-100 p-4 pl-12 rounded-2xl outline-none font-bold text-sm focus:bg-white" value={formRecibo.fechaTransaccion} onChange={(e) => setFormRecibo({ ...formRecibo, fechaTransaccion: e.target.value })} />
+                  </div>
                 </div>
               </div>
 

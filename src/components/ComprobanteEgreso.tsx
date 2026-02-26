@@ -60,7 +60,7 @@ export default function ComprobanteEgreso({ datos, onClose }: any) {
               <p className="font-bold text-[10px] text-slate-500">Celular: 315 340 0657</p>
               <p className="font-bold text-[10px] text-slate-500">Banco Caja Social</p>
               <p className="font-bold text-[10px] text-slate-500">Cuenta de Ahorros 24511819298</p>
-              <p className="font-bold text-[10px] text-slate-500">Convenio 15939402 • Ref.: Torre y Apat.</p>
+              <p className="font-bold text-[10px] text-red-600">Convenio 15939402 • Ref.: Torre y Apat.</p>
               <p className="font-bold text-[10px] text-slate-500">E-MAIL: cr.parquedelasflores@gmail.com</p>
             </div>
 
