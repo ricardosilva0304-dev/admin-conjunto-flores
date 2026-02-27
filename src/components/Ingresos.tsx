@@ -64,9 +64,21 @@ export default function Ingresos() {
       .gt("saldo_pendiente", 0);
 
     if (data) {
-      setDeudas(data);
+      // --- NUEVA LÓGICA DE ORDENAMIENTO (Más reciente a más antiguo) ---
+      const deudasOrdenadas = data.sort((a: any, b: any) => {
+        // Extraemos el formato "YYYY-MM" de ambas deudas
+        const fechaA = a.causaciones_globales?.mes_causado || a.fecha_vencimiento?.substring(0, 7) || "0000-00";
+        const fechaB = b.causaciones_globales?.mes_causado || b.fecha_vencimiento?.substring(0, 7) || "0000-00";
+
+        // localeCompare ordenará los textos. 
+        // Al poner fechaB antes que fechaA, logramos orden DESCENDENTE (Más nuevo arriba)
+        return fechaB.localeCompare(fechaA);
+      });
+
+      setDeudas(deudasOrdenadas); // Guardamos la lista ya ordenada
+
       const initialAbonos: any = {};
-      data.forEach((d: any) => initialAbonos[d.id] = "");
+      deudasOrdenadas.forEach((d: any) => initialAbonos[d.id] = "");
       setAbonos(initialAbonos);
     }
     await sugerirSiguienteRecibo();
