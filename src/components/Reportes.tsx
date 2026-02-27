@@ -325,11 +325,6 @@ export default function Reportes() {
                   </section>
                 )}
               </main>
-
-              <footer className="mt-20 pt-8 border-t-2 border-slate-900 grid grid-cols-2 gap-20">
-                <div className="text-center"><div className="w-full border-t border-slate-300 mb-2"></div><p className="text-[9px] font-black uppercase text-slate-900">Administración</p></div>
-                <div className="text-center"><div className="w-full border-t border-slate-300 mb-2"></div><p className="text-[9px] font-black uppercase text-slate-900">Revisoría / Consejo</p></div>
-              </footer>
             </div>
           </div>
         </div>
