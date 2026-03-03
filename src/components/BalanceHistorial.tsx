@@ -85,62 +85,91 @@ export default function BalanceHistorial() {
         <div className="animate-in fade-in slide-in-from-bottom-4 duration-700 space-y-6">
 
           {/* GRILLA DE RESULTADOS DIRECTOS */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
 
-            {/* INGRESOS TOTALES (CON LÓGICA DE EFECTIVO NETO) */}
-            <div className="bg-white p-6 rounded-2xl border border-slate-200 flex flex-col justify-between">
-              <div>
-                <p className="text-slate-400 text-[9px] font-black uppercase tracking-widest mb-1">Ingresos Totales (Bruto)</p>
-                <h3 className="text-2xl font-black text-emerald-600 tabular-nums">${resumen.total.toLocaleString()}</h3>
-              </div>
-              <div className="mt-4 pt-4 border-t border-slate-50 space-y-2">
-                {/* BANCOS (sin cambios) */}
-                <div className="flex justify-between text-[10px] font-bold text-slate-500">
-                  <span className="flex items-center gap-1.5"><Landmark size={12} /> Bancos</span>
-                  <span className="text-slate-900">${resumen.banco.toLocaleString()}</span>
-                </div>
-
-                {/* EFECTIVO (Ahora es el saldo neto) */}
-                <div className="flex justify-between text-[10px] font-bold text-slate-500">
-                  <span className="flex items-center gap-1.5"><Banknote size={12} /> Saldo Efectivo</span>
-                  <span className={`font-black ${resumen.efectivo < 0 ? 'text-rose-500' : 'text-slate-900'}`}>
-                    ${resumen.efectivo.toLocaleString()}
-                  </span>
-                </div>
-
-                {/* NUEVO: Desglose para total transparencia */}
-                <div className="pl-5 text-[9px] text-slate-400 italic">
-                  (Ingresos: ${resumen.efectivoBruto.toLocaleString()} - Gastos: ${resumen.gastos.toLocaleString()})
-                </div>
-              </div>
-            </div>
-
-            {/* EGRESOS TOTALES */}
-            <div className="bg-white p-6 rounded-2xl border border-slate-200 flex flex-col justify-between">
-              <div>
-                <p className="text-slate-400 text-[9px] font-black uppercase tracking-widest mb-1">Egresos Totales</p>
-                <h3 className="text-2xl font-black text-rose-500 tabular-nums">${resumen.gastos.toLocaleString()}</h3>
-              </div>
-              <p className="text-[9px] text-slate-400 font-medium mt-4 uppercase">
-                {resumen.listaEgresos.length} facturas pagadas
-              </p>
-            </div>
-
-            {/* BALANCE NETO (DESTACADO) */}
-            <div className="lg:col-span-2 bg-slate-900 p-6 rounded-2xl shadow-xl flex flex-col justify-between relative overflow-hidden">
-              <div className="absolute top-0 right-0 p-4 opacity-10 text-white">
-                <PieChart size={80} />
-              </div>
-              <div className="relative z-10">
-                <p className="text-emerald-400 text-[9px] font-black uppercase tracking-[0.2em] mb-1">Utilidad / Saldo Neto</p>
-                <h3 className={`text-4xl font-black tabular-nums ${resumen.balanceNeto >= 0 ? 'text-white' : 'text-rose-400'}`}>
-                  ${resumen.balanceNeto.toLocaleString()}
+            {/* COLUMNA IZQUIERDA: INGRESOS Y DESGLOSE (Ocupa más espacio) */}
+            <div className="lg:col-span-7 bg-white p-8 rounded-[2rem] border border-slate-200 shadow-sm flex flex-col justify-between">
+              <div className="mb-6">
+                <p className="text-slate-400 text-[10px] font-black uppercase tracking-[0.2em] mb-2">Ingresos Totales (Bruto)</p>
+                {/* Texto MUCHO más grande */}
+                <h3 className="text-4xl md:text-5xl font-black text-slate-900 tabular-nums tracking-tighter">
+                  ${resumen.total.toLocaleString()}
                 </h3>
               </div>
-              <div className="relative z-10 mt-4 flex items-center gap-2">
-                <div className={`w-2 h-2 rounded-full ${resumen.balanceNeto >= 0 ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'}`}></div>
-                <p className="text-slate-400 text-[10px] font-bold uppercase">Estado de liquidez mensual</p>
+
+              {/* DESGLOSE BANCARIO VS EFECTIVO (Diseño tipo "ticket") */}
+              <div className="bg-slate-50 rounded-2xl p-6 border border-slate-100 space-y-4">
+
+                {/* BANCOS */}
+                <div className="flex justify-between items-center pb-4 border-b border-slate-200">
+                  <div className="flex items-center gap-3">
+                    <div className="bg-white p-2 rounded-lg shadow-sm text-blue-500"><Landmark size={18} /></div>
+                    <div>
+                      <span className="block text-[11px] font-black text-slate-800 uppercase tracking-widest">En Bancos</span>
+                      <span className="block text-[9px] font-bold text-slate-400 uppercase mt-0.5">Transferencias</span>
+                    </div>
+                  </div>
+                  <span className="text-xl font-black text-slate-800 tabular-nums">${resumen.banco.toLocaleString()}</span>
+                </div>
+
+                {/* EFECTIVO (Resaltado como pediste) */}
+                <div className="flex justify-between items-center">
+                  <div className="flex items-center gap-3">
+                    <div className="bg-emerald-100 p-2 rounded-lg shadow-sm text-emerald-600"><Banknote size={18} /></div>
+                    <div>
+                      <span className="block text-[11px] font-black text-emerald-700 uppercase tracking-widest">Saldo Efectivo</span>
+                      <span className="block text-[9px] font-bold text-emerald-600/70 uppercase mt-0.5">Dinero físico en caja</span>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    {/* El saldo efectivo neto es el protagonista aquí */}
+                    <span className={`text-2xl font-black tabular-nums tracking-tight ${resumen.efectivo < 0 ? 'text-rose-500' : 'text-emerald-600'}`}>
+                      ${resumen.efectivo.toLocaleString()}
+                    </span>
+                    {/* Explicación matemática sutil debajo */}
+                    <p className="text-[9px] text-slate-400 font-bold mt-1 italic">
+                      Ingresó: ${resumen.efectivoBruto.toLocaleString()} - Gastos: ${resumen.gastos.toLocaleString()}
+                    </p>
+                  </div>
+                </div>
+
               </div>
+            </div>
+
+            {/* COLUMNA DERECHA: EGRESOS Y SALDO NETO */}
+            <div className="lg:col-span-5 space-y-6 flex flex-col">
+
+              {/* EGRESOS TOTALES */}
+              <div className="bg-rose-50 p-8 rounded-[2rem] border border-rose-100 flex flex-col justify-center flex-1">
+                <div className="flex justify-between items-start mb-2">
+                  <p className="text-rose-400 text-[10px] font-black uppercase tracking-[0.2em]">Egresos Totales</p>
+                  <TrendingDown className="text-rose-300" size={24} />
+                </div>
+                <h3 className="text-4xl font-black text-rose-600 tabular-nums tracking-tighter">
+                  -${resumen.gastos.toLocaleString()}
+                </h3>
+                <p className="text-[10px] text-rose-400 font-bold mt-3 uppercase tracking-widest">
+                  {resumen.listaEgresos.length} facturas pagadas
+                </p>
+              </div>
+
+              {/* BALANCE NETO (DESTACADO OSCURO) */}
+              <div className="bg-slate-900 p-8 rounded-[2rem] shadow-xl flex flex-col justify-center relative overflow-hidden flex-1">
+                <div className="absolute -bottom-4 -right-4 p-4 opacity-10 text-white">
+                  <PieChart size={120} />
+                </div>
+                <div className="relative z-10">
+                  <p className="text-emerald-400 text-[10px] font-black uppercase tracking-[0.3em] mb-2">Utilidad / Saldo Neto</p>
+                  <h3 className={`text-4xl font-black tabular-nums tracking-tighter ${resumen.balanceNeto >= 0 ? 'text-white' : 'text-rose-400'}`}>
+                    ${resumen.balanceNeto.toLocaleString()}
+                  </h3>
+                </div>
+                <div className="relative z-10 mt-6 flex items-center gap-2">
+                  <div className={`w-2.5 h-2.5 rounded-full ${resumen.balanceNeto >= 0 ? 'bg-emerald-500 animate-pulse shadow-[0_0_10px_emerald]' : 'bg-rose-500'}`}></div>
+                  <p className="text-slate-400 text-[9px] font-black uppercase tracking-widest">Estado de liquidez mensual</p>
+                </div>
+              </div>
+
             </div>
           </div>
 
