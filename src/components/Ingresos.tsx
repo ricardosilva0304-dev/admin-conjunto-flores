@@ -213,7 +213,7 @@ export default function Ingresos() {
 
             <input
               className="w-full bg-slate-50/50 border border-slate-100 pl-16 pr-14 py-5 rounded-[1.8rem] outline-none font-bold text-slate-700 text-base focus:bg-white focus:ring-4 ring-emerald-500/5 transition-all shadow-inner placeholder:text-slate-300"
-              placeholder="Busca por Nombre o Unidad (ej: 7-302)"
+              placeholder="Busca por Nombre o Unidad (ej: 1-101)"
               value={resSeleccionado ? `${resSeleccionado.nombre} | T${resSeleccionado.torre.slice(-1)}-${resSeleccionado.apartamento}` : busqueda}
               onChange={(e) => { setBusqueda(e.target.value); setResSeleccionado(null); }}
             />
