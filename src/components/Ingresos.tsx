@@ -213,12 +213,6 @@ export default function Ingresos() {
             <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] block">
               Unidad Responsable del Pago
             </label>
-
-            {/* AQUÍ MOSTRAMOS EL ÚLTIMO RECIBO CREADO */}
-            <div className="bg-slate-100 text-slate-500 px-3 py-1 rounded-full text-[9px] font-bold uppercase tracking-widest flex items-center gap-1.5 shadow-inner">
-              <Receipt size={10} className="text-slate-400" />
-              Último Recibo: <span className="font-black text-slate-700">{ultimoRecibo}</span>
-            </div>
           </div>
 
           <div className="relative group">
@@ -402,7 +396,7 @@ export default function Ingresos() {
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">No. Comprobante RC</label>
+                  <label className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Número de Recibo</label>
                   <div className="relative">
                     <Hash className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={16} />
                     <input className="w-full bg-slate-50 border border-slate-100 p-4 pl-12 rounded-2xl outline-none font-black text-slate-900" value={formRecibo.numero} onChange={(e) => setFormRecibo({ ...formRecibo, numero: e.target.value })} required />
