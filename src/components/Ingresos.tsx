@@ -217,7 +217,7 @@ export default function Ingresos() {
             {/* AQUÍ MOSTRAMOS EL ÚLTIMO RECIBO CREADO */}
             <div className="bg-slate-100 text-slate-500 px-3 py-1 rounded-full text-[9px] font-bold uppercase tracking-widest flex items-center gap-1.5 shadow-inner">
               <Receipt size={10} className="text-slate-400" />
-              Último Recibo: <span className="font-black text-slate-700">#{ultimoRecibo}</span>
+              Último Recibo: <span className="font-black text-slate-700">{formRecibo.numero}</span>
             </div>
           </div>
 
@@ -352,10 +352,12 @@ export default function Ingresos() {
                             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-emerald-500 font-black text-xs">$</span>
                             <input
                               type="number"
-                              className="w-full bg-white border border-slate-200 p-2.5 pl-7 rounded-xl text-right font-black text-sm outline-none focus:border-emerald-500 shadow-inner"
-                              value={abonos[d.id] || ""}
-                              onChange={(e) => setAbonos({ ...abonos, [d.id]: e.target.value })}
-                              placeholder="0"
+                              className="w-full bg-rose-50 border border-rose-100 p-4 pl-10 rounded-2xl font-black text-sm text-rose-600 outline-none focus:bg-white focus:border-rose-300 transition-all"
+                              placeholder="0.00"
+                              value={formManual.valor}
+                              onChange={(e) => setFormManual({ ...formManual, valor: e.target.value })}
+                              onWheel={(e) => e.currentTarget.blur()} // <-- SOLUCIÓN SCROLL
+                              required
                             />
                           </div>
                         </div>
@@ -402,7 +404,7 @@ export default function Ingresos() {
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">No. Comprobante RC</label>
+                  <label className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Número de Recibo</label>
                   <div className="relative">
                     <Hash className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={16} />
                     <input className="w-full bg-slate-50 border border-slate-100 p-4 pl-12 rounded-2xl outline-none font-black text-slate-900" value={formRecibo.numero} onChange={(e) => setFormRecibo({ ...formRecibo, numero: e.target.value })} required />
