@@ -213,12 +213,6 @@ export default function Ingresos() {
             <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] block">
               Unidad Responsable del Pago
             </label>
-
-            {/* AQUÍ MOSTRAMOS EL ÚLTIMO RECIBO CREADO */}
-            <div className="bg-slate-100 text-slate-500 px-3 py-1 rounded-full text-[9px] font-bold uppercase tracking-widest flex items-center gap-1.5 shadow-inner">
-              <Receipt size={10} className="text-slate-400" />
-              Último Recibo: <span className="font-black text-slate-700">{formRecibo.numero}</span>
-            </div>
           </div>
 
           <div className="relative group">
