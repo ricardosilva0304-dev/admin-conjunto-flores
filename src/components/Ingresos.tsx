@@ -15,6 +15,8 @@ export default function Ingresos() {
   const [loading, setLoading] = useState(true);
   const [procesando, setProcesando] = useState(false);
   const [datosRecibo, setDatosRecibo] = useState<any>(null);
+  // Al inicio de Ingresos.tsx, con los demás useState
+  const [ultimoRecibo, setUltimoRecibo] = useState<string>("Ninguno");
 
   const [busqueda, setBusqueda] = useState("");
   const [resSeleccionado, setResSeleccionado] = useState<any>(null);
@@ -185,10 +187,17 @@ export default function Ingresos() {
     finally { setProcesando(false); }
   }
 
+  // DENTRO DE: Ingresos.tsx -> const filteredRes = ...
+
   const filteredRes = busqueda.length > 0 ? residentes.filter(r => {
-    const term = busqueda.toLowerCase();
-    const unidadId = `${r.torre.replace("Torre ", "")}-${r.apartamento}`;
-    return r.nombre.toLowerCase().includes(term) || unidadId.includes(term);
+    // 1. Limpiamos lo que escribió el usuario: quitamos espacios y guiones
+    const termLimpio = busqueda.toLowerCase().replace(/[-\s]/g, "");
+
+    // 2. Construimos el ID de la unidad limpio (ej: "1101" en lugar de "1-101")
+    const unidadLimpia = `${r.torre.replace("Torre ", "")}${r.apartamento}`;
+
+    // 3. Comparamos
+    return r.nombre.toLowerCase().includes(termLimpio) || unidadLimpia.includes(termLimpio);
   }).slice(0, 4) : [];
 
   if (loading) return <div className="flex h-96 items-center justify-center"><Loader2 className="animate-spin text-slate-300" /></div>;
@@ -200,9 +209,17 @@ export default function Ingresos() {
       {/* BUSCADOR ESTILO PREMIUM LIGHT */}
       <section className="bg-white p-6 rounded-[2.5rem] border border-slate-100 shadow-sm relative z-[40]">
         <div className="flex flex-col gap-2">
-          <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-4 mb-1 block">
-            Unidad Responsable del Pago
-          </label>
+          <div className="flex justify-between items-end ml-4 mr-2 mb-1">
+            <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] block">
+              Unidad Responsable del Pago
+            </label>
+
+            {/* AQUÍ MOSTRAMOS EL ÚLTIMO RECIBO CREADO */}
+            <div className="bg-slate-100 text-slate-500 px-3 py-1 rounded-full text-[9px] font-bold uppercase tracking-widest flex items-center gap-1.5 shadow-inner">
+              <Receipt size={10} className="text-slate-400" />
+              Último Recibo: <span className="font-black text-slate-700">#{ultimoRecibo}</span>
+            </div>
+          </div>
 
           <div className="relative group">
             {/* Icono de búsqueda con efecto de foco */}
@@ -213,7 +230,7 @@ export default function Ingresos() {
 
             <input
               className="w-full bg-slate-50/50 border border-slate-100 pl-16 pr-14 py-5 rounded-[1.8rem] outline-none font-bold text-slate-700 text-base focus:bg-white focus:ring-4 ring-emerald-500/5 transition-all shadow-inner placeholder:text-slate-300"
-              placeholder="Busca por Nombre o Unidad (ej: 1-101)"
+              placeholder="Busca por Nombre o Unidad (ej: 1101)"
               value={resSeleccionado ? `${resSeleccionado.nombre} | T${resSeleccionado.torre.slice(-1)}-${resSeleccionado.apartamento}` : busqueda}
               onChange={(e) => { setBusqueda(e.target.value); setResSeleccionado(null); }}
             />
