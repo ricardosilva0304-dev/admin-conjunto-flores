@@ -50,7 +50,7 @@ export default function ComprobanteEgreso({ datos, onClose }: any) {
           {/* HEADER (Estilo Recibo de Caja) */}
           <div className="flex justify-between items-center mb-6 border-b-2 border-slate-900 pb-4">
             <div className="w-[180px]">
-              <img src="/logo.png" alt="Logo" className="w-full h-auto object-contain" />
+              <img src="/logo.png" alt="Logo " className="w-full h-auto object-contain" />
             </div>
 
             <div className="flex-1 text-center px-4">

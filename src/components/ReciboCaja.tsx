@@ -28,7 +28,7 @@ const ReciboContenido = ({ datos }: { datos: any }) => {
       {/* HEADER */}
       <div className="flex justify-between items-center mb-6 border-b-2 border-slate-900 pb-4">
         <div className="w-[200px]">
-          <img src="/logo.png" alt="Logo" className="w-full h-auto object-contain" />
+          <img src="/logo.png" alt="Logo " className="w-full h-auto object-contain" />
         </div>
         <div className="flex-1 text-center px-4">
           <h2 className="font-black text-[11px] uppercase leading-none mb-1">Agrupación Res. El Parque de las Flores</h2>
