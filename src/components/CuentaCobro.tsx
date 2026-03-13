@@ -268,7 +268,7 @@ export default function CuentaCobro({ residente, deudas, onClose }: any) {
               Instrucciones de Pago — Caja Social
             </p>
             <p>Cuenta Ahorros: <b>24511819298</b></p>
-            <p>Convenio: <b>15939402</b> • Referencia: <b>{residente.torre.slice(-1)} - {residente.apartamento}</b></p>
+            <p>Convenio: <b>15939402</b> • Referencia: <b>{residente.torre.slice(-1)}{residente.apartamento}</b></p>
           </div>
           <div className="text-center sm:text-right">
             <div className="w-36 sm:w-48 border-t border-slate-900 sm:ml-auto mb-1"></div>
