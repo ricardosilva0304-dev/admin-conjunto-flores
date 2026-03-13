@@ -250,7 +250,7 @@ export default function EstadoCuenta({ residente, deudas, onClose }: Props) {
         <div className="mt-auto pt-4 sm:pt-8 border-t-2 border-slate-100 flex flex-col sm:grid sm:grid-cols-2 gap-4 sm:gap-10 items-start sm:items-end">
           <div className="text-[8px] sm:text-[9px] text-slate-400 font-bold uppercase space-y-1">
             <p>Banco: <b>Caja Social</b> • Ahorros • <b>24511819298</b></p>
-            <p>Convenio: <b>15939402</b> • Ref: <b>{residente.torre}{residente.apartamento}</b></p>
+            <p>Convenio: <b>15939402</b> • Ref: <b>{residente.torre.slice(-1)} - {residente.apartamento}</b></p>
           </div>
           <div className="text-left sm:text-right">
             <div className="w-32 sm:w-40 border-t border-slate-400 sm:ml-auto mb-1"></div>
