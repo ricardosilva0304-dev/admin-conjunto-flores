@@ -178,9 +178,7 @@ export default function Reportes() {
             </div>
 
             {/* Contenido del reporte */}
-            <div ref={printRef} className="report-content bg-white text-slate-900
-              p-4 sm:p-8 md:p-12
-              min-h-[200px] md:min-h-[279mm]">
+            <div ref={printRef} className="report-content bg-white text-slate-900 p-4 sm:p-8 md:p-12 min-h-[200px] md:min-h-[279mm]">
 
               {/* ── ENCABEZADO ── */}
               <header className="mb-6 sm:mb-8 pb-4 border-b-2 border-slate-900">
