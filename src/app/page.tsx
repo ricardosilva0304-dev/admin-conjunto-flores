@@ -1,7 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
-import dynamic from 'next/dynamic';
 
 // --- IMPORTACIÓN DE COMPONENTES ---
 import Sidebar from "@/components/Sidebar";
@@ -19,14 +18,13 @@ import BalanceHistorial from "@/components/BalanceHistorial";
 
 // --- ICONOS ---
 import {
-  Lock, Fingerprint, AlertCircle, Loader2, ChevronRight,
+  Lock, Fingerprint, Loader2,
   LayoutDashboard, Settings, Users, MapPin, Zap,
   PieChart, Wallet, LogOut, UserCircle2, BarChart3, Receipt,
   Menu, History, Info, Calendar
 } from "lucide-react";
 
 export default function App() {
-  // --- 1. TODOS LOS HOOKS (ESTADOS) AL PRINCIPIO ---
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [activeTab, setActiveTab] = useState("resumen");
   const [cedula, setCedula] = useState("");
@@ -36,17 +34,13 @@ export default function App() {
   const [adminName, setAdminName] = useState("");
   const [currentTime, setCurrentTime] = useState(new Date());
   const [userRole, setUserRole] = useState("");
-
-  // Control de menú lateral para celular
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
-  // Timer para el reloj en tiempo real
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
 
-  // --- 2. LÓGICAS DE SISTEMA ---
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -63,7 +57,7 @@ export default function App() {
         setError("La cédula o la contraseña no coinciden.");
       } else {
         setAdminName(data.nombre);
-        setUserRole(data.rol || "admin"); // <--- CAPTURAMOS EL ROL
+        setUserRole(data.rol || "admin");
         setIsLoggedIn(true);
       }
     } catch (err) {
@@ -82,24 +76,23 @@ export default function App() {
     }
   };
 
-  // Mapeo dinámico para Títulos e Iconos en el Header
   const sectionMeta: any = {
-    resumen: { label: "Panel Principal", icon: <LayoutDashboard size={24} strokeWidth={2.5} /> },
-    balance: { label: "Balance Histórico", icon: <History size={24} strokeWidth={2.5} /> },
-    ingresos: { label: "Caja de Ingresos", icon: <Wallet size={24} strokeWidth={2.5} /> },
-    recibos: { label: "Historial Recibos", icon: <Receipt size={24} strokeWidth={2.5} /> },
-    causacion: { label: "Causación Mensual", icon: <Zap size={24} strokeWidth={2.5} /> },
-    egresos: { label: "Gestión de Gastos", icon: <LogOut size={24} strokeWidth={2.5} /> },
-    deudores: { label: "Control Cartera", icon: <UserCircle2 size={24} strokeWidth={2.5} /> },
-    residentes: { label: "Base Residentes", icon: <Users size={24} strokeWidth={2.5} /> },
-    zonas: { label: "Reservas Áreas", icon: <MapPin size={24} strokeWidth={2.5} /> },
-    reportes: { label: "Reporte Mensual", icon: <BarChart3 size={24} strokeWidth={2.5} /> },
-    config: { label: "Configuración", icon: <Settings size={24} strokeWidth={2.5} /> },
+    resumen: { label: "Panel Principal", labelShort: "Dashboard", icon: <LayoutDashboard size={20} strokeWidth={2.5} /> },
+    balance: { label: "Balance Histórico", labelShort: "Balance", icon: <History size={20} strokeWidth={2.5} /> },
+    ingresos: { label: "Caja de Ingresos", labelShort: "Ingresos", icon: <Wallet size={20} strokeWidth={2.5} /> },
+    recibos: { label: "Historial Recibos", labelShort: "Recibos", icon: <Receipt size={20} strokeWidth={2.5} /> },
+    causacion: { label: "Causación Mensual", labelShort: "Causación", icon: <Zap size={20} strokeWidth={2.5} /> },
+    egresos: { label: "Gestión de Gastos", labelShort: "Egresos", icon: <LogOut size={20} strokeWidth={2.5} /> },
+    deudores: { label: "Control Cartera", labelShort: "Cartera", icon: <UserCircle2 size={20} strokeWidth={2.5} /> },
+    residentes: { label: "Base Residentes", labelShort: "Residentes", icon: <Users size={20} strokeWidth={2.5} /> },
+    zonas: { label: "Reservas Áreas", labelShort: "Zonas", icon: <MapPin size={20} strokeWidth={2.5} /> },
+    reportes: { label: "Reporte Mensual", labelShort: "Reportes", icon: <BarChart3 size={20} strokeWidth={2.5} /> },
+    config: { label: "Configuración", labelShort: "Config", icon: <Settings size={20} strokeWidth={2.5} /> },
   };
 
-  const currentMeta = sectionMeta[activeTab] || { label: activeTab, icon: <Info size={24} /> };
+  const currentMeta = sectionMeta[activeTab] || { label: activeTab, labelShort: activeTab, icon: <Info size={20} /> };
 
-  // --- 3. VISTA CONDICIONAL (LOGIN DARK) ---
+  // ── LOGIN ──────────────────────────────────────────────────────────
   if (!isLoggedIn) {
     return (
       <main className="min-h-screen bg-[#09090b] flex items-center justify-center p-6 relative overflow-hidden font-sans text-white">
@@ -131,7 +124,11 @@ export default function App() {
                   <input type="password" required placeholder="••••••••" className="w-full bg-black/40 border border-white/5 text-white pl-12 pr-4 py-4 rounded-2xl outline-none focus:ring-2 ring-emerald-500/10 focus:border-emerald-500 font-bold transition-all" onChange={(e) => setPassword(e.target.value)} />
                 </div>
               </div>
-              {error && <p className="text-rose-500 text-center text-[11px] font-black bg-rose-500/10 py-4 rounded-2xl border border-rose-500/10">{error}</p>}
+              {error && (
+                <p className="text-rose-500 text-center text-[11px] font-black bg-rose-500/10 py-4 rounded-2xl border border-rose-500/10">
+                  {error}
+                </p>
+              )}
               <button type="submit" disabled={loading} className="w-full bg-emerald-500 hover:bg-emerald-400 text-black font-black py-5 rounded-2xl transition-all shadow-xl active:scale-95 disabled:opacity-30 uppercase tracking-widest text-xs">
                 {loading ? <Loader2 className="animate-spin mx-auto" /> : "Iniciar Gestión"}
               </button>
@@ -142,111 +139,114 @@ export default function App() {
     );
   }
 
-  // --- 4. VISTA DEL DASHBOARD (USER LOGGED IN) ---
+  // ── DASHBOARD ─────────────────────────────────────────────────────
   return (
     <div className="flex h-screen bg-[#F8FAFC] overflow-hidden font-sans text-slate-900">
 
-      {/* MENU SIDEBAR (Responsive listo) */}
       <Sidebar
         activeTab={activeTab}
         setActiveTab={(t: string) => { setActiveTab(t); setIsSidebarOpen(false); }}
         isOpen={isSidebarOpen}
         setIsOpen={setIsSidebarOpen}
-        onLogout={handleLogout} // <--- AÑADE ESTA LÍNEA
+        onLogout={handleLogout}
         role={userRole}
       />
 
-      <main className="flex-1 overflow-y-auto relative scroll-smooth flex flex-col">
+      <main className="flex-1 overflow-y-auto relative scroll-smooth flex flex-col min-w-0">
 
-        <header className="sticky top-0 bg-white/80 backdrop-blur-md border-b border-slate-100 px-4 md:px-10 py-4 z-50 flex justify-between items-center transition-all">
+        {/* ── HEADER ────────────────────────────────────────────── */}
+        <header className="sticky top-0 bg-white/80 backdrop-blur-md border-b border-slate-100 z-50 transition-all
+          px-3 py-2.5
+          md:px-10 md:py-4">
 
-          {/* SECCIÓN IZQUIERDA: IDENTIDAD Y CONTEXTO */}
-          <div className="flex items-center gap-6">
-            {/* Botón Menú Móvil (Solo visible en móviles) */}
-            <button
-              onClick={() => setIsSidebarOpen(true)}
-              className="md:hidden p-2.5 bg-slate-50 text-slate-600 rounded-xl hover:bg-slate-100 active:scale-95 transition-all"
-            >
-              <Menu size={20} strokeWidth={2.5} />
-            </button>
+          <div className="flex items-center justify-between gap-2">
 
-            <div className="flex items-center gap-4">
-              {/* Icono de la Sección Actual */}
-              <div className="hidden sm:flex w-11 h-11 bg-emerald-50 text-emerald-600 rounded-2xl items-center justify-center shadow-sm shadow-emerald-500/10">
+            {/* IZQUIERDA: Hamburger + Sección */}
+            <div className="flex items-center gap-2 sm:gap-4 min-w-0">
+
+              {/* Botón menú móvil */}
+              <button
+                onClick={() => setIsSidebarOpen(true)}
+                className="md:hidden flex-shrink-0 p-2 bg-slate-50 text-slate-600 rounded-xl hover:bg-slate-100 active:scale-95 transition-all"
+              >
+                <Menu size={18} strokeWidth={2.5} />
+              </button>
+
+              {/* Icono sección — solo sm+ */}
+              <div className="hidden sm:flex w-9 h-9 md:w-11 md:h-11 bg-emerald-50 text-emerald-600 rounded-xl md:rounded-2xl items-center justify-center shadow-sm shadow-emerald-500/10 flex-shrink-0">
                 {currentMeta.icon}
               </div>
 
-              <div className="flex flex-col">
-                {/* Breadcrumb pequeño */}
-                <span className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] leading-none mb-1">
+              {/* Texto */}
+              <div className="flex flex-col min-w-0">
+                <span className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] leading-none mb-0.5 hidden sm:block">
                   Plataforma de Gestión
                 </span>
-                {/* Título Dinámico */}
-                <h1 className="text-slate-900 text-lg md:text-xl font-black tracking-tight flex items-center gap-2">
-                  {currentMeta.label}
-                  <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></div>
+                <h1 className="font-black tracking-tight leading-none text-slate-900 truncate
+                  text-base
+                  sm:text-lg
+                  md:text-xl">
+                  {/* Móvil: nombre corto / Desktop: nombre completo */}
+                  <span className="sm:hidden">{currentMeta.labelShort}</span>
+                  <span className="hidden sm:inline">{currentMeta.label}</span>
+
+                  {/* Dot animado */}
+                  <span className="inline-block w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse ml-2 align-middle" />
                 </h1>
               </div>
             </div>
-          </div>
 
-          {/* SECCIÓN DERECHA: RELOJ Y ESTADO */}
-          <div className="flex items-center gap-4 md:gap-8">
-
-            {/* Reloj Ejecutivo */}
-            <div className="flex flex-col items-end border-r border-slate-100 pr-4 md:pr-8">
-              <div className="flex items-baseline gap-1.5 text-slate-900">
-                <span className="text-xl md:text-2xl font-black tabular-nums tracking-tighter">
+            {/* DERECHA: Reloj */}
+            <div className="flex items-center gap-1 flex-shrink-0">
+              {/* Hora */}
+              <div className="flex items-baseline gap-1 text-slate-900">
+                <span className="font-black tabular-nums tracking-tighter
+                  text-lg
+                  md:text-2xl">
                   {currentTime.toLocaleTimeString('es-CO', {
-                    hour: '2-digit',
-                    minute: '2-digit',
-                    hour12: false
+                    hour: '2-digit', minute: '2-digit', hour12: false
                   })}
                 </span>
-                <span className="text-xs font-bold text-emerald-500 opacity-80 tabular-nums">
+                <span className="text-[10px] md:text-xs font-bold text-emerald-500 opacity-80 tabular-nums">
                   {currentTime.getSeconds().toString().padStart(2, '0')}
                 </span>
               </div>
-              <div className="flex items-center gap-2 mt-0.5">
-                <div className="px-2 py-0.5 bg-slate-50 border border-slate-100 rounded text-[9px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
-                  <Calendar size={10} className="text-slate-400" />
-                  {currentTime.toLocaleDateString('es-CO', {
-                    weekday: 'short',
-                    day: '2-digit',
-                    month: 'short'
-                  }).toUpperCase()}
+
+              {/* Fecha — siempre visible, formato compacto en móvil */}
+              <div className="ml-1 md:ml-3 pl-2 md:pl-4 border-l border-slate-100">
+                <div className="px-1.5 md:px-2 py-0.5 bg-slate-50 border border-slate-100 rounded text-[8px] md:text-[9px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
+                  <Calendar size={9} className="text-slate-400 flex-shrink-0" />
+                  {/* Móvil: día y mes abreviado. Desktop: día semana + día + mes */}
+                  <span className="sm:hidden">
+                    {currentTime.toLocaleDateString('es-CO', { day: '2-digit', month: 'short' }).toUpperCase()}
+                  </span>
+                  <span className="hidden sm:inline">
+                    {currentTime.toLocaleDateString('es-CO', {
+                      weekday: 'short', day: '2-digit', month: 'short'
+                    }).toUpperCase()}
+                  </span>
                 </div>
               </div>
             </div>
+
           </div>
         </header>
 
-        {/* ÁREA CENTRAL DINÁMICA */}
-        <div className="flex-1 p-4 md:p-12 max-w-[1400px] w-full mx-auto animate-in fade-in duration-1000">
+        {/* ── CONTENIDO ─────────────────────────────────────────── */}
+        <div className="flex-1 p-3 sm:p-6 md:p-12 max-w-[1400px] w-full mx-auto animate-in fade-in duration-1000">
 
           {activeTab === "resumen" && <Resumen adminName={adminName} goToDeudores={() => setActiveTab("deudores")} />}
-
           {activeTab === "balance" && <BalanceHistorial />}
-
           {activeTab === "ingresos" && <Ingresos />}
-
           {activeTab === "recibos" && <HistorialRecibos />}
-
           {activeTab === "causacion" && <Causacion />}
-
           {activeTab === "egresos" && <Egresos />}
-
           {activeTab === "deudores" && <Deudores role={userRole} />}
-
           {activeTab === "residentes" && <Residentes />}
-
           {activeTab === "zonas" && <ZonasComunes />}
-
           {activeTab === "reportes" && <Reportes />}
-
           {activeTab === "config" && <Configuracion />}
 
-          {/* Protección en caso de tabs inexistentes */}
           {!sectionMeta[activeTab] && (
             <div className="flex flex-col items-center justify-center py-40 opacity-20">
               <Loader2 className="animate-spin text-slate-500" size={60} />
