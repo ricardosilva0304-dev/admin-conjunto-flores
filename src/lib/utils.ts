@@ -3,9 +3,9 @@
  */
 export function numeroALetras(num: number): string {
   const unidades = (n: number) => ['CERO', 'UN', 'DOS', 'TRES', 'CUATRO', 'CINCO', 'SEIS', 'SIETE', 'OCHO', 'NUEVE'][n];
-  const decenas = (n: number) => ['DIEZ', 'ONCE', 'DOCE', 'TRECE', 'CATORCE', 'QUINCE', 'DIECISEIS', 'DIECISIETE', 'DIECIOCHO', 'DIECINUEVE', 'VEINTE', 'TREINTA Y ', 'CUARENTA Y ', 'CINCUENTA Y ', 'SESENTA Y ', 'SETENTA Y ', 'OCHENTA Y ', 'NOVENTA Y '][n - 10] || 
-                                 ['', '', 'VEINTI', 'TREINTA Y ', 'CUARENTA Y ', 'CINCUENTA Y ', 'SESENTA Y ', 'SETENTA Y ', 'OCHENTA Y ', 'NOVENTA Y '][Math.floor(n/10)] + (n%10 > 0 ? unidades(n%10) : '');
-  const centenas = (n: number) => n === 100 ? 'CIEN' : ['CIENTO', 'DOSCIENTOS', 'TRESCIENTOS', 'CUATROCIENTOS', 'QUINIENTOS', 'SEISCIENTOS', 'SETECIENTOS', 'OCHOCIENTOS', 'NOVECIENTOS'][Math.floor(n/100)-1] + (n%100 > 0 ? ' ' + decenas(n%100) : '');
+  const decenas = (n: number) => ['DIEZ', 'ONCE', 'DOCE', 'TRECE', 'CATORCE', 'QUINCE', 'DIECISEIS', 'DIECISIETE', 'DIECIOCHO', 'DIECINUEVE', 'VEINTE', 'TREINTA Y ', 'CUARENTA Y ', 'CINCUENTA Y ', 'SESENTA Y ', 'SETENTA Y ', 'OCHENTA Y ', 'NOVENTA Y '][n - 10] ||
+    ['', '', 'VEINTI', 'TREINTA Y ', 'CUARENTA Y ', 'CINCUENTA Y ', 'SESENTA Y ', 'SETENTA Y ', 'OCHENTA Y ', 'NOVENTA Y '][Math.floor(n / 10)] + (n % 10 > 0 ? unidades(n % 10) : '');
+  const centenas = (n: number) => n === 100 ? 'CIEN' : ['CIENTO', 'DOSCIENTOS', 'TRESCIENTOS', 'CUATROCIENTOS', 'QUINIENTOS', 'SEISCIENTOS', 'SETECIENTOS', 'OCHOCIENTOS', 'NOVECIENTOS'][Math.floor(n / 100) - 1] + (n % 100 > 0 ? ' ' + decenas(n % 100) : '');
 
   const convertirSeccion = (n: number) => {
     if (n < 10) return unidades(n);
@@ -14,7 +14,7 @@ export function numeroALetras(num: number): string {
   };
 
   let resultado = '';
-  let absoluto = Math.abs(num); // Manejamos el valor absoluto para el texto
+  let absoluto = Math.abs(num);
 
   if (absoluto >= 1000000) {
     const millones = Math.floor(absoluto / 1000000);
@@ -32,22 +32,35 @@ export function numeroALetras(num: number): string {
 }
 
 /**
- * LÓGICA ÚNICA DE CÁLCULO DE PRECIOS (M1, M2, M3)
- * Centralizamos esto aquí para que todos los componentes calculen lo mismo.
+ * LÓGICA DE CÁLCULO DE PRECIOS
+ *
+ * Tramos vigentes 2025 en adelante:
+ *   Día  1 – 10  →  precio_m1  (tarifa puntual)
+ *   Día 11 – 31  →  precio_m2  (tarifa tardía)
+ *   Mes vencido  →  precio_m2  (siempre tarifa tardía si el mes ya pasó)
+ *
+ * Modos manuales desde Causación:
+ *   M1   → fuerza tarifa puntual
+ *   M2   → fuerza tarifa tardía
+ *   M3   → reservado / mismo valor que M2 (compatibilidad con datos anteriores)
+ *   AUTO → aplica la lógica automática por fecha
  */
 export function calcularValorDeudaHoy(deuda: any) {
   if (Number(deuda.saldo_pendiente) <= 0) {
     return Number(deuda.saldo_pendiente) || 0;
   }
-  // Si es un cargo manual sin causación programada, devolvemos el saldo directo
+
+  // Cargo manual sin causación → devuelve el saldo directo
   if (!deuda.causaciones_globales) return Number(deuda.saldo_pendiente) || 0;
 
   const m1 = Number(deuda.precio_m1 || deuda.monto_original || 0);
   const m2 = Number(deuda.precio_m2 || m1);
-  const m3 = Number(deuda.precio_m3 || m1);
-  const pagadoYa = m1 - (Number(deuda.saldo_pendiente) || 0);
+  // m3 se mantiene por compatibilidad pero apunta a m2 en la nueva lógica
+  const m3 = Number(deuda.precio_m3 || m2);
 
+  const pagadoYa = m1 - (Number(deuda.saldo_pendiente) || 0);
   const modo = deuda.causaciones_globales.tipo_cobro || 'NORMAL';
+
   let precioTarifa = m1;
 
   if (modo === 'M1') {
@@ -55,9 +68,10 @@ export function calcularValorDeudaHoy(deuda: any) {
   } else if (modo === 'M2') {
     precioTarifa = m2;
   } else if (modo === 'M3') {
+    // Compatibilidad con causaciones antiguas — usa m3 si existe, si no m2
     precioTarifa = m3;
   } else {
-    // LÓGICA AUTOMÁTICA POR FECHA
+    // AUTOMÁTICO: día 1-10 → m1, día 11 en adelante → m2
     const hoy = new Date();
     const dia = hoy.getDate();
     const mesAct = hoy.getMonth() + 1;
@@ -65,11 +79,11 @@ export function calcularValorDeudaHoy(deuda: any) {
     const [yC, mC] = deuda.causaciones_globales.mes_causado.split("-").map(Number);
 
     if (anioAct > yC || (anioAct === yC && mesAct > mC)) {
-      precioTarifa = m3; // Si el mes ya pasó, aplica tarifa máxima
+      // Mes ya vencido → tarifa tardía
+      precioTarifa = m2;
     } else {
-      if (dia > 10 && dia <= 20) precioTarifa = m2;
-      else if (dia > 20) precioTarifa = m3;
-      else precioTarifa = m1;
+      // Mes en curso
+      precioTarifa = dia <= 10 ? m1 : m2;
     }
   }
 

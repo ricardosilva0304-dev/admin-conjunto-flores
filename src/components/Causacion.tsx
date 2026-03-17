@@ -219,24 +219,29 @@ export default function Causacion() {
         </div>
 
         {/* Filtros de tipo */}
-        <div className="mt-4 sm:mt-6 grid grid-cols-4 gap-2 sm:flex sm:flex-wrap sm:gap-2">
-          {['TODOS', 'CARRO', 'MOTO', 'BICI'].map(f => {
+        <div className="mt-4 sm:mt-6 flex bg-slate-100 p-1 rounded-2xl gap-1">
+          {[
+            { key: 'TODOS', label: 'General' },
+            { key: 'CARRO', label: 'Carros' },
+            { key: 'MOTO', label: 'Motos' },
+            { key: 'BICI', label: 'Bicis' },
+          ].map(({ key, label }) => {
             const count = residentes.filter(r => {
-              if (f === "TODOS") return true;
-              if (f === "CARRO") return (r.carros || 0) > 0;
-              if (f === "MOTO") return (r.motos || 0) > 0;
-              if (f === "BICI") return (r.bicis || 0) > 0;
+              if (key === "TODOS") return true;
+              if (key === "CARRO") return (r.carros || 0) > 0;
+              if (key === "MOTO") return (r.motos || 0) > 0;
+              if (key === "BICI") return (r.bicis || 0) > 0;
               return false;
             }).length;
+            const activo = filtroTipo === key;
             return (
               <button
-                key={f}
-                onClick={() => setFiltroTipo(f)}
-                className={`py-2.5 sm:px-5 rounded-xl text-[9px] sm:text-[10px] font-black uppercase transition-all flex items-center justify-center gap-1.5 ${filtroTipo === f ? "bg-emerald-500 text-white shadow-lg shadow-emerald-500/20" : "bg-slate-50 text-slate-400 border border-slate-100 hover:bg-slate-100"}`}
+                key={key}
+                onClick={() => setFiltroTipo(key)}
+                className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-[10px] sm:text-xs font-black transition-all ${activo ? "bg-white text-slate-900 shadow-md" : "text-slate-400 hover:text-slate-600"}`}
               >
-                <span className="hidden sm:inline">{f === 'TODOS' ? 'General' : f}</span>
-                <span className="sm:hidden text-[8px]">{f === 'TODOS' ? 'Todo' : f}</span>
-                <span className={`px-1 py-0.5 rounded text-[8px] ${filtroTipo === f ? 'bg-white/20' : 'bg-slate-200 text-slate-500'}`}>
+                {label}
+                <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-lg ${activo ? "bg-emerald-500 text-white" : "bg-slate-200 text-slate-500"}`}>
                   {count}
                 </span>
               </button>
@@ -324,15 +329,16 @@ export default function Causacion() {
                       <div className="flex items-center justify-between pt-3 border-t border-slate-50">
                         <span className="text-[8px] sm:text-[9px] font-black text-slate-300 uppercase tracking-widest">Regla:</span>
                         <div className="flex bg-slate-50 p-1 rounded-xl border border-slate-100 gap-0.5">
-                          {['M1', 'M2', 'M3', 'NORMAL'].map(m => {
+                          {['M1', 'M2', 'NORMAL'].map(m => {
                             const active = (h.tipo_cobro || 'NORMAL') === m;
+                            const label = m === 'NORMAL' ? 'AUTO' : m === 'M1' ? 'Puntual' : 'Tardío';
                             return (
                               <button
                                 key={m}
                                 onClick={() => cambiarModo(h.id, m)}
                                 className={`px-2 sm:px-3 py-1 rounded-lg text-[8px] sm:text-[9px] font-black transition-all ${active ? "bg-slate-900 text-white shadow-md" : "text-slate-400 hover:text-slate-600"}`}
                               >
-                                {m === 'NORMAL' ? 'AUTO' : m}
+                                {label}
                               </button>
                             );
                           })}

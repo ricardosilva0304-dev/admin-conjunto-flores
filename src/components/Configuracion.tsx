@@ -39,7 +39,7 @@ export default function Configuracion() {
       cobro_por_vehiculo: nuevo.porVehiculo === "Si",
       monto_1_10: parseFloat(nuevo.m1),
       monto_11_20: parseFloat(nuevo.m2 || nuevo.m1),
-      monto_21_adelante: parseFloat(nuevo.m3 || nuevo.m1)
+      monto_21_adelante: parseFloat(nuevo.m2 || nuevo.m1) // igual a m2 — un solo tramo tardío
     };
     if (editandoId) await supabase.from("conceptos_pago").update(datos).eq("id", editandoId);
     else await supabase.from("conceptos_pago").insert([datos]);
@@ -112,12 +112,8 @@ export default function Configuracion() {
                     <p className="text-xs font-black text-emerald-600 tabular-nums">${Number(c.monto_1_10).toLocaleString()}</p>
                   </div>
                   <div className="text-center">
-                    <p className="text-[7px] font-black text-slate-300 uppercase mb-0.5">11-20</p>
-                    <p className="text-xs font-black text-slate-500 tabular-nums">${Number(c.monto_11_20).toLocaleString()}</p>
-                  </div>
-                  <div className="text-center">
-                    <p className="text-[7px] font-black text-slate-300 uppercase mb-0.5">21+</p>
-                    <p className="text-xs font-black text-rose-500 tabular-nums">${Number(c.monto_21_adelante).toLocaleString()}</p>
+                    <p className="text-[7px] font-black text-slate-300 uppercase mb-0.5">11-31</p>
+                    <p className="text-xs font-black text-rose-500 tabular-nums">${Number(c.monto_11_20).toLocaleString()}</p>
                   </div>
                 </div>
               </div>
@@ -140,9 +136,9 @@ export default function Configuracion() {
               <tr className="text-slate-400 text-[10px] font-bold uppercase border-b border-slate-100 bg-slate-50/20">
                 <th className="px-6 py-4">Concepto</th>
                 <th className="px-6 py-4">Modo Cobro</th>
-                <th className="px-6 py-4 text-center">Tramo 1-10</th>
-                <th className="px-6 py-4 text-center">Tramo 11-20</th>
-                <th className="px-6 py-4 text-center">Tramo 21+</th>
+                <th className="px-6 py-4 text-center">Puntual (1-10)</th>
+                <th className="px-6 py-4 text-center">Tardío (11-31)</th>
+                <th className="px-6 py-4 text-center text-slate-300">Reservado</th>
                 <th className="px-6 py-4 text-right">Acción</th>
               </tr>
             </thead>
@@ -237,11 +233,10 @@ export default function Configuracion() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-3 gap-2 sm:gap-3">
+                <div className="grid grid-cols-2 gap-2 sm:gap-3">
                   {[
-                    { t: 'Día 1-10', f: 'm1', c: 'emerald' },
-                    { t: 'Día 11-20', f: 'm2', c: 'slate' },
-                    { t: 'Día 21+', f: 'm3', c: 'rose' }
+                    { t: 'Puntual (Día 1-10)', f: 'm1', c: 'emerald' },
+                    { t: 'Tardío (Día 11-31)', f: 'm2', c: 'rose' },
                   ].map(item => (
                     <div key={item.f} className="space-y-1">
                       <label className="text-slate-400 text-[8px] font-black uppercase ml-1">{item.t}</label>
@@ -255,6 +250,8 @@ export default function Configuracion() {
                     </div>
                   ))}
                 </div>
+                {/* Campo m3 oculto — se guarda igual a m2 para compatibilidad */}
+                <input type="hidden" value={nuevo.m2} />
 
                 {editandoId && (
                   <button
