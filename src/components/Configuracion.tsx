@@ -108,12 +108,12 @@ export default function Configuracion() {
                 {/* Tramos en fila */}
                 <div className="flex gap-3">
                   <div className="text-center">
-                    <p className="text-[7px] font-black text-slate-300 uppercase mb-0.5">1-10</p>
-                    <p className="text-xs font-black text-emerald-600 tabular-nums">${Number(c.monto_1_10).toLocaleString()}</p>
+                    <p className="text-[7px] font-black text-emerald-600 uppercase mb-0.5">Con descuento · 1-10</p>
+                    <p className="text-sm font-black text-emerald-600 tabular-nums">${Number(c.monto_1_10).toLocaleString()}</p>
                   </div>
                   <div className="text-center">
-                    <p className="text-[7px] font-black text-slate-300 uppercase mb-0.5">11-31</p>
-                    <p className="text-xs font-black text-rose-500 tabular-nums">${Number(c.monto_11_20).toLocaleString()}</p>
+                    <p className="text-[7px] font-black text-rose-500 uppercase mb-0.5">Sin descuento · 11-31</p>
+                    <p className="text-sm font-black text-rose-500 tabular-nums">${Number(c.monto_11_20).toLocaleString()}</p>
                   </div>
                 </div>
               </div>
@@ -136,9 +136,8 @@ export default function Configuracion() {
               <tr className="text-slate-400 text-[10px] font-bold uppercase border-b border-slate-100 bg-slate-50/20">
                 <th className="px-6 py-4">Concepto</th>
                 <th className="px-6 py-4">Modo Cobro</th>
-                <th className="px-6 py-4 text-center">Puntual (1-10)</th>
-                <th className="px-6 py-4 text-center">Tardío (11-31)</th>
-                <th className="px-6 py-4 text-center text-slate-300">Reservado</th>
+                <th className="px-6 py-4 text-center">Con Descuento (1-10)</th>
+                <th className="px-6 py-4 text-center">Sin Descuento (11-31)</th>
                 <th className="px-6 py-4 text-right">Acción</th>
               </tr>
             </thead>
@@ -151,9 +150,8 @@ export default function Configuracion() {
                       {c.cobro_por_vehiculo ? "POR VEHÍCULO" : "VALOR FIJO"}
                     </span>
                   </td>
-                  <td className="px-6 py-4 text-center font-medium text-emerald-600 tabular-nums">${Number(c.monto_1_10).toLocaleString()}</td>
-                  <td className="px-6 py-4 text-center font-medium text-slate-500 tabular-nums">${Number(c.monto_11_20).toLocaleString()}</td>
-                  <td className="px-6 py-4 text-center font-medium text-rose-500 tabular-nums">${Number(c.monto_21_adelante).toLocaleString()}</td>
+                  <td className="px-6 py-4 text-center font-black text-emerald-600 tabular-nums">${Number(c.monto_1_10).toLocaleString()}</td>
+                  <td className="px-6 py-4 text-center font-black text-rose-500 tabular-nums">${Number(c.monto_11_20).toLocaleString()}</td>
                   <td className="px-6 py-4 text-right">
                     <button onClick={() => abrirEditar(c)} className="p-2 text-slate-300 hover:text-emerald-500 transition-colors">
                       <Edit size={16} />
@@ -235,8 +233,8 @@ export default function Configuracion() {
 
                 <div className="grid grid-cols-2 gap-2 sm:gap-3">
                   {[
-                    { t: 'Puntual (Día 1-10)', f: 'm1', c: 'emerald' },
-                    { t: 'Tardío (Día 11-31)', f: 'm2', c: 'rose' },
+                    { t: 'Con Descuento (Día 1 - 10)', f: 'm1', c: 'emerald' },
+                    { t: 'Sin Descuento (Día 11 - 31)', f: 'm2', c: 'rose' },
                   ].map(item => (
                     <div key={item.f} className="space-y-1">
                       <label className="text-slate-400 text-[8px] font-black uppercase ml-1">{item.t}</label>

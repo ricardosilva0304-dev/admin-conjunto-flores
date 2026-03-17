@@ -331,7 +331,7 @@ export default function Causacion() {
                         <div className="flex bg-slate-50 p-1 rounded-xl border border-slate-100 gap-0.5">
                           {['M1', 'M2', 'NORMAL'].map(m => {
                             const active = (h.tipo_cobro || 'NORMAL') === m;
-                            const label = m === 'NORMAL' ? 'AUTO' : m === 'M1' ? 'Puntual' : 'Tardío';
+                            const label = m === 'NORMAL' ? 'Automático' : m === 'M1' ? 'Con Descuento' : 'Sin Descuento';
                             return (
                               <button
                                 key={m}
