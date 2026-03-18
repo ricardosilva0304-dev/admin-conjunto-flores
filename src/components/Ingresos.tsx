@@ -65,9 +65,20 @@ export default function Ingresos() {
 
     if (data) {
       const deudasOrdenadas = data.sort((a: any, b: any) => {
-        const fechaA = a.causaciones_globales?.mes_causado || a.fecha_vencimiento?.substring(0, 7) || "0000-00";
-        const fechaB = b.causaciones_globales?.mes_causado || b.fecha_vencimiento?.substring(0, 7) || "0000-00";
-        return fechaB.localeCompare(fechaA);
+        // Para causaciones normales usa mes_causado
+        // Para cargos manuales usa fecha_vencimiento (se guarda como YYYY-MM-01)
+        const fechaA = a.causaciones_globales?.mes_causado
+          || a.fecha_vencimiento?.substring(0, 7)
+          || "0000-00";
+        const fechaB = b.causaciones_globales?.mes_causado
+          || b.fecha_vencimiento?.substring(0, 7)
+          || "0000-00";
+        // Orden descendente (más reciente arriba)
+        if (fechaB !== fechaA) return fechaB.localeCompare(fechaA);
+        // Si el mes es igual, las causaciones van antes que los cargos manuales
+        const esManualA = !a.causaciones_globales ? 1 : 0;
+        const esManualB = !b.causaciones_globales ? 1 : 0;
+        return esManualA - esManualB;
       });
       setDeudas(deudasOrdenadas);
       const initialAbonos: any = {};
