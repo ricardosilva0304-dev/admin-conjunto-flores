@@ -2,9 +2,9 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import {
-   UserPlus, Search, Phone, MapPin,
-   Car, Bike, Trash2, Edit, X, Loader2,
-   Users, AtSign
+   UserPlus, Search, Phone,
+   Trash2, Edit, X, Loader2,
+   Users, AtSign, ChevronDown
 } from "lucide-react";
 
 const ESTRUCTURA_TORRES: any = {
@@ -23,12 +23,58 @@ function generarAptosEstandar() {
    return aptos;
 }
 
-const MotoIcon = ({ className, size = 14 }: { className?: string; size?: number }) => (
-   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
-      <circle cx="7" cy="18" r="3" /><circle cx="17" cy="18" r="3" />
-      <path d="M12 18V9c0-2 1-3 3-3 1 0 2 .5 3 1.5" /><path d="M16 18H8" /><path d="M7 15c-1-2-1-4 1-5l4-2 2 3h4" />
+// ── ICONOS SVG PERSONALIZADOS ─────────────────────────────────────────────────
+
+const CarIcon = ({ className, size = 14 }: { className?: string; size?: number }) => (
+   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <path d="M5 17H3v-5l2-5h14l2 5v5h-2" />
+      <circle cx="7.5" cy="17.5" r="2.5" />
+      <circle cx="16.5" cy="17.5" r="2.5" />
+      <path d="M5 12h14" />
    </svg>
 );
+
+const MotoIcon = ({ className, size = 14 }: { className?: string; size?: number }) => (
+   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <circle cx="7" cy="17" r="3" />
+      <circle cx="17" cy="17" r="3" />
+      <path d="M10 17h4" />
+      <path d="M12 17V9c0-1.5.8-2.5 2-3 1-.4 2-.2 3 .5" />
+      <path d="M7 14c-1-1.5-1-3.5 1-4.5L11 8l2 3h4" />
+   </svg>
+);
+
+const BikeIcon = ({ className, size = 14 }: { className?: string; size?: number }) => (
+   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <circle cx="5.5" cy="17.5" r="3.5" />
+      <circle cx="18.5" cy="17.5" r="3.5" />
+      <path d="M5.5 17.5L10 6h4" />
+      <path d="M10 6l2.5 5.5" />
+      <path d="M12.5 11.5L18.5 17.5" />
+      <path d="M18.5 14V6.5" />
+      <path d="M16 6.5h5" />
+   </svg>
+);
+
+// ── BADGE DE VEHÍCULO ─────────────────────────────────────────────────────────
+
+const VehicleBadge = ({
+   icon: Icon, count, activeColor
+}: {
+   icon: React.FC<{ className?: string; size?: number }>;
+   count: number;
+   activeColor: string;
+}) => (
+   <div className={`flex flex-col items-center gap-0.5 w-8 ${count === 0 ? "opacity-30" : ""}`}>
+      <Icon size={13} className={count > 0 ? activeColor : "text-slate-400"} />
+      <span className="text-[9px] font-black tabular-nums text-slate-500 leading-none">{count}</span>
+   </div>
+);
+
+// ── COMPONENTE PRINCIPAL ──────────────────────────────────────────────────────
 
 export default function Residentes() {
    const [residentes, setResidentes] = useState<any[]>([]);
@@ -49,7 +95,7 @@ export default function Residentes() {
    async function cargarResidentes() {
       setLoading(true);
       const { data } = await supabase.from("residentes").select("*")
-         .order('torre', { ascending: true }).order('apartamento', { ascending: true });
+         .order("torre", { ascending: true }).order("apartamento", { ascending: true });
       if (data) setResidentes(data);
       setLoading(false);
    }
@@ -73,7 +119,8 @@ export default function Residentes() {
          : supabase.from("residentes").insert([payload]);
       const { error } = await action;
       if (!error) {
-         setShowModal(false); cargarResidentes();
+         setShowModal(false);
+         cargarResidentes();
          setForm({ nombre: "", celular: "", email: "", torre: "", apto: "", carros: 0, motos: 0, bicis: 0 });
       } else alert("Error al guardar: " + error.message);
       setGuardando(false);
@@ -90,73 +137,94 @@ export default function Residentes() {
       return r.nombre.toLowerCase().includes(term) || r.apartamento.includes(term);
    });
 
+   const totalCarros = residentes.reduce((a, r) => a + (r.carros || 0), 0);
+   const totalMotos = residentes.reduce((a, r) => a + (r.motos || 0), 0);
+   const totalBicis = residentes.reduce((a, r) => a + (r.bicis || 0), 0);
+
    if (loading) return (
       <div className="flex h-64 items-center justify-center">
-         <Loader2 className="animate-spin text-slate-300" size={28} />
+         <Loader2 className="animate-spin text-emerald-400" size={28} />
       </div>
    );
 
    return (
-      <div className="max-w-6xl mx-auto space-y-4 sm:space-y-6 pb-24 font-sans text-slate-800 px-0">
+      <div className="max-w-6xl mx-auto space-y-4 pb-24 font-sans text-slate-800 px-2 sm:px-4 lg:px-0">
 
-         {/* ── CABECERA ─────────────────────────────────────────── */}
-         <div className="bg-white p-4 sm:p-6 rounded-xl border border-slate-200 flex items-center justify-between gap-3">
-            <div className="min-w-0">
-               <div className="flex items-center gap-2 sm:gap-3">
-                  <Users size={18} className="text-emerald-500 flex-shrink-0" />
-                  {/* Título en una sola línea — usa truncate en móvil */}
-                  <h1 className="text-slate-800 font-black uppercase tracking-tight leading-none
-                     text-lg sm:text-2xl">
-                     Directorio Residentes
-                  </h1>
+         {/* ── CABECERA ──────────────────────────────────────────────────────── */}
+         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+            <div className="px-4 py-4 sm:px-6 sm:py-5 flex items-center justify-between gap-4">
+
+               {/* Título + stats */}
+               <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                     <div className="w-7 h-7 bg-emerald-500 rounded-lg flex items-center justify-center flex-shrink-0">
+                        <Users size={14} className="text-white" />
+                     </div>
+                     <h1 className="font-black text-slate-900 text-base sm:text-xl tracking-tight leading-none uppercase">
+                        Directorio de Residentes
+                     </h1>
+                  </div>
+
+                  {/* Stats de vehículos */}
+                  <div className="mt-2.5 flex items-center gap-3 sm:gap-5">
+                     <span className="text-[10px] font-semibold text-slate-400">
+                        {residentes.length} residentes
+                     </span>
+                     <div className="h-3 w-px bg-slate-200" />
+                     <div className="flex items-center gap-3">
+                        <span className="flex items-center gap-1 text-[10px] font-semibold text-slate-500">
+                           <CarIcon size={11} className="text-emerald-500" />
+                           {totalCarros}
+                        </span>
+                        <span className="flex items-center gap-1 text-[10px] font-semibold text-slate-500">
+                           <MotoIcon size={11} className="text-amber-500" />
+                           {totalMotos}
+                        </span>
+                        <span className="flex items-center gap-1 text-[10px] font-semibold text-slate-500">
+                           <BikeIcon size={11} className="text-blue-500" />
+                           {totalBicis}
+                        </span>
+                     </div>
+                  </div>
                </div>
-               {/* Stats en una sola fila, iconos pequeños */}
-               <div className="mt-1.5 flex gap-3 sm:gap-4 text-[9px] sm:text-[10px] font-bold text-slate-400 uppercase tracking-widest flex-wrap">
-                  <span>{residentes.length} personas</span>
-                  <span className="flex items-center gap-1">
-                     <Car size={9} /> {residentes.reduce((a, r) => a + (r.carros || 0), 0)}
-                  </span>
-                  <span className="flex items-center gap-1">
-                     <MotoIcon size={9} /> {residentes.reduce((a, r) => a + (r.motos || 0), 0)}
-                  </span>
-                  <span className="flex items-center gap-1">
-                     <Bike size={9} /> {residentes.reduce((a, r) => a + (r.bicis || 0), 0)}
-                  </span>
-               </div>
+
+               {/* Botón nuevo */}
+               <button
+                  onClick={() => {
+                     setEditandoId(null);
+                     setForm({ nombre: "", celular: "", email: "", torre: "", apto: "", carros: 0, motos: 0, bicis: 0 });
+                     setShowModal(true);
+                  }}
+                  className="flex-shrink-0 flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white rounded-xl font-bold transition-all shadow-md shadow-emerald-200
+                     px-3 py-2.5 text-[10px] sm:px-5 sm:py-3 sm:text-xs"
+               >
+                  <UserPlus size={14} />
+                  <span className="hidden sm:inline tracking-wide uppercase">Registrar Nuevo</span>
+                  <span className="sm:hidden">Nuevo</span>
+               </button>
             </div>
-
-            <button
-               onClick={() => {
-                  setEditandoId(null);
-                  setForm({ nombre: "", celular: "", email: "", torre: "", apto: "", carros: 0, motos: 0, bicis: 0 });
-                  setShowModal(true);
-               }}
-               className="flex-shrink-0 bg-slate-900 text-white rounded-xl font-black tracking-widest hover:bg-black transition-all shadow-lg active:scale-95 flex items-center gap-1.5
-                  px-3 py-2.5 text-[9px]
-                  sm:px-8 sm:py-3.5 sm:text-xs"
-            >
-               <UserPlus size={14} />
-               <span className="hidden sm:inline">REGISTRAR NUEVO</span>
-               <span className="sm:hidden">Nuevo</span>
-            </button>
          </div>
 
-         {/* ── FILTROS ──────────────────────────────────────────── */}
-         <section className="bg-white p-3 rounded-2xl border border-slate-200 flex flex-col gap-2.5 shadow-sm">
+         {/* ── FILTROS ───────────────────────────────────────────────────────── */}
+         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-3 space-y-2.5">
+
             {/* Buscador */}
-            <div className="relative group">
-               <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-emerald-500 transition-colors" size={16} />
+            <div className="relative">
+               <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-300 pointer-events-none" size={15} />
                <input
-                  placeholder="Busca por Nombre o Apto (5-101)..."
-                  className="w-full bg-slate-50 border border-slate-100 pl-11 pr-4 py-3 sm:py-4 rounded-xl outline-none font-bold text-slate-600 text-sm focus:bg-white transition-all"
+                  placeholder="Buscar por nombre o apartamento (ej: 5-101)…"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-10 pr-4 py-2.5 sm:py-3
+                     text-sm font-medium text-slate-700 placeholder:text-slate-300
+                     focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent
+                     transition-all"
                   onChange={(e) => setBusqueda(e.target.value)}
                />
             </div>
 
-            {/* Torres en grid fijo — sin scroll horizontal */}
+            {/* Filtro de torres */}
             <div className="grid grid-cols-6 gap-1 bg-slate-50 rounded-xl p-1">
                {[
-                  { key: "TODAS", label: "Todo" },
+                  { key: "TODAS", label: "Todas" },
                   { key: "Torre 1", label: "T-1" },
                   { key: "Torre 5", label: "T-5" },
                   { key: "Torre 6", label: "T-6" },
@@ -166,97 +234,116 @@ export default function Residentes() {
                   <button
                      key={key}
                      onClick={() => setFiltroTorre(key)}
-                     className={`py-2 rounded-lg text-[9px] sm:text-[10px] font-black tracking-widest transition-all ${filtroTorre === key
-                           ? "bg-emerald-600 text-white shadow-lg"
-                           : "text-slate-400 hover:bg-slate-200"
+                     className={`py-2 rounded-lg text-[10px] sm:text-xs font-bold tracking-wide transition-all ${filtroTorre === key
+                           ? "bg-emerald-600 text-white shadow-sm"
+                           : "text-slate-400 hover:text-slate-600 hover:bg-white"
                         }`}
                   >
                      {label}
                   </button>
                ))}
             </div>
-         </section>
+         </div>
 
-         {/* ── LISTADO POR TORRE ────────────────────────────────── */}
-         <div className="space-y-6 sm:space-y-10">
+         {/* Contador de resultados */}
+         {busqueda || filtroTorre !== "TODAS" ? (
+            <p className="text-xs text-slate-400 font-medium px-1">
+               {residentesFiltrados.length} resultado{residentesFiltrados.length !== 1 ? "s" : ""}
+            </p>
+         ) : null}
+
+         {/* ── LISTADO POR TORRE ─────────────────────────────────────────────── */}
+         <div className="space-y-8">
             {Array.from(new Set(residentesFiltrados.map(r => r.torre))).sort().map(torre => (
-               <div key={torre} className="space-y-2 sm:space-y-3">
+               <div key={torre}>
 
                   {/* Separador de torre */}
-                  <div className="flex items-center gap-3 px-1">
-                     <span className="text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">
+                  <div className="flex items-center gap-3 mb-3">
+                     <span className="text-[10px] font-black text-emerald-600 uppercase tracking-widest flex-shrink-0">
                         {torre}
                      </span>
-                     <div className="h-px w-full bg-slate-100" />
+                     <div className="h-px flex-1 bg-slate-100" />
+                     <span className="text-[10px] text-slate-300 font-semibold flex-shrink-0">
+                        {residentesFiltrados.filter(r => r.torre === torre).length} aptos
+                     </span>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2 sm:gap-3">
+                  {/* Grid de tarjetas */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-2">
                      {residentesFiltrados.filter(r => r.torre === torre).map(res => (
                         <div
                            key={res.id}
-                           className="bg-white border border-slate-200 p-3.5 sm:p-5 rounded-2xl flex items-center justify-between hover:bg-slate-50 transition-colors gap-2"
+                           className="group bg-white border border-slate-200 rounded-xl p-3.5 sm:p-4
+                              flex items-center gap-3 hover:border-emerald-200 hover:shadow-sm
+                              transition-all duration-200"
                         >
-                           {/* Número de apto + info */}
-                           <div className="flex items-center gap-3 sm:gap-5 min-w-0 flex-1">
-                              <div className="w-10 h-10 sm:w-12 sm:h-10 bg-slate-100 rounded-lg flex items-center justify-center font-black text-[11px] sm:text-xs text-slate-500 flex-shrink-0">
-                                 {res.apartamento}
-                              </div>
-                              <div className="min-w-0">
-                                 <h4 className="font-bold text-slate-900 text-xs sm:text-sm truncate uppercase tracking-tight">
-                                    {res.nombre}
-                                 </h4>
-                                 {/* Contacto — solo teléfono en móvil, email en sm+ */}
-                                 <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-0.5">
-                                    <span className="text-[9px] font-medium text-slate-400 flex items-center gap-1">
-                                       <Phone size={9} /> {res.celular || '--'}
+                           {/* Badge apto */}
+                           <div className="w-11 h-11 sm:w-12 sm:h-12 bg-slate-100 group-hover:bg-emerald-50 rounded-lg
+                              flex items-center justify-center font-black text-[11px] text-slate-500
+                              group-hover:text-emerald-600 transition-colors flex-shrink-0">
+                              {res.apartamento}
+                           </div>
+
+                           {/* Info */}
+                           <div className="min-w-0 flex-1">
+                              <p className="font-bold text-slate-900 text-xs sm:text-sm truncate uppercase tracking-tight leading-tight">
+                                 {res.nombre}
+                              </p>
+                              <div className="flex flex-col gap-0.5 mt-1">
+                                 {res.celular && (
+                                    <span className="flex items-center gap-1 text-[10px] text-slate-400 font-medium">
+                                       <Phone size={9} className="flex-shrink-0" />
+                                       <span className="truncate">{res.celular}</span>
                                     </span>
-                                    <span className="hidden sm:flex text-[9px] font-medium text-slate-400 items-center gap-1">
-                                       <AtSign size={9} /> {res.email || '--'}
+                                 )}
+                                 {res.email && (
+                                    <span className="hidden sm:flex items-center gap-1 text-[10px] text-slate-400 font-medium">
+                                       <AtSign size={9} className="flex-shrink-0" />
+                                       <span className="truncate">{res.email}</span>
                                     </span>
-                                 </div>
+                                 )}
                               </div>
                            </div>
 
                            {/* Vehículos + acciones */}
-                           <div className="flex items-center gap-2 sm:gap-4 flex-shrink-0">
-                              {/* Vehículos — compactos en móvil */}
-                              <div className="flex items-center gap-2 sm:gap-3 border-l border-slate-100 pl-2 sm:pl-4">
-                                 <div className="text-center">
-                                    <Car size={12} className={res.carros > 0 ? "text-emerald-500" : "text-slate-200"} />
-                                    <span className="text-[8px] font-black block text-slate-600">{res.carros}</span>
-                                 </div>
-                                 <div className="text-center">
-                                    <MotoIcon size={12} className={res.motos > 0 ? "text-amber-500" : "text-slate-200"} />
-                                    <span className="text-[8px] font-black block text-slate-600">{res.motos}</span>
-                                 </div>
-                                 <div className="text-center hidden xs:block">
-                                    <Bike size={12} className={res.bicis > 0 ? "text-blue-500" : "text-slate-200"} />
-                                    <span className="text-[8px] font-black block text-slate-600">{res.bicis}</span>
-                                 </div>
+                           <div className="flex items-center gap-2 flex-shrink-0">
+
+                              {/* Vehículos */}
+                              <div className="flex items-center gap-1 border-l border-slate-100 pl-2.5">
+                                 <VehicleBadge icon={CarIcon} count={res.carros || 0} activeColor="text-emerald-500" />
+                                 <VehicleBadge icon={MotoIcon} count={res.motos || 0} activeColor="text-amber-500" />
+                                 <VehicleBadge icon={BikeIcon} count={res.bicis || 0} activeColor="text-blue-500" />
                               </div>
 
-                              {/* Botones editar/eliminar */}
-                              <div className="flex gap-0.5 sm:gap-1">
+                              {/* Acciones */}
+                              <div className="flex items-center gap-0.5 border-l border-slate-100 pl-2">
                                  <button
+                                    title="Editar"
                                     onClick={() => {
                                        setEditandoId(res.id);
-                                       setForm({ nombre: res.nombre, celular: res.celular || "", email: res.email || "", torre: res.torre, apto: res.apartamento, carros: res.carros || 0, motos: res.motos || 0, bicis: res.bicis || 0 });
+                                       setForm({
+                                          nombre: res.nombre, celular: res.celular || "",
+                                          email: res.email || "", torre: res.torre,
+                                          apto: res.apartamento, carros: res.carros || 0,
+                                          motos: res.motos || 0, bicis: res.bicis || 0
+                                       });
                                        setShowModal(true);
                                     }}
-                                    className="p-2 text-slate-300 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
+                                    className="p-1.5 rounded-lg text-slate-300 hover:text-emerald-600 hover:bg-emerald-50 transition-colors"
                                  >
-                                    <Edit size={14} />
+                                    <Edit size={13} />
                                  </button>
                                  <button
+                                    title="Eliminar"
                                     onClick={async () => {
-                                       if (confirm("¿Eliminar residente?")) {
+                                       if (confirm("¿Eliminar este residente?")) {
                                           await supabase.from("residentes").delete().eq("id", res.id);
                                           cargarResidentes();
                                        }
                                     }}
-                                    className="p-2 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-colors"
+                                    className="p-1.5 rounded-lg text-slate-300 hover:text-rose-500 hover:bg-rose-50 transition-colors"
                                  >
-                                    <Trash2 size={14} />
+                                    <Trash2 size={13} />
                                  </button>
                               </div>
                            </div>
@@ -267,111 +354,165 @@ export default function Residentes() {
             ))}
          </div>
 
-         {/* ── MODAL REGISTRO ───────────────────────────────────── */}
-         {showModal && (
-            <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[150] flex flex-col items-center justify-end sm:justify-center p-0 sm:p-4">
-               <div className="bg-white w-full sm:max-w-2xl rounded-t-3xl sm:rounded-2xl shadow-2xl overflow-hidden flex flex-col animate-in slide-in-from-bottom-6 sm:zoom-in-95 duration-300">
-                  <form onSubmit={manejarGuardar} className="p-5 sm:p-8 space-y-4 sm:space-y-6">
+         {/* Estado vacío */}
+         {residentesFiltrados.length === 0 && !loading && (
+            <div className="text-center py-16 text-slate-300">
+               <Users size={40} className="mx-auto mb-3 opacity-40" />
+               <p className="text-sm font-semibold">No se encontraron residentes</p>
+            </div>
+         )}
 
-                     {/* Header modal */}
-                     <div className="flex justify-between items-center pb-3 sm:pb-4 border-b border-slate-100">
-                        <h3 className="font-black text-lg sm:text-xl text-slate-900 uppercase tracking-tighter italic">
-                           {editandoId ? "Actualizar Residente" : "Registro Habitacional"}
-                        </h3>
-                        <button type="button" onClick={() => setShowModal(false)} className="text-slate-300 p-1.5 hover:text-rose-500 transition-colors">
-                           <X size={20} />
+         {/* ── MODAL ─────────────────────────────────────────────────────────── */}
+         {showModal && (
+            <div
+               className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[150] flex flex-col items-center justify-end sm:justify-center p-0 sm:p-6"
+               onClick={(e) => { if (e.target === e.currentTarget) setShowModal(false); }}
+            >
+               <div className="bg-white w-full sm:max-w-lg rounded-t-3xl sm:rounded-2xl shadow-2xl overflow-hidden
+                  animate-in slide-in-from-bottom-4 sm:zoom-in-95 duration-200">
+
+                  <form onSubmit={manejarGuardar}>
+
+                     {/* Header */}
+                     <div className="px-5 pt-5 pb-4 sm:px-6 sm:pt-6 flex justify-between items-center border-b border-slate-100">
+                        <div>
+                           <h3 className="font-black text-slate-900 text-base sm:text-lg uppercase tracking-tight">
+                              {editandoId ? "Editar Residente" : "Nuevo Residente"}
+                           </h3>
+                           <p className="text-[10px] text-slate-400 font-medium mt-0.5">
+                              {editandoId ? "Actualiza los datos del residente" : "Completa los datos para registrar"}
+                           </p>
+                        </div>
+                        <button
+                           type="button" onClick={() => setShowModal(false)}
+                           className="p-2 text-slate-300 hover:text-slate-600 hover:bg-slate-100 rounded-xl transition-colors"
+                        >
+                           <X size={18} />
                         </button>
                      </div>
 
-                     <div className="space-y-3 sm:space-y-4">
-                        <div className="space-y-1">
-                           <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Nombre Completo</label>
+                     {/* Cuerpo */}
+                     <div className="px-5 py-4 sm:px-6 sm:py-5 space-y-4 overflow-y-auto max-h-[70vh] sm:max-h-none">
+
+                        {/* Nombre */}
+                        <div className="space-y-1.5">
+                           <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                              Nombre Completo *
+                           </label>
                            <input
-                              className="w-full bg-slate-50 border border-slate-100 p-3.5 sm:p-4 rounded-xl outline-none font-bold uppercase text-sm"
+                              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3
+                                 text-sm font-semibold uppercase text-slate-800
+                                 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent transition-all"
                               value={form.nombre}
                               onChange={(e) => setForm({ ...form, nombre: e.target.value })}
-                              placeholder="NOMBRE COMPLETO" required
+                              placeholder="Nombre completo" required
                            />
                         </div>
 
+                        {/* Celular + Email */}
                         <div className="grid grid-cols-2 gap-3">
-                           <div className="space-y-1">
-                              <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Celular</label>
-                              <input
-                                 type="number" inputMode="numeric"
-                                 className="w-full bg-slate-50 border border-slate-100 p-3.5 rounded-xl outline-none font-bold text-sm"
-                                 value={form.celular}
-                                 onChange={(e) => setForm({ ...form, celular: e.target.value })}
-                                 placeholder="312 000 0000"
-                              />
-                           </div>
-                           <div className="space-y-1">
-                              <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Email</label>
-                              <input
-                                 type="email"
-                                 className="w-full bg-slate-50 border border-slate-100 p-3.5 rounded-xl outline-none font-bold text-sm"
-                                 value={form.email}
-                                 onChange={(e) => setForm({ ...form, email: e.target.value })}
-                                 placeholder="usuario@gmail.com"
-                              />
-                           </div>
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-3">
-                           <div className="space-y-1">
-                              <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Torre</label>
-                              <select
-                                 className="w-full bg-slate-50 border border-slate-100 p-3.5 rounded-xl outline-none font-black appearance-none text-sm"
-                                 value={form.torre}
-                                 onChange={(e) => setForm({ ...form, torre: e.target.value, apto: "" })}
-                                 required
-                              >
-                                 <option value="">Seleccione...</option>
-                                 {Object.keys(ESTRUCTURA_TORRES).map(t => <option key={t} value={t}>{t}</option>)}
-                              </select>
-                           </div>
-                           <div className="space-y-1">
-                              <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Apartamento</label>
-                              <select
-                                 className="w-full bg-slate-50 border border-slate-100 p-3.5 rounded-xl outline-none font-black appearance-none text-sm"
-                                 value={form.apto}
-                                 onChange={(e) => setForm({ ...form, apto: e.target.value })}
-                                 disabled={!form.torre} required
-                              >
-                                 <option value="">Elegir Apto...</option>
-                                 {form.torre && ESTRUCTURA_TORRES[form.torre].map((a: any) => <option key={a} value={a}>{a}</option>)}
-                              </select>
-                           </div>
-                        </div>
-
-                        {/* Vehículos */}
-                        <div className="bg-slate-50 p-4 sm:p-6 rounded-2xl flex items-center justify-around gap-3 text-center border border-slate-100">
-                           {['carros', 'motos', 'bicis'].map((tipo) => (
-                              <div key={tipo} className="flex flex-col items-center gap-1.5">
-                                 <p className="text-[8px] font-black text-slate-400 uppercase">{tipo}</p>
+                           {[
+                              { label: "Celular", key: "celular", type: "tel", placeholder: "312 000 0000" },
+                              { label: "Email", key: "email", type: "email", placeholder: "correo@ejemplo.com" },
+                           ].map(({ label, key, type, placeholder }) => (
+                              <div key={key} className="space-y-1.5">
+                                 <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">{label}</label>
                                  <input
-                                    type="number" inputMode="numeric"
-                                    className="w-16 sm:w-20 bg-white border border-slate-200 p-2 rounded-lg text-center font-black text-sm"
-                                    value={form[tipo as keyof typeof form]}
-                                    onChange={(e) => setForm({ ...form, [tipo]: parseInt(e.target.value) || 0 })}
+                                    type={type}
+                                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3
+                                       text-sm font-medium text-slate-800 placeholder:text-slate-300
+                                       focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent transition-all"
+                                    value={form[key as keyof typeof form] as string}
+                                    onChange={(e) => setForm({ ...form, [key]: e.target.value })}
+                                    placeholder={placeholder}
                                  />
                               </div>
                            ))}
                         </div>
+
+                        {/* Torre + Apto */}
+                        <div className="grid grid-cols-2 gap-3">
+                           <div className="space-y-1.5">
+                              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Torre *</label>
+                              <div className="relative">
+                                 <select
+                                    className="w-full appearance-none bg-slate-50 border border-slate-200 rounded-xl px-4 py-3
+                                       text-sm font-semibold text-slate-800
+                                       focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent transition-all"
+                                    value={form.torre}
+                                    onChange={(e) => setForm({ ...form, torre: e.target.value, apto: "" })}
+                                    required
+                                 >
+                                    <option value="">Seleccionar…</option>
+                                    {Object.keys(ESTRUCTURA_TORRES).map(t => <option key={t} value={t}>{t}</option>)}
+                                 </select>
+                                 <ChevronDown size={14} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                              </div>
+                           </div>
+                           <div className="space-y-1.5">
+                              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Apartamento *</label>
+                              <div className="relative">
+                                 <select
+                                    className="w-full appearance-none bg-slate-50 border border-slate-200 rounded-xl px-4 py-3
+                                       text-sm font-semibold text-slate-800 disabled:opacity-40
+                                       focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent transition-all"
+                                    value={form.apto}
+                                    onChange={(e) => setForm({ ...form, apto: e.target.value })}
+                                    disabled={!form.torre} required
+                                 >
+                                    <option value="">Elegir apto…</option>
+                                    {form.torre && ESTRUCTURA_TORRES[form.torre].map((a: any) => (
+                                       <option key={a} value={a}>{a}</option>
+                                    ))}
+                                 </select>
+                                 <ChevronDown size={14} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                              </div>
+                           </div>
+                        </div>
+
+                        {/* Vehículos */}
+                        <div className="space-y-1.5">
+                           <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Vehículos</label>
+                           <div className="grid grid-cols-3 gap-2">
+                              {[
+                                 { key: "carros", label: "Carros", Icon: CarIcon, color: "text-emerald-500" },
+                                 { key: "motos", label: "Motos", Icon: MotoIcon, color: "text-amber-500" },
+                                 { key: "bicis", label: "Bicicletas", Icon: BikeIcon, color: "text-blue-500" },
+                              ].map(({ key, label, Icon, color }) => (
+                                 <div key={key} className="bg-slate-50 border border-slate-200 rounded-xl p-3 flex flex-col items-center gap-2">
+                                    <Icon size={16} className={color} />
+                                    <p className="text-[9px] font-bold text-slate-400 uppercase">{label}</p>
+                                    <input
+                                       type="number" inputMode="numeric" min={0} max={9}
+                                       className="w-14 text-center bg-white border border-slate-200 rounded-lg py-1.5 font-black text-sm text-slate-700
+                                          focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent"
+                                       value={form[key as keyof typeof form]}
+                                       onChange={(e) => setForm({ ...form, [key]: parseInt(e.target.value) || 0 })}
+                                    />
+                                 </div>
+                              ))}
+                           </div>
+                        </div>
                      </div>
 
-                     <div className="flex gap-2 sm:gap-3 pt-3 sm:pt-4 border-t border-slate-100">
+                     {/* Footer */}
+                     <div className="px-5 pb-5 pt-3 sm:px-6 sm:pb-6 flex gap-2.5 border-t border-slate-100">
                         <button
                            type="submit" disabled={guardando}
-                           className="flex-1 bg-slate-900 text-white font-black py-3.5 sm:py-4 rounded-xl text-[10px] sm:text-xs uppercase tracking-[0.1em] hover:bg-emerald-600 transition-all"
+                           className="flex-1 flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700
+                              text-white font-bold py-3 rounded-xl text-xs uppercase tracking-wide
+                              transition-all shadow-md shadow-emerald-100 active:scale-95 disabled:opacity-60"
                         >
-                           {guardando ? <Loader2 className="animate-spin mx-auto" size={18} /> : "GUARDAR RESIDENTE"}
+                           {guardando
+                              ? <Loader2 className="animate-spin" size={16} />
+                              : editandoId ? "Actualizar" : "Guardar Residente"
+                           }
                         </button>
                         <button
                            type="button" onClick={() => setShowModal(false)}
-                           className="px-5 sm:px-6 bg-slate-100 text-slate-400 font-bold py-3.5 sm:py-4 rounded-xl text-[10px] sm:text-xs uppercase tracking-widest"
+                           className="px-5 bg-slate-100 hover:bg-slate-200 text-slate-500 font-bold py-3 rounded-xl text-xs uppercase tracking-wide transition-colors"
                         >
-                           Salir
+                           Cancelar
                         </button>
                      </div>
                   </form>
