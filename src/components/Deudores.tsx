@@ -55,7 +55,8 @@ export default function Deudores({ role }: { role?: string }) {
       }
       return (r.nombre.toLowerCase().includes(term) || r.apartamento.includes(term)) && coincideTorre;
     }).sort((a, b) => {
-      if (a.torre !== b.torre) return a.torre.localeCompare(b.torre);
+      const ordenTorre = (t: string) => t === "Torre 1" ? 9 : parseInt(t.replace("Torre ", ""));
+      if (a.torre !== b.torre) return ordenTorre(a.torre) - ordenTorre(b.torre);
       return parseInt(a.apartamento) - parseInt(b.apartamento);
     });
   }, [residentes, deudas, busqueda, filtroTorre]);
@@ -165,8 +166,8 @@ export default function Deudores({ role }: { role?: string }) {
                 key={key}
                 onClick={() => setFiltroTorre(key)}
                 className={`py-2 rounded-lg text-[9px] sm:text-[10px] font-black transition-all truncate ${filtroTorre === key
-                    ? "bg-slate-900 text-white shadow-md"
-                    : "text-slate-400 hover:bg-slate-200"
+                  ? "bg-slate-900 text-white shadow-md"
+                  : "text-slate-400 hover:bg-slate-200"
                   }`}
               >
                 {label}
