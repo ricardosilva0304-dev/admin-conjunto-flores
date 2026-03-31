@@ -273,50 +273,52 @@ export default function Residentes() {
                      {residentesFiltrados.filter(r => r.torre === torre).map(res => (
                         <div
                            key={res.id}
-                           className="group bg-white border border-slate-200 rounded-xl p-3.5 sm:p-4
-                              flex items-center gap-3 hover:border-emerald-200 hover:shadow-sm
+                           className="group bg-white border border-slate-200 rounded-xl p-3.5
+                              flex flex-col gap-3 hover:border-emerald-200 hover:shadow-sm
                               transition-all duration-200"
                         >
-                           {/* Badge apto */}
-                           <div className="w-11 h-11 sm:w-12 sm:h-12 bg-slate-100 group-hover:bg-emerald-50 rounded-lg
-                              flex items-center justify-center font-black text-[11px] text-slate-500
-                              group-hover:text-emerald-600 transition-colors flex-shrink-0">
-                              {res.apartamento}
-                           </div>
+                           {/* Fila 1: Badge apto + Info completa */}
+                           <div className="flex items-start gap-3">
+                              {/* Badge apto */}
+                              <div className="w-10 h-10 bg-slate-100 group-hover:bg-emerald-50 rounded-lg
+                                 flex items-center justify-center font-black text-[11px] text-slate-500
+                                 group-hover:text-emerald-600 transition-colors flex-shrink-0 mt-0.5">
+                                 {res.apartamento}
+                              </div>
 
-                           {/* Info */}
-                           <div className="min-w-0 flex-1">
-                              <p className="font-bold text-slate-900 text-xs sm:text-sm truncate uppercase tracking-tight leading-tight">
-                                 {res.nombre}
-                              </p>
-                              <div className="flex flex-col gap-0.5 mt-1">
-                                 {res.celular && (
-                                    <span className="flex items-center gap-1 text-[10px] text-slate-400 font-medium">
-                                       <Phone size={9} className="flex-shrink-0" />
-                                       <span className="truncate">{res.celular}</span>
-                                    </span>
-                                 )}
-                                 {res.email && (
-                                    <span className="hidden sm:flex items-center gap-1 text-[10px] text-slate-400 font-medium">
-                                       <AtSign size={9} className="flex-shrink-0" />
-                                       <span className="truncate">{res.email}</span>
-                                    </span>
-                                 )}
+                              {/* Info — sin truncate para que siempre sea legible */}
+                              <div className="flex-1 min-w-0">
+                                 <p className="font-bold text-slate-900 text-sm leading-snug uppercase tracking-tight break-words">
+                                    {res.nombre}
+                                 </p>
+                                 <div className="flex flex-col gap-0.5 mt-1">
+                                    {res.celular && (
+                                       <span className="flex items-center gap-1 text-[10px] text-slate-400 font-medium">
+                                          <Phone size={9} className="flex-shrink-0" />
+                                          {res.celular}
+                                       </span>
+                                    )}
+                                    {res.email && (
+                                       <span className="flex items-center gap-1 text-[10px] text-slate-400 font-medium break-all">
+                                          <AtSign size={9} className="flex-shrink-0" />
+                                          {res.email}
+                                       </span>
+                                    )}
+                                 </div>
                               </div>
                            </div>
 
-                           {/* Vehículos + acciones */}
-                           <div className="flex items-center gap-2 flex-shrink-0">
-
+                           {/* Fila 2: Vehículos + Acciones */}
+                           <div className="flex items-center justify-between pt-2.5 border-t border-slate-100">
                               {/* Vehículos */}
-                              <div className="flex items-center gap-1 border-l border-slate-100 pl-2.5">
+                              <div className="flex items-center gap-3">
                                  <VehicleBadge icon={CarIcon} count={res.carros || 0} activeColor="text-emerald-500" />
                                  <VehicleBadge icon={MotoIcon} count={res.motos || 0} activeColor="text-amber-500" />
                                  <VehicleBadge icon={BikeIcon} count={res.bicis || 0} activeColor="text-blue-500" />
                               </div>
 
                               {/* Acciones */}
-                              <div className="flex items-center gap-0.5 border-l border-slate-100 pl-2">
+                              <div className="flex items-center gap-1">
                                  <button
                                     title="Editar"
                                     onClick={() => {
@@ -331,7 +333,7 @@ export default function Residentes() {
                                     }}
                                     className="p-1.5 rounded-lg text-slate-300 hover:text-emerald-600 hover:bg-emerald-50 transition-colors"
                                  >
-                                    <Edit size={13} />
+                                    <Edit size={14} />
                                  </button>
                                  <button
                                     title="Eliminar"
@@ -343,7 +345,7 @@ export default function Residentes() {
                                     }}
                                     className="p-1.5 rounded-lg text-slate-300 hover:text-rose-500 hover:bg-rose-50 transition-colors"
                                  >
-                                    <Trash2 size={13} />
+                                    <Trash2 size={14} />
                                  </button>
                               </div>
                            </div>
