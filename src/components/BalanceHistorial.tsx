@@ -20,6 +20,7 @@ export default function BalanceHistorial() {
     const ultimoDia = `${periodo}-${new Date(anio, mesNum, 0).getDate()}`;
 
     try {
+      // ── Mes actual ──────────────────────────────────────────
       const [recaudado, egresos] = await Promise.all([
         supabase.from("pagos")
           .select("monto_total, metodo_pago")
@@ -35,12 +36,29 @@ export default function BalanceHistorial() {
       const totalGastos = egresos.data?.reduce((acc, e) => acc + Number(e.monto), 0) || 0;
       const ingresosBanco = recaudado.data?.filter(p => p.metodo_pago === 'Transferencia').reduce((acc, p) => acc + Number(p.monto_total), 0) || 0;
       const ingresosEfectivoBruto = recaudado.data?.filter(p => p.metodo_pago === 'Efectivo').reduce((acc, p) => acc + Number(p.monto_total), 0) || 0;
-      const efectivoNeto = ingresosEfectivoBruto - totalGastos;
+      const efectivoNetoMes = ingresosEfectivoBruto - totalGastos;
+
+      // ── Meses anteriores: traer TODO lo anterior al primer día del mes ──
+      const [pagosAnteriores, egresosAnteriores] = await Promise.all([
+        supabase.from("pagos")
+          .select("monto_total, metodo_pago")
+          .eq("metodo_pago", "Efectivo")
+          .lt("fecha_pago", primerDia),
+        supabase.from("egresos")
+          .select("monto")
+          .lt("fecha", primerDia)
+      ]);
+
+      const efectivoAcumuladoAnterior =
+        (pagosAnteriores.data?.reduce((acc, p) => acc + Number(p.monto_total), 0) || 0)
+        - (egresosAnteriores.data?.reduce((acc, e) => acc + Number(e.monto), 0) || 0);
+
+      const efectivoAcumulado = efectivoNetoMes + efectivoAcumuladoAnterior;
 
       setResumen({
         total: totalRecaudado,
         banco: ingresosBanco,
-        efectivo: efectivoNeto,
+        efectivo: efectivoAcumulado,          // ← ahora es acumulado
         efectivoBruto: ingresosEfectivoBruto,
         gastos: totalGastos,
         balanceNeto: totalRecaudado - totalGastos,
@@ -64,7 +82,6 @@ export default function BalanceHistorial() {
           </div>
         </div>
 
-        {/* Input + botón siempre en una sola línea */}
         <div className="flex items-center gap-2 mt-3 sm:mt-0 sm:ml-auto sm:w-auto
           sm:flex sm:flex-row sm:items-center sm:justify-end">
           <div className="sm:hidden w-full flex items-center gap-2">
@@ -82,7 +99,6 @@ export default function BalanceHistorial() {
             </button>
           </div>
 
-          {/* Desktop: layout original */}
           <div className="hidden sm:flex items-center gap-2">
             <input
               type="month"
@@ -103,10 +119,8 @@ export default function BalanceHistorial() {
       {resumen ? (
         <div className="animate-in fade-in slide-in-from-bottom-4 duration-700 space-y-4 sm:space-y-6">
 
-          {/* ── GRILLA PRINCIPAL ─────────────────────────────── */}
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6">
 
-            {/* Ingresos + desglose */}
             <div className="lg:col-span-7 bg-white p-5 sm:p-8 rounded-2xl sm:rounded-[2rem] border border-slate-200 shadow-sm flex flex-col gap-4 sm:gap-6">
               <div>
                 <p className="text-slate-400 text-[9px] sm:text-[10px] font-black uppercase tracking-[0.2em] mb-1.5">
@@ -120,7 +134,6 @@ export default function BalanceHistorial() {
 
               <div className="bg-slate-50 rounded-2xl p-4 sm:p-6 border border-slate-100 space-y-3 sm:space-y-4">
 
-                {/* Banco */}
                 <div className="flex justify-between items-center pb-3 sm:pb-4 border-b border-slate-200">
                   <div className="flex items-center gap-2 sm:gap-3 min-w-0">
                     <div className="bg-white p-1.5 sm:p-2 rounded-lg shadow-sm text-blue-500 flex-shrink-0">
@@ -136,7 +149,6 @@ export default function BalanceHistorial() {
                   </span>
                 </div>
 
-                {/* Efectivo */}
                 <div className="flex justify-between items-center">
                   <div className="flex items-center gap-2 sm:gap-3 min-w-0">
                     <div className="bg-emerald-100 p-1.5 sm:p-2 rounded-lg shadow-sm text-emerald-600 flex-shrink-0">
@@ -161,10 +173,8 @@ export default function BalanceHistorial() {
               </div>
             </div>
 
-            {/* Egresos + Balance neto */}
             <div className="lg:col-span-5 grid grid-cols-2 lg:grid-cols-1 gap-4 sm:gap-6">
 
-              {/* Egresos */}
               <div className="bg-rose-50 p-4 sm:p-8 rounded-2xl sm:rounded-[2rem] border border-rose-100 flex flex-col justify-center">
                 <div className="flex justify-between items-start mb-1 sm:mb-2">
                   <p className="text-rose-400 text-[8px] sm:text-[10px] font-black uppercase tracking-[0.2em]">Egresos Totales</p>
@@ -178,7 +188,6 @@ export default function BalanceHistorial() {
                 </p>
               </div>
 
-              {/* Saldo neto */}
               <div className="bg-slate-900 p-4 sm:p-8 rounded-2xl sm:rounded-[2rem] shadow-xl flex flex-col justify-center relative overflow-hidden">
                 <div className="absolute -bottom-4 -right-4 p-4 opacity-10 text-white">
                   <PieChart size={80} />
@@ -208,7 +217,6 @@ export default function BalanceHistorial() {
               </h3>
             </div>
 
-            {/* Móvil: cards apiladas. Desktop: tabla */}
             <div className="sm:hidden divide-y divide-slate-50">
               {resumen.listaEgresos.length === 0 ? (
                 <p className="px-4 py-10 text-center text-slate-400 text-xs italic">
@@ -230,7 +238,6 @@ export default function BalanceHistorial() {
               )}
             </div>
 
-            {/* Tabla desktop */}
             <div className="hidden sm:block overflow-x-auto">
               <table className="w-full text-left">
                 <thead>
