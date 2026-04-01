@@ -25,7 +25,6 @@ export default function Causacion() {
   const [fechaLimite, setFechaLimite] = useState("");
   const [filtroTipo, setFiltroTipo] = useState("TODOS");
 
-  // Meses del historial abiertos/cerrados
   const [mesesAbiertos, setMesesAbiertos] = useState<Record<string, boolean>>({});
 
   useEffect(() => { cargarDatos(); }, []);
@@ -41,7 +40,6 @@ export default function Causacion() {
     if (r.data) setResidentes(r.data);
     if (h.data) {
       setHistorial(h.data);
-      // Abrir el mes más reciente por defecto
       if (h.data.length > 0) {
         const primerMes = h.data[0].mes_causado;
         setMesesAbiertos({ [primerMes]: true });
@@ -95,22 +93,47 @@ export default function Causacion() {
 
     setGenerando(true);
     try {
-      const [anio, mes] = mesDeuda.split("-");
+      const [anio, mesNum] = mesDeuda.split("-");
       const mesesNombres = ["ENERO", "FEBRERO", "MARZO", "ABRIL", "MAYO", "JUNIO", "JULIO", "AGOSTO", "SEPTIEMBRE", "OCTUBRE", "NOVIEMBRE", "DICIEMBRE"];
-      const periodoTexto = `${mesesNombres[parseInt(mes) - 1]} ${anio}`;
+      const periodoTexto = `${mesesNombres[parseInt(mesNum) - 1]} ${anio}`;
       const nombreConPeriodo = `${concepto.nombre.trim().toUpperCase()} (${periodoTexto})`;
 
-      const { data: lote, error: errLote } = await supabase.from("causaciones_globales").insert([{
-        mes_causado: mesDeuda,
-        concepto_nombre: nombreConPeriodo,
-        total_residentes: residentesAfectados.length,
-        fecha_limite: fechaLimite,
-        tipo_cobro: 'NORMAL'
-      }]).select().single();
+      // Nombre con el que se guardaron los anticipos para este concepto+mes
+      const nombreAnticipo = `ANTICIPO - ${concepto.nombre.trim().toUpperCase()} (${periodoTexto})`;
+
+      // Consultar todos los anticipos existentes para este concepto+mes de una sola vez
+      const { data: anticiposExistentes } = await supabase
+        .from("deudas_residentes")
+        .select("id, residente_id, saldo_pendiente, precio_m1")
+        .eq("concepto_nombre", nombreAnticipo);
+
+      // Indexar por residente_id para búsqueda O(1)
+      const anticiposPorResidente: Record<number, any> = {};
+      (anticiposExistentes || []).forEach(a => {
+        anticiposPorResidente[a.residente_id] = a;
+      });
+
+      // Crear el lote de causación
+      const { data: lote, error: errLote } = await supabase
+        .from("causaciones_globales")
+        .insert([{
+          mes_causado: mesDeuda,
+          concepto_nombre: nombreConPeriodo,
+          total_residentes: residentesAfectados.length,
+          fecha_limite: fechaLimite,
+          tipo_cobro: 'NORMAL'
+        }])
+        .select()
+        .single();
 
       if (errLote) throw errLote;
 
-      const deudas = residentesAfectados.map(res => {
+      // Construir deudas considerando anticipos
+      const deudasAInsertar: any[] = [];
+      const anticiposAActualizar: Array<{ id: number; nuevoSaldo: number }> = [];
+
+      for (const res of residentesAfectados) {
+        // Calcular factor vehículos
         let factor = 1;
         const nombreC = concepto.nombre.toUpperCase();
         if (concepto.cobro_por_vehiculo) {
@@ -118,25 +141,103 @@ export default function Causacion() {
           else if (nombreC.includes("MOTO")) factor = Number(res.motos) || 0;
           else if (nombreC.includes("BICI")) factor = Number(res.bicis) || 0;
         }
-        if (factor === 0) return null;
-        const montoBase = (Number(concepto.monto_1_10) || 0) * factor;
-        return {
-          causacion_id: lote.id, residente_id: res.id,
-          unidad: `T${res.torre.slice(-1)}-${res.apartamento}`,
-          concepto_nombre: nombreConPeriodo,
-          monto_original: montoBase, precio_m1: montoBase,
-          precio_m2: (Number(concepto.monto_11_20) || montoBase) * factor,
-          precio_m3: (Number(concepto.monto_21_adelante) || montoBase) * factor,
-          saldo_pendiente: montoBase, fecha_vencimiento: fechaLimite
-        };
-      }).filter(d => d !== null);
+        if (factor === 0) continue;
 
-      if (deudas.length > 0) await supabase.from("deudas_residentes").insert(deudas);
+        const montoBase = (Number(concepto.monto_1_10) || 0) * factor;
+        const montoM2 = (Number(concepto.monto_11_20) || montoBase) * factor;
+        const montoM3 = (Number(concepto.monto_21_adelante) || montoBase) * factor;
+
+        const anticipo = anticiposPorResidente[res.id];
+
+        if (anticipo) {
+          // El residente pagó anticipado
+          const valorPagado = Math.abs(Number(anticipo.saldo_pendiente)); // es negativo en DB
+
+          if (valorPagado >= montoBase) {
+            // Anticipo cubre el total: insertar con saldo 0 (ya pagado)
+            deudasAInsertar.push({
+              causacion_id: lote.id,
+              residente_id: res.id,
+              unidad: `T${res.torre.slice(-1)}-${res.apartamento}`,
+              concepto_nombre: nombreConPeriodo,
+              monto_original: montoBase,
+              precio_m1: montoBase,
+              precio_m2: montoM2,
+              precio_m3: montoM3,
+              saldo_pendiente: 0,
+              fecha_vencimiento: fechaLimite,
+              estado: "PAGADO"
+            });
+            // Consumir el anticipo completamente (saldo → 0)
+            anticiposAActualizar.push({ id: anticipo.id, nuevoSaldo: 0 });
+
+          } else {
+            // Anticipo parcial: insertar solo la diferencia
+            // Esto ocurre si subió el precio (ej: pagó $146k pero ahora vale $156k → debe $10k)
+            const diferencia = montoBase - valorPagado;
+            deudasAInsertar.push({
+              causacion_id: lote.id,
+              residente_id: res.id,
+              unidad: `T${res.torre.slice(-1)}-${res.apartamento}`,
+              concepto_nombre: nombreConPeriodo,
+              monto_original: montoBase,
+              precio_m1: diferencia,  // solo debe la diferencia
+              precio_m2: montoM2 - valorPagado,
+              precio_m3: montoM3 - valorPagado,
+              saldo_pendiente: diferencia,
+              fecha_vencimiento: fechaLimite,
+              estado: "PENDIENTE"
+            });
+            // Consumir el anticipo completamente
+            anticiposAActualizar.push({ id: anticipo.id, nuevoSaldo: 0 });
+          }
+
+        } else {
+          // Sin anticipo: flujo normal
+          deudasAInsertar.push({
+            causacion_id: lote.id,
+            residente_id: res.id,
+            unidad: `T${res.torre.slice(-1)}-${res.apartamento}`,
+            concepto_nombre: nombreConPeriodo,
+            monto_original: montoBase,
+            precio_m1: montoBase,
+            precio_m2: montoM2,
+            precio_m3: montoM3,
+            saldo_pendiente: montoBase,
+            fecha_vencimiento: fechaLimite,
+            estado: "PENDIENTE"
+          });
+        }
+      }
+
+      // Insertar todas las deudas de una sola vez
+      if (deudasAInsertar.length > 0) {
+        await supabase.from("deudas_residentes").insert(deudasAInsertar);
+      }
+
+      // Actualizar los anticipos consumidos (marcar saldo en 0)
+      for (const { id, nuevoSaldo } of anticiposAActualizar) {
+        await supabase
+          .from("deudas_residentes")
+          .update({ saldo_pendiente: nuevoSaldo, estado: "APLICADO" })
+          .eq("id", id);
+      }
+
+      const conAnticipo = anticiposAActualizar.length;
+      const sinAnticipo = deudasAInsertar.length - conAnticipo;
+
       await cargarDatos();
       setConceptoId("");
-      alert("Proceso completado.");
-    } catch (err: any) { alert(err.message); }
-    finally { setGenerando(false); }
+      alert(
+        `✅ Causación completada.\n` +
+        `· ${sinAnticipo} cobros normales generados\n` +
+        (conAnticipo > 0 ? `· ${conAnticipo} anticipos aplicados automáticamente` : "")
+      );
+    } catch (err: any) {
+      alert(err.message);
+    } finally {
+      setGenerando(false);
+    }
   }
 
   const residentesAfectados = residentes.filter(r => {
@@ -160,7 +261,6 @@ export default function Causacion() {
 
       {/* ── GENERADOR ────────────────────────────────────────── */}
       <section className="bg-white p-4 sm:p-8 rounded-2xl sm:rounded-[2.5rem] border border-slate-100 shadow-sm">
-        {/* Título */}
         <div className="flex items-center gap-3 mb-5 sm:mb-8">
           <div className="w-9 h-9 sm:w-10 sm:h-10 bg-emerald-500 rounded-xl flex items-center justify-center text-slate-900 shadow-lg shadow-emerald-500/20 flex-shrink-0">
             <Zap size={18} strokeWidth={2.5} />
@@ -170,12 +270,11 @@ export default function Causacion() {
               Generar Cobros Masivos
             </h2>
             <p className="text-slate-400 text-[9px] sm:text-[10px] font-bold uppercase mt-0.5 tracking-tighter">
-              Planificación financiera del mes
+              Planificación financiera del mes · Los anticipos se aplican automáticamente
             </p>
           </div>
         </div>
 
-        {/* Formulario — 1 columna en móvil, grid en desktop */}
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-12 gap-3 sm:gap-4 items-end">
           <div className="sm:col-span-2 md:col-span-4 space-y-1.5">
             <label className="text-[9px] font-black text-slate-400 uppercase ml-1 tracking-widest">Concepto de pago</label>
@@ -261,7 +360,6 @@ export default function Causacion() {
           return (
             <div key={mesKey} className="bg-white border border-slate-100 rounded-2xl overflow-hidden shadow-sm">
 
-              {/* Cabecera del mes — clickeable */}
               <button
                 onClick={() => setMesesAbiertos(prev => ({ ...prev, [mesKey]: !prev[mesKey] }))}
                 className="w-full flex items-center justify-between px-4 sm:px-6 py-3.5 sm:py-4 hover:bg-slate-50 transition-colors group"
@@ -279,15 +377,11 @@ export default function Causacion() {
                 }
               </button>
 
-              {/* Contenido del mes */}
               {abierto && (
                 <div className="border-t border-slate-100 p-3 sm:p-4 grid grid-cols-1 md:grid-cols-2 gap-3">
                   {items.map(h => (
-                    <div
-                      key={h.id}
-                      className="border border-slate-100 p-4 sm:p-5 rounded-2xl flex flex-col gap-4 hover:border-emerald-200 hover:shadow-md transition-all group"
-                    >
-                      {/* Info + acciones */}
+                    <div key={h.id} className="border border-slate-100 p-4 sm:p-5 rounded-2xl flex flex-col gap-4 hover:border-emerald-200 hover:shadow-md transition-all group">
+
                       <div className="flex items-start justify-between gap-3">
                         <div className="flex items-center gap-3 min-w-0">
                           <div className="w-10 h-10 sm:w-12 sm:h-12 bg-slate-50 rounded-xl flex items-center justify-center text-slate-400 group-hover:bg-emerald-50 group-hover:text-emerald-600 transition-colors flex-shrink-0">
@@ -325,7 +419,6 @@ export default function Causacion() {
                         </div>
                       </div>
 
-                      {/* Regla de cobro */}
                       <div className="flex items-center justify-between pt-3 border-t border-slate-50">
                         <span className="text-[8px] sm:text-[9px] font-black text-slate-300 uppercase tracking-widest">Regla:</span>
                         <div className="flex bg-slate-50 p-1 rounded-xl border border-slate-100 gap-0.5">
@@ -365,7 +458,6 @@ export default function Causacion() {
         <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-md z-[500] flex flex-col items-center justify-end sm:justify-center p-0 sm:p-4 animate-in fade-in duration-300">
           <div className="bg-white w-full sm:max-w-4xl rounded-t-[2rem] sm:rounded-[2.5rem] shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-bottom-4 sm:zoom-in-95 duration-300 border border-white/20 max-h-[90vh] sm:h-[85vh]">
 
-            {/* Header modal */}
             <div className="p-4 sm:p-8 border-b border-slate-100 flex items-center justify-between bg-slate-50/50 flex-shrink-0">
               <div className="flex items-center gap-3 sm:gap-4 min-w-0">
                 <div className="w-10 h-10 sm:w-12 sm:h-12 bg-slate-900 rounded-xl sm:rounded-2xl flex items-center justify-center text-white flex-shrink-0">
@@ -388,7 +480,6 @@ export default function Causacion() {
               </button>
             </div>
 
-            {/* Buscador + KPIs */}
             <div className="px-4 sm:px-8 py-3 sm:py-5 bg-white border-b border-slate-100 flex flex-col gap-3 flex-shrink-0">
               <div className="relative group">
                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-emerald-500 transition-colors" size={15} />
@@ -399,7 +490,6 @@ export default function Causacion() {
                 />
               </div>
 
-              {/* KPIs en 2 columnas */}
               <div className="grid grid-cols-2 gap-2 sm:gap-4">
                 <div className="bg-emerald-50 border border-emerald-100 px-4 sm:px-6 py-2.5 sm:py-3 rounded-xl sm:rounded-2xl">
                   <p className="text-[7px] sm:text-[8px] font-black text-emerald-600 uppercase tracking-widest">Recaudado</p>
@@ -416,7 +506,6 @@ export default function Causacion() {
               </div>
             </div>
 
-            {/* Lista de deudas */}
             <div className="flex-1 overflow-y-auto p-3 sm:p-6 space-y-2 bg-[#F8FAFC]">
               {loadingDetalle ? (
                 <div className="flex flex-col items-center justify-center h-40 opacity-20">
