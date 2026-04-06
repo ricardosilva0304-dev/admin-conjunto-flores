@@ -3,6 +3,7 @@ import { useState, useRef } from "react";
 import { supabase } from "@/lib/supabase";
 import { calcularValorDeudaHoy } from "@/lib/utils";
 import { Printer, Loader2, PieChart } from "lucide-react";
+import BalanceHistorial from "./BalanceHistorial";
 
 interface ReporteFinancieroData {
   tipo: 'FINANCIERO';
@@ -60,7 +61,7 @@ export default function Reportes() {
     setDatosReporte(null);
     const TORRES_REQUERIDAS = ['Torre 5', 'Torre 6', 'Torre 7', 'Torre 8'];
     try {
-      if (tipoReporte === "General" || tipoReporte === "Solo Ingresos" || tipoReporte === "Solo Egresos") {
+      if (tipoReporte === "Solo Ingresos" || tipoReporte === "Solo Egresos") {
         if (!mes) return alert("Selecciona un mes");
         const [anio, mesNum] = mes.split("-").map(Number);
         const primerDia = `${mes}-01`;
@@ -101,7 +102,8 @@ export default function Reportes() {
     finally { setLoading(false); }
   }
 
-  const needsMes = tipoReporte === "General" || tipoReporte.includes("Solo");
+  const needsMes = tipoReporte.includes("Solo");
+  const esBalanceConsolidado = tipoReporte === "General";
 
   return (
     <div className="max-w-6xl mx-auto space-y-4 sm:space-y-6 pb-24 font-sans text-slate-800 px-0">
@@ -124,7 +126,7 @@ export default function Reportes() {
           </div>
         </div>
 
-        {/* Controles en columna en móvil */}
+        {/* Controles */}
         <div className="flex flex-col sm:flex-row gap-2">
           <select
             className="flex-1 bg-slate-800 border border-white/10 text-white p-3 rounded-xl text-xs font-black outline-none focus:ring-2 ring-emerald-500/50"
@@ -146,18 +148,26 @@ export default function Reportes() {
             />
           )}
 
-          <button
-            onClick={generarReporte}
-            disabled={loading}
-            className="bg-emerald-500 text-slate-900 px-6 py-3 rounded-xl text-xs font-black uppercase tracking-widest active:scale-95 disabled:opacity-30 flex items-center justify-center gap-2"
-          >
-            {loading ? <Loader2 className="animate-spin" size={16} /> : "GENERAR"}
-          </button>
+          {/* Balance Consolidado no necesita botón Generar — lo maneja BalanceHistorial */}
+          {!esBalanceConsolidado && (
+            <button
+              onClick={generarReporte}
+              disabled={loading}
+              className="bg-emerald-500 text-slate-900 px-6 py-3 rounded-xl text-xs font-black uppercase tracking-widest active:scale-95 disabled:opacity-30 flex items-center justify-center gap-2"
+            >
+              {loading ? <Loader2 className="animate-spin" size={16} /> : "GENERAR"}
+            </button>
+          )}
         </div>
       </section>
 
-      {/* ── VISTA PREVIA ─────────────────────────────────────── */}
-      {datosReporte && (
+      {/* ── BALANCE CONSOLIDADO — componente completo ── */}
+      {esBalanceConsolidado && (
+        <BalanceHistorial />
+      )}
+
+      {/* ── VISTA PREVIA otros reportes ─────────────────────── */}
+      {!esBalanceConsolidado && datosReporte && (
         <div className="flex justify-center">
           <style jsx>{`
             .report-content table { width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 10px; font-family: sans-serif; }
@@ -182,7 +192,6 @@ export default function Reportes() {
 
               {/* ── ENCABEZADO ── */}
               <header className="mb-6 sm:mb-8 pb-4 border-b-2 border-slate-900">
-                {/* Móvil: apilado. Desktop: en fila */}
                 <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
                   <div className="flex items-center gap-3">
                     <img src="/logo.png" alt="Logo" className="w-10 h-10 sm:w-14 sm:h-14 object-contain flex-shrink-0" />
@@ -207,12 +216,11 @@ export default function Reportes() {
               </header>
 
               <main>
-                {/* ── REPORTE FINANCIERO ── */}
+                {/* ── REPORTE FINANCIERO (Solo Ingresos / Solo Egresos) ── */}
                 {datosReporte.tipo === 'FINANCIERO' && (
                   <>
-                    {/* KPIs — 1 col móvil, 3 col desktop */}
                     <section className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4 mb-6 sm:mb-8">
-                      {(tipoReporte === "General" || tipoReporte === "Solo Ingresos") && (
+                      {tipoReporte === "Solo Ingresos" && (
                         <div className="p-3 sm:p-4 border border-slate-200 rounded-lg bg-white">
                           <p className="text-[8px] sm:text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Recaudo Total (Bruto)</p>
                           <p className="text-lg sm:text-xl font-black text-slate-900 tabular-nums">
@@ -224,53 +232,32 @@ export default function Reportes() {
                               <span className="text-emerald-600">${datosReporte.summary.ingresosBanco.toLocaleString()}</span>
                             </div>
                             <div className="flex justify-between text-[8px] sm:text-[9px] font-bold">
-                              <span className="text-slate-400 uppercase">Saldo Efectivo:</span>
-                              <span className={datosReporte.summary.ingresosEfectivo < 0 ? 'text-rose-600 font-black' : 'text-emerald-600 font-black'}>
-                                ${datosReporte.summary.ingresosEfectivo.toLocaleString()}
-                              </span>
+                              <span className="text-slate-400 uppercase">En Efectivo:</span>
+                              <span className="text-emerald-600">${datosReporte.summary.ingresosEfectivoBruto.toLocaleString()}</span>
                             </div>
-                            <p className="text-[7px] sm:text-[8px] text-slate-300 italic text-right">
-                              Ing: ${datosReporte.summary.ingresosEfectivoBruto.toLocaleString()} − Gtos: ${datosReporte.summary.totalEgresos.toLocaleString()}
-                            </p>
                           </div>
                           <p className="text-[7px] text-slate-300 uppercase mt-1 text-right">
                             {datosReporte.summary.numIngresos} transacciones
                           </p>
                         </div>
                       )}
-                      {(tipoReporte === "General" || tipoReporte === "Solo Egresos") && (
+                      {tipoReporte === "Solo Egresos" && (
                         <div className="p-3 sm:p-4 border border-slate-200 rounded-lg bg-white">
                           <p className="text-[8px] sm:text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Gastos Totales</p>
                           <p className="text-lg sm:text-xl font-black text-rose-600 tabular-nums">
                             -${datosReporte.summary.totalEgresos.toLocaleString()}
                           </p>
                           <div className="mt-2 pt-2 border-t border-slate-100">
-                            <p className="text-[8px] sm:text-[9px] font-bold text-slate-400 uppercase">
-                              Salidas: <span className="text-slate-700">${datosReporte.summary.totalEgresos.toLocaleString()}</span>
-                            </p>
                             <p className="text-[7px] text-slate-300 uppercase mt-1 text-right italic">
                               {datosReporte.summary.numEgresos} facturas
                             </p>
                           </div>
                         </div>
                       )}
-                      {tipoReporte === "General" && (
-                        <div className="p-3 sm:p-4 bg-slate-900 rounded-lg">
-                          <p className="text-[8px] sm:text-[9px] font-black text-emerald-400 uppercase tracking-widest mb-1">Saldo Neto</p>
-                          <p className="text-lg sm:text-xl font-black text-white tabular-nums">
-                            ${datosReporte.summary.saldoNeto.toLocaleString()}
-                          </p>
-                          <div className="mt-2 pt-2 border-t border-white/10">
-                            <p className="text-[7px] sm:text-[8px] text-slate-400 uppercase font-bold">
-                              Disponibilidad final del periodo
-                            </p>
-                          </div>
-                        </div>
-                      )}
                     </section>
 
-                    {/* Tabla ingresos — scroll horizontal en móvil */}
-                    {(tipoReporte === "General" || tipoReporte === "Solo Ingresos") && (
+                    {/* Tabla ingresos en efectivo */}
+                    {tipoReporte === "Solo Ingresos" && (
                       <section className="mb-6 sm:mb-10">
                         <h3 className="text-[9px] sm:text-[10px] font-bold uppercase text-slate-500 mb-2 border-b pb-1">
                           Relación de Ingresos <span className="text-slate-400 font-normal italic">(Caja en Efectivo)</span>
@@ -301,7 +288,7 @@ export default function Reportes() {
                     )}
 
                     {/* Tabla egresos */}
-                    {(tipoReporte === "General" || tipoReporte === "Solo Egresos") && (
+                    {tipoReporte === "Solo Egresos" && (
                       <section className="mb-6 sm:mb-10">
                         <h3 className="text-[9px] sm:text-[10px] font-bold uppercase text-slate-500 mb-2 border-b pb-1">Relación de Gastos</h3>
                         <div className="overflow-x-auto -mx-1">
