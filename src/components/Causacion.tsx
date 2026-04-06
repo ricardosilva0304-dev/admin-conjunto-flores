@@ -27,7 +27,14 @@ export default function Causacion() {
 
   const [mesesAbiertos, setMesesAbiertos] = useState<Record<string, boolean>>({});
 
-  useEffect(() => { cargarDatos(); }, []);
+  useEffect(() => {
+    cargarDatos();
+    const canal = supabase.channel("causacion-rt")
+      .on("postgres_changes", { event: "*", schema: "public", table: "causaciones_globales" }, cargarDatos)
+      .on("postgres_changes", { event: "*", schema: "public", table: "deudas_residentes" }, cargarDatos)
+      .subscribe();
+    return () => { supabase.removeChannel(canal); };
+  }, []);
 
   async function cargarDatos() {
     setLoading(true);

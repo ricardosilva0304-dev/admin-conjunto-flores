@@ -1,6 +1,7 @@
 "use client";
 import React, { useMemo, useRef } from "react";
 import { X, FileText } from "lucide-react";
+import { hoyCol } from "@/lib/utils";
 import { numeroALetras, calcularValorDeudaHoy, formatPeriodo } from "@/lib/utils";
 
 export default function CuentaCobro({ residente, deudas, onClose }: any) {
@@ -74,7 +75,7 @@ export default function CuentaCobro({ residente, deudas, onClose }: any) {
                       </div>
                       <div style="text-align: right;">
                         <div style="background: #000; color: #fff; padding: 4px 10px; font-size: 11px; font-weight: bold;">CUENTA DE COBRO</div>
-                        <p style="font-size: 12px; font-weight: 800; margin: 5px 0 0 0;">Nº ${new Date().getFullYear()}${String(new Date().getMonth() + 1).padStart(2, '0')}-${residente.apartamento}</p>
+                        <p style="font-size: 12px; font-weight: 800; margin: 5px 0 0 0;">Nº ${hoyCol().getFullYear()}${String(hoyCol().getMonth() + 1).padStart(2, '0')}-${residente.apartamento}</p>
                       </div>
                     </div>
                     <div class="residente-box">
@@ -188,7 +189,7 @@ export default function CuentaCobro({ residente, deudas, onClose }: any) {
               CUENTA DE COBRO
             </span>
             <p className="text-sm sm:text-lg font-black text-slate-800">
-              Nº {new Date().getFullYear()}{String(new Date().getMonth() + 1).padStart(2, '0')}-{residente.apartamento}
+              Nº {hoyCol().getFullYear()}{String(hoyCol().getMonth() + 1).padStart(2, '0')}-{residente.apartamento}
             </p>
           </div>
         </div>

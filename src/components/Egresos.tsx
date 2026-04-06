@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect, useMemo } from "react";
 import { supabase } from "@/lib/supabase";
+import { fechaColStr } from "@/lib/utils";
 import {
   Plus, Search, Trash2, Printer,
   TrendingDown, Loader2, X, Receipt,
@@ -28,10 +29,16 @@ export default function Egresos() {
   const [items, setItems] = useState([{ concepto: "", valor: "" }]);
   const [form, setForm] = useState<any>({
     recibo_n: "", pagado_a: "",
-    fecha: new Date().toISOString().split('T')[0]
+    fecha: fechaColStr()
   });
 
-  useEffect(() => { cargarEgresos(); }, []);
+  useEffect(() => {
+    cargarEgresos();
+    const canal = supabase.channel("egresos-rt")
+      .on("postgres_changes", { event: "*", schema: "public", table: "egresos" }, cargarEgresos)
+      .subscribe();
+    return () => { supabase.removeChannel(canal); };
+  }, []);
 
   async function cargarEgresos() {
     setLoading(true);

@@ -41,6 +41,11 @@ export default function App() {
     return () => clearInterval(timer);
   }, []);
 
+  useEffect(() => {
+    const nombre = sectionMeta[activeTab]?.label || activeTab;
+    document.title = `${nombre} · Parque de las Flores`;
+  }, [activeTab, isLoggedIn]);
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);

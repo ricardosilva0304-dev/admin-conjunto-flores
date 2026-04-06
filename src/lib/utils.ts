@@ -1,6 +1,19 @@
-/**
- * Convierte números a letras para documentos legales
- */
+/** Retorna un Date con la hora actual en zona Colombia (UTC-5) */
+export function hoyCol(): Date {
+  return new Date(new Date().toLocaleString("en-US", { timeZone: "America/Bogota" }));
+}
+
+/** Retorna "YYYY-MM-DD" en hora colombiana */
+export function fechaColStr(): string {
+  const d = hoyCol();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+/** Retorna "YYYY-MM" en hora colombiana */
+export function mesColStr(): string {
+  return fechaColStr().slice(0, 7);
+}
+
 export function numeroALetras(num: number): string {
   const unidades = (n: number) => ['CERO', 'UN', 'DOS', 'TRES', 'CUATRO', 'CINCO', 'SEIS', 'SIETE', 'OCHO', 'NUEVE'][n];
   const decenas = (n: number) => ['DIEZ', 'ONCE', 'DOCE', 'TRECE', 'CATORCE', 'QUINCE', 'DIECISEIS', 'DIECISIETE', 'DIECIOCHO', 'DIECINUEVE', 'VEINTE', 'TREINTA Y ', 'CUARENTA Y ', 'CINCUENTA Y ', 'SESENTA Y ', 'SETENTA Y ', 'OCHENTA Y ', 'NOVENTA Y '][n - 10] ||
@@ -72,7 +85,7 @@ export function calcularValorDeudaHoy(deuda: any) {
     precioTarifa = m3;
   } else {
     // AUTOMÁTICO: día 1-10 → m1, día 11 en adelante → m2
-    const hoy = new Date();
+    const hoy = hoyCol();
     const dia = hoy.getDate();
     const mesAct = hoy.getMonth() + 1;
     const anioAct = hoy.getFullYear();

@@ -90,7 +90,13 @@ export default function Residentes() {
       carros: 0, motos: 0, bicis: 0
    });
 
-   useEffect(() => { cargarResidentes(); }, []);
+   useEffect(() => {
+      cargarResidentes();
+      const canal = supabase.channel("residentes-rt")
+         .on("postgres_changes", { event: "*", schema: "public", table: "residentes" }, cargarResidentes)
+         .subscribe();
+      return () => { supabase.removeChannel(canal); };
+   }, []);
 
    async function cargarResidentes() {
       setLoading(true);
@@ -235,8 +241,8 @@ export default function Residentes() {
                      key={key}
                      onClick={() => setFiltroTorre(key)}
                      className={`py-2 rounded-lg text-[10px] sm:text-xs font-bold tracking-wide transition-all ${filtroTorre === key
-                           ? "bg-emerald-600 text-white shadow-sm"
-                           : "text-slate-400 hover:text-slate-600 hover:bg-white"
+                        ? "bg-emerald-600 text-white shadow-sm"
+                        : "text-slate-400 hover:text-slate-600 hover:bg-white"
                         }`}
                   >
                      {label}

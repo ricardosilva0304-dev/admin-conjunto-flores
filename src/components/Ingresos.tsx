@@ -2,7 +2,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { supabase } from "@/lib/supabase";
 import ReciboCaja from "./ReciboCaja";
-import { calcularValorDeudaHoy, formatPeriodo } from "@/lib/utils";
+import { calcularValorDeudaHoy, formatPeriodo, fechaColStr, mesColStr, hoyCol } from "@/lib/utils";
 import {
   Search, Wallet, Loader2, X, Receipt,
   Calendar, ChevronRight, Hash, CreditCard,
@@ -20,10 +20,10 @@ export default function Ingresos() {
 
   const [formRecibo, setFormRecibo] = useState({
     numero: "",
-    fecha: new Date().toISOString().split("T")[0],
+    fecha: fechaColStr(),
     metodo: "Transferencia",
     referencia: "",
-    fechaTransaccion: new Date().toISOString().split("T")[0],
+    fechaTransaccion: fechaColStr(),
   });
   const [abonos, setAbonos] = useState<{ [key: string]: string }>({});
 
@@ -32,7 +32,7 @@ export default function Ingresos() {
   const [guardandoManual, setGuardandoManual] = useState(false);
   const [formManual, setFormManual] = useState({
     concepto: "",
-    mes: new Date().toISOString().split("-").slice(0, 2).join("-"),
+    mes: mesColStr(),
     valor: "",
   });
 
@@ -45,7 +45,8 @@ export default function Ingresos() {
     mes: "",
     metodo: "Transferencia",
     referencia: "",
-    fechaTransaccion: new Date().toISOString().split("T")[0],
+    fechaRecibo: fechaColStr(),
+    fechaTransaccion: fechaColStr(),
     numeroRecibo: "",
   });
 
@@ -105,7 +106,16 @@ export default function Ingresos() {
     return `${n[parseInt(m) - 1]} ${a}`;
   }, [formAnticipo.mes]);
 
-  useEffect(() => { cargarResidentes(); cargarConceptos(); }, []);
+  useEffect(() => {
+    cargarResidentes(); cargarConceptos();
+    const canal = supabase.channel("ingresos-rt")
+      .on("postgres_changes", { event: "*", schema: "public", table: "deudas_residentes" }, () => {
+        if (resSeleccionado) cargarDeudasResidente(resSeleccionado);
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "residentes" }, cargarResidentes)
+      .subscribe();
+    return () => { supabase.removeChannel(canal); };
+  }, []);
 
   async function cargarConceptos() {
     const { data } = await supabase.from("conceptos_pago").select("*");
@@ -222,9 +232,6 @@ export default function Ingresos() {
       const unidad = `T${resSeleccionado.torre.slice(-1)}-${resSeleccionado.apartamento}`;
 
       // 1 — Guardar crédito en deudas_residentes (saldo NEGATIVO)
-      //     precio_m1 = lo que pagó (con descuento)
-      //     precio_m2/m3 = escalas completas del concepto, para que si queda diferencia
-      //     pendiente después de la causación, calcularValorDeudaHoy la escale bien
       const { error: errDeuda } = await supabase.from("deudas_residentes").insert([{
         residente_id: resSeleccionado.id,
         unidad,
@@ -246,7 +253,7 @@ export default function Ingresos() {
         unidad,
         numero_recibo: formAnticipo.numeroRecibo,
         monto_total: valorAnticipo,
-        fecha_pago: new Date().toISOString().split("T")[0],
+        fecha_pago: formAnticipo.fechaRecibo || fechaColStr(),
         metodo_pago: formAnticipo.metodo,
         comprobante: formAnticipo.referencia.toUpperCase(),
         fecha_transaccion: formAnticipo.fechaTransaccion,
@@ -258,7 +265,7 @@ export default function Ingresos() {
       // 3 — Abrir ReciboCaja
       setDatosRecibo({
         numero: formAnticipo.numeroRecibo,
-        fecha: new Date().toISOString().split("T")[0],
+        fecha: formAnticipo.fechaRecibo || fechaColStr(),
         nombre: resSeleccionado.nombre,
         unidad,
         valor: valorAnticipo,
@@ -274,7 +281,8 @@ export default function Ingresos() {
       setFormAnticipo({
         concepto_id: "", mes: "",
         metodo: "Transferencia", referencia: "",
-        fechaTransaccion: new Date().toISOString().split("T")[0],
+        fechaRecibo: fechaColStr(),
+        fechaTransaccion: fechaColStr(),
         numeroRecibo: "",
       });
       setResSeleccionado(null);
@@ -715,7 +723,7 @@ export default function Ingresos() {
                     <input type="month"
                       className="w-full bg-slate-50 border border-slate-100 p-3 pl-8 rounded-xl font-bold text-sm outline-none focus:bg-white"
                       value={formAnticipo.mes}
-                      min={new Date(new Date().setMonth(new Date().getMonth() + 1)).toISOString().slice(0, 7)}
+                      min={(() => { const d = hoyCol(); d.setMonth(d.getMonth() + 1); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`; })()}
                       onChange={e => setFormAnticipo({ ...formAnticipo, mes: e.target.value })}
                       required
                     />
@@ -749,6 +757,19 @@ export default function Ingresos() {
               {/* Datos del recibo */}
               <div className="border-t border-slate-100 pt-4 space-y-3">
                 <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Datos del Recibo</p>
+
+                {/* Fecha del recibo */}
+                <div className="space-y-1">
+                  <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block">Fecha del Recibo</label>
+                  <div className="relative">
+                    <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-300" size={12} />
+                    <input type="date"
+                      className="w-full bg-slate-50 border border-slate-100 p-3 pl-8 rounded-xl outline-none font-bold text-sm focus:bg-white"
+                      value={formAnticipo.fechaRecibo}
+                      onChange={e => setFormAnticipo({ ...formAnticipo, fechaRecibo: e.target.value })}
+                    />
+                  </div>
+                </div>
 
                 {/* N° recibo */}
                 <div className="space-y-1">

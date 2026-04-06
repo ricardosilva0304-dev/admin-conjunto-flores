@@ -2,6 +2,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { supabase } from "@/lib/supabase";
 import { calcularValorDeudaHoy } from "@/lib/utils";
+import { mesColStr } from "@/lib/utils";
 import {
   Search, Loader2, X, CheckCircle2,
   Plus, FileText, Wallet, LayoutGrid, DollarSign, Calendar, ChevronRight
@@ -22,10 +23,17 @@ export default function Deudores({ role }: { role?: string }) {
   const [cobroResidente, setCobroResidente] = useState<any>(null);
   const [busquedaManual, setBusquedaManual] = useState("");
   const [formManual, setFormManual] = useState({
-    residente_id: "", concepto: "", mes: new Date().toISOString().split('-').slice(0, 2).join('-'), valor: ""
+    residente_id: "", concepto: "", mes: mesColStr(), valor: ""
   });
 
-  useEffect(() => { cargarInformacion(); }, []);
+  useEffect(() => {
+    cargarInformacion();
+    const canal = supabase.channel("deudores-rt")
+      .on("postgres_changes", { event: "*", schema: "public", table: "deudas_residentes" }, cargarInformacion)
+      .on("postgres_changes", { event: "*", schema: "public", table: "residentes" }, cargarInformacion)
+      .subscribe();
+    return () => { supabase.removeChannel(canal); };
+  }, []);
 
   async function cargarInformacion() {
     setLoading(true);

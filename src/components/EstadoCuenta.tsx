@@ -1,7 +1,7 @@
 "use client";
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { supabase } from "@/lib/supabase";
-import { calcularValorDeudaHoy } from "@/lib/utils";
+import { calcularValorDeudaHoy, fechaColStr } from "@/lib/utils";
 import { Printer, X, Loader2, Wallet, History, CheckCircle2 } from "lucide-react";
 
 interface Props { residente: any; deudas: any[]; onClose: () => void; }
@@ -125,7 +125,7 @@ export default function EstadoCuenta({ residente, deudas, onClose }: Props) {
               ESTADO DE CUENTA
             </div>
             <p className="text-[8px] sm:text-[9px] font-bold text-slate-400 uppercase">
-              Emisión: {new Date().toLocaleDateString('es-CO')}
+              Emisión: {fechaColStr().split("-").reverse().join("/")}
             </p>
           </div>
         </div>

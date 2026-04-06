@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
-import { calcularValorDeudaHoy } from "@/lib/utils";
+import { calcularValorDeudaHoy, hoyCol, fechaColStr } from "@/lib/utils";
 import {
     TrendingUp, TrendingDown, Wallet, AlertTriangle,
     LayoutGrid, Calendar, ChevronRight, Loader2,
@@ -21,12 +21,20 @@ export default function Resumen({ adminName, goToDeudores }: ResumenProps) {
     const [morosos, setMorosos] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
 
-    useEffect(() => { cargarDatosDashboard(); }, []);
+    useEffect(() => {
+        cargarDatosDashboard();
+        const canal = supabase.channel("resumen-rt")
+            .on("postgres_changes", { event: "*", schema: "public", table: "pagos" }, cargarDatosDashboard)
+            .on("postgres_changes", { event: "*", schema: "public", table: "egresos" }, cargarDatosDashboard)
+            .on("postgres_changes", { event: "*", schema: "public", table: "deudas_residentes" }, cargarDatosDashboard)
+            .subscribe();
+        return () => { supabase.removeChannel(canal); };
+    }, []);
 
     async function cargarDatosDashboard() {
         setLoading(true);
-        const hoy = new Date();
-        const primerDiaMes = new Date(hoy.getFullYear(), hoy.getMonth(), 1).toISOString();
+        const hoy = hoyCol();
+        const primerDiaMes = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, "0")}-01`;
 
         try {
             const [pagosRes, egresosRes, deudasRes] = await Promise.all([
@@ -76,7 +84,7 @@ export default function Resumen({ adminName, goToDeudores }: ResumenProps) {
     }
 
     const getSaludo = () => {
-        const h = new Date().getHours();
+        const h = hoyCol().getHours();
         if (h < 12) return "Buenos días";
         if (h < 18) return "Buenas tardes";
         return "Buenas noches";
