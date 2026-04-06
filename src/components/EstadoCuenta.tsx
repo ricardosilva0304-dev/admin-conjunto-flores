@@ -20,16 +20,28 @@ export default function EstadoCuenta({ residente, deudas, onClose }: Props) {
     fetchPagos();
   }, [residente]);
 
+  const anticipos = useMemo(() => {
+    return deudas
+      .filter(d => d.estado === "ANTICIPO" && calcularValorDeudaHoy(d) < 0)
+      .sort((a, b) => {
+        const fechaA = a.fecha_vencimiento?.substring(0, 7) || "0000-00";
+        const fechaB = b.fecha_vencimiento?.substring(0, 7) || "0000-00";
+        return fechaA.localeCompare(fechaB);
+      });
+  }, [deudas]);
+
   const deudasPendientes = useMemo(() => {
     return deudas
-      .filter(d => calcularValorDeudaHoy(d) !== 0)
+      .filter(d => d.estado !== "ANTICIPO" && calcularValorDeudaHoy(d) > 0)
       .sort((a, b) => {
         const fechaA = a.causaciones_globales?.mes_causado || a.fecha_vencimiento?.substring(0, 7) || "0000-00";
         const fechaB = b.causaciones_globales?.mes_causado || b.fecha_vencimiento?.substring(0, 7) || "0000-00";
         return fechaA.localeCompare(fechaB);
       });
   }, [deudas]);
-  const totalDeuda = deudasPendientes.reduce((acc, d) => acc + calcularValorDeudaHoy(d), 0);
+
+  const totalAnticipos = anticipos.reduce((acc, d) => acc + calcularValorDeudaHoy(d), 0);
+  const totalDeuda = deudasPendientes.reduce((acc, d) => acc + calcularValorDeudaHoy(d), 0) + totalAnticipos;
 
   const handlePrint = () => {
     const content = printRef.current;
@@ -200,6 +212,82 @@ export default function EstadoCuenta({ residente, deudas, onClose }: Props) {
             </div>
           )}
         </div>
+
+        {/* PAGOS ANTICIPADOS */}
+        {anticipos.length > 0 && (
+          <div className="mb-6 sm:mb-10">
+            <h3 className="text-[9px] sm:text-[10px] font-black uppercase text-slate-800 mb-3 sm:mb-4 border-b border-slate-100 pb-2 flex items-center gap-2">
+              <span className="inline-block w-2 h-2 rounded-full bg-amber-400"></span>
+              Pagos Anticipados / Créditos a Favor
+            </h3>
+
+            {/* Móvil */}
+            <div className="sm:hidden space-y-2">
+              {anticipos.map((d: any) => {
+                const valor = Math.abs(calcularValorDeudaHoy(d));
+                const [year, month] = (d.fecha_vencimiento?.substring(0, 7) || "").split("-");
+                const meses = ["ENERO", "FEBRERO", "MARZO", "ABRIL", "MAYO", "JUNIO", "JULIO", "AGOSTO", "SEPTIEMBRE", "OCTUBRE", "NOVIEMBRE", "DICIEMBRE"];
+                const periodoLabel = year && month ? `${meses[parseInt(month) - 1]} ${year}` : "";
+                return (
+                  <div key={d.id} className="flex justify-between items-center py-2.5 border-b border-amber-50">
+                    <div className="flex-1 pr-3">
+                      <p className="text-xs font-bold text-slate-700 uppercase leading-tight">{d.concepto_nombre}</p>
+                      {periodoLabel && <p className="text-[9px] font-bold text-amber-500 mt-0.5">Aplica: {periodoLabel}</p>}
+                    </div>
+                    <p className="text-sm font-black text-amber-600 tabular-nums flex-shrink-0">
+                      ${valor.toLocaleString()} CR
+                    </p>
+                  </div>
+                );
+              })}
+              <div className="flex justify-between items-center pt-2">
+                <p className="text-[9px] font-black text-slate-400 uppercase">Total Créditos:</p>
+                <p className="text-base font-black text-amber-600 tabular-nums">
+                  ${Math.abs(totalAnticipos).toLocaleString()} CR
+                </p>
+              </div>
+            </div>
+
+            {/* Desktop */}
+            <table className="hidden sm:table w-full">
+              <thead>
+                <tr>
+                  <th className="w-2/3">Concepto / Mes que Aplica</th>
+                  <th className="text-right">Crédito</th>
+                </tr>
+              </thead>
+              <tbody>
+                {anticipos.map((d: any) => {
+                  const valor = Math.abs(calcularValorDeudaHoy(d));
+                  const [year, month] = (d.fecha_vencimiento?.substring(0, 7) || "").split("-");
+                  const meses = ["ENERO", "FEBRERO", "MARZO", "ABRIL", "MAYO", "JUNIO", "JULIO", "AGOSTO", "SEPTIEMBRE", "OCTUBRE", "NOVIEMBRE", "DICIEMBRE"];
+                  const periodoLabel = year && month ? `${meses[parseInt(month) - 1]} ${year}` : "";
+                  return (
+                    <tr key={d.id}>
+                      <td className="uppercase font-bold text-slate-700">
+                        {d.concepto_nombre}
+                        {periodoLabel && (
+                          <span className="ml-2 text-[9px] font-black text-amber-500 bg-amber-50 px-2 py-0.5 rounded-full">
+                            Aplica: {periodoLabel}
+                          </span>
+                        )}
+                      </td>
+                      <td className="text-right font-black text-amber-600 tabular-nums">
+                        ${valor.toLocaleString()} CR
+                      </td>
+                    </tr>
+                  );
+                })}
+                <tr className="bg-amber-50 font-black">
+                  <td className="text-right py-4 uppercase text-[9px] text-amber-500">Total Créditos a Favor:</td>
+                  <td className="text-right py-4 text-base text-amber-600">
+                    ${Math.abs(totalAnticipos).toLocaleString()} CR
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        )}
 
         {/* ÚLTIMOS MOVIMIENTOS */}
         {pagos.length > 0 && (
