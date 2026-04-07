@@ -268,6 +268,88 @@ export default function Reportes() {
                     </div>
                   </div>
 
+                  {/* Tabla ingresos efectivo */}
+                  <div>
+                    <h3 className="text-[10px] font-black uppercase text-slate-500 tracking-widest mb-3 pb-2 border-b border-slate-200 flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block" />
+                      Ingresos en Efectivo del Periodo
+                    </h3>
+                    <table className="w-full text-left border-collapse">
+                      <thead>
+                        <tr className="border-b border-slate-200">
+                          <th className="pb-2 text-[9px] font-black uppercase tracking-widest text-slate-400">Recibo</th>
+                          <th className="pb-2 text-[9px] font-black uppercase tracking-widest text-slate-400">Unidad</th>
+                          <th className="pb-2 text-[9px] font-black uppercase tracking-widest text-slate-400">Titular</th>
+                          <th className="pb-2 text-[9px] font-black uppercase tracking-widest text-slate-400">Concepto</th>
+                          <th className="pb-2 text-[9px] font-black uppercase tracking-widest text-slate-400 text-right">Monto</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {datosReporte.ingresos.filter(i => i.metodo_pago === 'Efectivo').length === 0 ? (
+                          <tr><td colSpan={5} className="py-4 text-center text-[10px] text-slate-300 italic">Sin ingresos en efectivo en este periodo</td></tr>
+                        ) : (
+                          datosReporte.ingresos.filter(i => i.metodo_pago === 'Efectivo').map((i, idx) => (
+                            <tr key={i.id} className={`border-b border-slate-50 ${idx % 2 !== 0 ? 'bg-slate-50/50' : ''}`}>
+                              <td className="py-2 text-[10px] font-bold text-slate-500">RC-{i.numero_recibo}</td>
+                              <td className="py-2 text-[10px] font-black text-slate-800">{i.unidad}</td>
+                              <td className="py-2 text-[10px] uppercase text-slate-600">{i.residentes?.nombre}</td>
+                              <td className="py-2 text-[10px] text-slate-400 uppercase">{i.concepto_texto?.split("||")[0].split("|")[0]}</td>
+                              <td className="py-2 text-[10px] font-black text-emerald-600 tabular-nums text-right">{fmt(Number(i.monto_total))}</td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                      <tfoot>
+                        <tr className="border-t border-slate-200">
+                          <td colSpan={4} className="pt-2 text-[9px] font-black uppercase text-slate-400 tracking-widest text-right pr-4">Subtotal Efectivo:</td>
+                          <td className="pt-2 text-[11px] font-black text-emerald-700 tabular-nums text-right">
+                            {fmt(datosReporte.ingresos.filter(i => i.metodo_pago === 'Efectivo').reduce((s, i) => s + Number(i.monto_total), 0))}
+                          </td>
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
+
+                  {/* Tabla egresos */}
+                  <div>
+                    <h3 className="text-[10px] font-black uppercase text-slate-500 tracking-widest mb-3 pb-2 border-b border-slate-200 flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-rose-500 inline-block" />
+                      Egresos del Periodo
+                    </h3>
+                    <table className="w-full text-left border-collapse">
+                      <thead>
+                        <tr className="border-b border-slate-200">
+                          <th className="pb-2 text-[9px] font-black uppercase tracking-widest text-slate-400">Gasto No.</th>
+                          <th className="pb-2 text-[9px] font-black uppercase tracking-widest text-slate-400">Fecha</th>
+                          <th className="pb-2 text-[9px] font-black uppercase tracking-widest text-slate-400">Tercero</th>
+                          <th className="pb-2 text-[9px] font-black uppercase tracking-widest text-slate-400">Descripción</th>
+                          <th className="pb-2 text-[9px] font-black uppercase tracking-widest text-slate-400 text-right">Monto</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {datosReporte.egresos.length === 0 ? (
+                          <tr><td colSpan={5} className="py-4 text-center text-[10px] text-slate-300 italic">Sin egresos en este periodo</td></tr>
+                        ) : (
+                          datosReporte.egresos.map((e, idx) => (
+                            <tr key={e.id} className={`border-b border-slate-50 ${idx % 2 !== 0 ? 'bg-slate-50/50' : ''}`}>
+                              <td className="py-2 text-[10px] font-bold text-slate-500">CE-{e.recibo_n}</td>
+                              <td className="py-2 text-[10px] text-slate-400">{e.fecha}</td>
+                              <td className="py-2 text-[10px] font-black text-slate-800 uppercase">{e.pagado_a}</td>
+                              <td className="py-2 text-[10px] text-slate-400 italic uppercase">{e.concepto}</td>
+                              <td className="py-2 text-[10px] font-black text-rose-600 tabular-nums text-right">{fmt(Number(e.monto))}</td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                      <tfoot>
+                        <tr className="border-t border-slate-200">
+                          <td colSpan={4} className="pt-2 text-[9px] font-black uppercase text-slate-400 tracking-widest text-right pr-4">Total Egresos:</td>
+                          <td className="pt-2 text-[11px] font-black text-rose-700 tabular-nums text-right">{fmt(datosReporte.summary.totalEgresos)}</td>
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
+
                   {/* Pie */}
                   <div className="pt-6 border-t border-slate-100 flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4">
                     <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest">
