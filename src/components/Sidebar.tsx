@@ -33,7 +33,7 @@ export default function Sidebar({ activeTab, setActiveTab, isOpen, setIsOpen, on
   // 1. Filtrar los items aquí
   const filteredMenuItems = menuItems.filter(item => {
     if (role === 'contador') {
-      return ['resumen', 'balance', 'deudores', 'reportes'].includes(item.id);
+      return ['resumen', 'recibos', 'balance', 'deudores', 'reportes'].includes(item.id);
     }
     return true; 
   });
