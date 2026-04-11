@@ -4,8 +4,133 @@ import { supabase } from "@/lib/supabase";
 import { calcularValorDeudaHoy } from "@/lib/utils";
 import {
   Zap, History, Trash2, Eye, X, Loader2,
-  CheckCircle2, Calendar, LayoutGrid, Search, ChevronDown, ChevronUp
+  CheckCircle2, Calendar, LayoutGrid, Search, ChevronDown, ChevronUp, Printer
 } from "lucide-react";
+
+function imprimirAuditoria(causacionActiva: any, deudasDetalle: any[], calcularValorDeudaHoy: (d: any) => number) {
+  const hoy = new Date();
+  const fechaStr = hoy.toLocaleDateString("es-CO", { day: "2-digit", month: "long", year: "numeric" }).toUpperCase();
+
+  const torreIndex = (unidad: string) => {
+    const letra = unidad?.charAt(1);
+    const orden: Record<string, number> = { "5": 0, "6": 1, "7": 2, "8": 3 };
+    return orden[letra] ?? 99;
+  };
+
+  const sorted = [...deudasDetalle].sort((a, b) => {
+    const ti = torreIndex(a.unidad) - torreIndex(b.unidad);
+    if (ti !== 0) return ti;
+    return (a.unidad || "").localeCompare(b.unidad || "");
+  });
+
+  const porTorre: Record<string, any[]> = {};
+  sorted.forEach(d => {
+    const t = d.unidad?.charAt(1) ? `Torre ${d.unidad.charAt(1)}` : "Otras";
+    if (!porTorre[t]) porTorre[t] = [];
+    porTorre[t].push(d);
+  });
+
+  const fmt = (n: number) => `$${n.toLocaleString("es-CO")}`;
+  const totalRecaudado = deudasDetalle.reduce((acc, d) => acc + (Number(d.monto_original) - Number(d.saldo_pendiente)), 0);
+  const totalPorCobrar = deudasDetalle.reduce((acc, d) => acc + calcularValorDeudaHoy(d), 0);
+
+  let html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"/>
+  <title>Auditoría – ${causacionActiva?.concepto_nombre}</title>
+  <style>
+    @page { margin: 18mm 15mm; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 9.5pt; color: #1e293b; background: #fff; }
+    .enc { display: flex; align-items: flex-start; justify-content: space-between; padding-bottom: 10px; border-bottom: 2.5px solid #0f172a; margin-bottom: 12px; }
+    .enc h1 { font-size: 17pt; font-weight: 900; text-transform: uppercase; line-height: 1; letter-spacing: -0.5px; }
+    .enc .sub { font-size: 7.5pt; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 2px; margin-top: 3px; }
+    .enc .der { text-align: right; }
+    .enc .concepto { font-size: 9pt; font-weight: 800; text-transform: uppercase; }
+    .enc .fecha { font-size: 7.5pt; color: #94a3b8; font-weight: 600; margin-top: 3px; }
+    .resumen { display: flex; gap: 10px; margin-bottom: 14px; }
+    .card { flex: 1; padding: 8px 14px; border-radius: 8px; }
+    .card.verde { background: #f0fdf4; border: 1.5px solid #bbf7d0; }
+    .card.rojo  { background: #fff1f2; border: 1.5px solid #fecdd3; }
+    .card .lbl { font-size: 7pt; font-weight: 800; text-transform: uppercase; letter-spacing: 1.5px; }
+    .card.verde .lbl { color: #15803d; }
+    .card.rojo  .lbl { color: #be123c; }
+    .card .val { font-size: 14pt; font-weight: 900; margin-top: 2px; }
+    .card.verde .val { color: #166534; }
+    .card.rojo  .val { color: #9f1239; }
+    .torre { font-size: 8pt; font-weight: 900; text-transform: uppercase; letter-spacing: 3px; color: #fff; background: #0f172a; padding: 5px 12px; border-radius: 6px; margin: 12px 0 6px; display: inline-block; }
+    .sec-lbl { font-size: 7pt; font-weight: 800; text-transform: uppercase; letter-spacing: 1.5px; margin: 8px 0 4px; padding: 3px 8px; border-radius: 4px; display: inline-block; }
+    .s-pag { background: #dcfce7; color: #166534; }
+    .s-abo { background: #fff7ed; color: #9a3412; }
+    .s-pen { background: #fef2f2; color: #991b1b; }
+    table { width: 100%; border-collapse: collapse; margin-bottom: 4px; }
+    th { font-size: 7pt; font-weight: 800; text-transform: uppercase; letter-spacing: 0.8px; color: #94a3b8; padding: 4px 8px; border-bottom: 1px solid #e2e8f0; text-align: left; }
+    th:last-child, td:last-child { text-align: right; }
+    td { font-size: 8.5pt; padding: 5px 8px; border-bottom: 1px solid #f1f5f9; vertical-align: middle; }
+    tr:last-child td { border-bottom: none; }
+    .uni { font-weight: 900; font-size: 8pt; background: #0f172a; color: #fff; padding: 2px 6px; border-radius: 4px; }
+    .uni.v { background: #16a34a; }
+    .nom { font-weight: 700; }
+    .gris { color: #94a3b8; font-size: 7.5pt; }
+    .mp { color: #16a34a; font-weight: 900; }
+    .mr { color: #dc2626; font-weight: 900; }
+    .pie { margin-top: 16px; border-top: 1.5px solid #e2e8f0; padding-top: 8px; display: flex; justify-content: space-between; }
+    .pie p { font-size: 7pt; font-weight: 700; color: #cbd5e1; text-transform: uppercase; letter-spacing: 2px; }
+    @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
+  </style></head><body>
+  <div class="enc">
+    <div><h1>Auditoría Detallada</h1><p class="sub">Parque de las Flores · Admin Pro</p></div>
+    <div class="der"><div class="concepto">${causacionActiva?.concepto_nombre}</div><div class="fecha">Generado: ${fechaStr}</div></div>
+  </div>
+  <div class="resumen">
+    <div class="card verde"><div class="lbl">Recaudado</div><div class="val">${fmt(totalRecaudado)}</div></div>
+    <div class="card rojo"><div class="lbl">Por Cobrar</div><div class="val">${fmt(totalPorCobrar)}</div></div>
+  </div>`;
+
+  Object.entries(porTorre).forEach(([torre, deudas]) => {
+    const pagados = deudas.filter(d => Number(d.saldo_pendiente) === 0);
+    const abonados = deudas.filter(d => Number(d.saldo_pendiente) > 0 && Number(d.monto_original) > Number(d.saldo_pendiente));
+    const pendientes = deudas.filter(d => Number(d.saldo_pendiente) > 0 && Number(d.monto_original) <= Number(d.saldo_pendiente));
+
+    html += `<div class="torre">${torre}</div>`;
+
+    const renderGrupo = (lista: any[], tipo: "pagado" | "abono" | "pendiente") => {
+      if (lista.length === 0) return "";
+      const labels = { pagado: "✓ Pagados", abono: "◑ Con Abono — Saldo Pendiente", pendiente: "✗ Sin Pago" };
+      const cls = { pagado: "s-pag", abono: "s-abo", pendiente: "s-pen" };
+      let rows = lista.map(d => {
+        const valorHoy = calcularValorDeudaHoy(d);
+        const abonado = Number(d.monto_original) - Number(d.saldo_pendiente);
+        if (tipo === "pagado") return `<tr>
+          <td><span class="uni v">${d.unidad}</span></td>
+          <td class="nom">${d.residentes?.nombre || "—"}</td>
+          <td class="mp">${fmt(Number(d.monto_original))}</td></tr>`;
+        if (tipo === "abono") return `<tr>
+          <td><span class="uni">${d.unidad}</span></td>
+          <td class="nom">${d.residentes?.nombre || "—"}<br><span class="gris">Abonó: ${fmt(abonado)}</span></td>
+          <td class="mr">${fmt(valorHoy)}</td></tr>`;
+        return `<tr>
+          <td><span class="uni">${d.unidad}</span></td>
+          <td class="nom">${d.residentes?.nombre || "—"}</td>
+          <td class="mr">${fmt(valorHoy)}</td></tr>`;
+      }).join("");
+      return `<div class="sec-lbl ${cls[tipo]}">${labels[tipo]} (${lista.length})</div>
+        <table><thead><tr><th>Unidad</th><th>Residente</th><th>${tipo === "pagado" ? "Valor" : "Saldo"}</th></tr></thead>
+        <tbody>${rows}</tbody></table>`;
+    };
+
+    html += renderGrupo(pagados, "pagado");
+    html += renderGrupo(abonados, "abono");
+    html += renderGrupo(pendientes, "pendiente");
+  });
+
+  html += `<div class="pie"><p>Admin Pro · Parque de las Flores</p><p>Total: ${deudasDetalle.length} unidades</p></div>
+  </body></html>`;
+
+  const win = window.open("", "_blank", "width=900,height=700");
+  if (!win) return;
+  win.document.write(html);
+  win.document.close();
+  win.onload = () => { win.focus(); win.print(); };
+}
 
 export default function Causacion() {
   const [conceptos, setConceptos] = useState<any[]>([]);
@@ -479,12 +604,22 @@ export default function Causacion() {
                   </p>
                 </div>
               </div>
-              <button
-                onClick={() => setShowDetalles(false)}
-                className="p-2.5 bg-white border border-slate-100 text-slate-300 hover:text-rose-500 rounded-full shadow-sm transition-all flex-shrink-0"
-              >
-                <X size={20} />
-              </button>
+              <div className="flex items-center gap-2 flex-shrink-0">
+                <button
+                  onClick={() => imprimirAuditoria(causacionActiva, deudasDetalle, calcularValorDeudaHoy)}
+                  className="p-2.5 bg-slate-900 text-white rounded-full shadow-sm hover:bg-emerald-600 transition-all flex items-center gap-2 px-4"
+                  title="Imprimir auditoría"
+                >
+                  <Printer size={16} />
+                  <span className="text-[9px] font-black uppercase tracking-widest hidden sm:inline">Imprimir</span>
+                </button>
+                <button
+                  onClick={() => setShowDetalles(false)}
+                  className="p-2.5 bg-white border border-slate-100 text-slate-300 hover:text-rose-500 rounded-full shadow-sm transition-all"
+                >
+                  <X size={20} />
+                </button>
+              </div>
             </div>
 
             <div className="px-4 sm:px-8 py-3 sm:py-5 bg-white border-b border-slate-100 flex flex-col gap-3 flex-shrink-0">
