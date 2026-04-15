@@ -27,7 +27,10 @@ import {
 export default function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [activeTab, setActiveTab] = useState("resumen");
-  const [cedula, setCedula] = useState("");
+
+  // 1. CAMBIO AQUÍ: Se reemplazó "cedula" por "correo"
+  const [correo, setCorreo] = useState("");
+
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -50,19 +53,36 @@ export default function App() {
     e.preventDefault();
     setLoading(true);
     setError("");
+
     try {
-      const { data, error: dbError } = await supabase
+      // 1. Autenticar al usuario usando Supabase Auth (correo y contraseña)
+      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+        email: correo,
+        password: password,
+      });
+
+      if (authError || !authData.user) {
+        setError("El correo o la contraseña son incorrectos.");
+        setLoading(false);
+        return;
+      }
+
+      // 2. Si el login es exitoso, usamos el ID del usuario (authData.user.id) 
+      // para buscar su nombre y su rol en tu tabla 'perfiles_admin'
+      const { data: profileData, error: profileError } = await supabase
         .from("perfiles_admin")
         .select("*")
-        .eq("cedula", cedula)
-        .eq("password", password)
+        .eq("auth_user_id", authData.user.id)
         .single();
 
-      if (dbError || !data) {
-        setError("La cédula o la contraseña no coinciden.");
+      if (profileError || !profileData) {
+        // Si entra aquí, es porque no vinculaste el auth_user_id en la base de datos
+        setError("El usuario no tiene un perfil asignado en la base de datos.");
+        await supabase.auth.signOut(); // Cerramos la sesión por seguridad
       } else {
-        setAdminName(data.nombre);
-        setUserRole(data.rol || "admin");
+        // 3. ¡Todo correcto! Guardamos el nombre y el ROL (admin o contador)
+        setAdminName(profileData.nombre);
+        setUserRole(profileData.rol);
         setIsLoggedIn(true);
       }
     } catch (err) {
@@ -115,13 +135,24 @@ export default function App() {
 
           <div className="bg-zinc-900/40 backdrop-blur-3xl border border-white/5 p-10 rounded-[3rem] shadow-2xl">
             <form onSubmit={handleLogin} className="space-y-6">
+
               <div className="space-y-2">
-                <label className="text-zinc-500 text-[10px] font-black uppercase tracking-[0.2em] ml-2">Cédula</label>
+                {/* 3. CAMBIO AQUÍ: Etiqueta actualizada */}
+                <label className="text-zinc-500 text-[10px] font-black uppercase tracking-[0.2em] ml-2">Correo Electrónico</label>
                 <div className="relative group">
                   <Fingerprint className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-600 group-focus-within:text-emerald-500 transition-colors" size={20} />
-                  <input type="number" required placeholder="Número Identificación" className="w-full bg-black/40 border border-white/5 text-white pl-12 pr-4 py-4 rounded-2xl outline-none focus:ring-2 ring-emerald-500/10 focus:border-emerald-500 font-bold transition-all" onChange={(e) => setCedula(e.target.value)} />
+
+                  {/* 4. CAMBIO AQUÍ: type="email" (o "text"), nuevo placeholder, y setCorreo */}
+                  <input
+                    type="email"
+                    required
+                    placeholder="usuario@correo.com"
+                    className="w-full bg-black/40 border border-white/5 text-white pl-12 pr-4 py-4 rounded-2xl outline-none focus:ring-2 ring-emerald-500/10 focus:border-emerald-500 font-bold transition-all"
+                    onChange={(e) => setCorreo(e.target.value)}
+                  />
                 </div>
               </div>
+
               <div className="space-y-2">
                 <label className="text-zinc-500 text-[10px] font-black uppercase tracking-[0.2em] ml-2">Clave Acceso</label>
                 <div className="relative group">
