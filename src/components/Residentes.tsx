@@ -76,7 +76,7 @@ const VehicleBadge = ({
 
 // ── COMPONENTE PRINCIPAL ──────────────────────────────────────────────────────
 
-export default function Residentes() {
+export default function Residentes({ role }: { role?: string }) {
    const [residentes, setResidentes] = useState<any[]>([]);
    const [loading, setLoading] = useState(true);
    const [guardando, setGuardando] = useState(false);
@@ -108,6 +108,7 @@ export default function Residentes() {
 
    async function manejarGuardar(e: React.FormEvent) {
       e.preventDefault();
+      if (role === 'contador') return alert("No tienes permiso para modificar residentes.");
       if (!form.nombre || !form.torre || !form.apto) return alert("Llena los datos obligatorios");
       if (!editandoId) {
          const existe = residentes.find(r => r.torre === form.torre && r.apartamento === form.apto);
@@ -344,6 +345,7 @@ export default function Residentes() {
                                  <button
                                     title="Eliminar"
                                     onClick={async () => {
+                                       if (role === 'contador') return alert("No tienes permiso para eliminar residentes.");
                                        if (confirm("¿Eliminar este residente?")) {
                                           await supabase.from("residentes").delete().eq("id", res.id);
                                           cargarResidentes();

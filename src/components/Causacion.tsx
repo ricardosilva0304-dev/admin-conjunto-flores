@@ -132,7 +132,7 @@ function imprimirAuditoria(causacionActiva: any, deudasDetalle: any[], calcularV
   win.onload = () => { win.focus(); win.print(); };
 }
 
-export default function Causacion() {
+export default function Causacion({ role }: { role?: string }) {
   const [conceptos, setConceptos] = useState<any[]>([]);
   const [residentes, setResidentes] = useState<any[]>([]);
   const [historial, setHistorial] = useState<any[]>([]);
@@ -200,6 +200,7 @@ export default function Causacion() {
   }, [deudasDetalle, busquedaDetalle]);
 
   async function cambiarModo(id: number, nuevoModo: string) {
+    if (role === 'contador') return alert("No tienes permiso para modificar causaciones.");
     setHistorial(prev => prev.map(h => h.id === id ? { ...h, tipo_cobro: nuevoModo } : h));
     await supabase.from("causaciones_globales").update({ tipo_cobro: nuevoModo }).eq("id", id);
   }
@@ -219,6 +220,7 @@ export default function Causacion() {
   }
 
   async function generarCausacion() {
+    if (role === 'contador') return alert("No tienes permiso para generar causaciones.");
     if (!conceptoId || !mesDeuda || !fechaLimite) return;
     const concepto = conceptos.find(c => c.id === parseInt(conceptoId));
     if (!concepto || !confirm(`¿Confirmar cobros para ${residentesAfectados.length} unidades?`)) return;
@@ -538,6 +540,7 @@ export default function Causacion() {
                           </button>
                           <button
                             onClick={async () => {
+                              if (role === 'contador') return alert("No tienes permiso para eliminar causaciones.");
                               if (confirm("¿Borrar esta causación?")) {
                                 await supabase.from("causaciones_globales").delete().eq("id", h.id);
                                 cargarDatos();

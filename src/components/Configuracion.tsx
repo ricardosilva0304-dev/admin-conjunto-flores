@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import { Plus, Edit, X, Loader2, Percent, Settings } from "lucide-react";
 
-export default function Configuracion() {
+export default function Configuracion({ role }: { role?: string }) {
   const [conceptos, setConceptos] = useState<any[]>([]);
   const [tasaMora, setTasaMora] = useState("");
   const [loading, setLoading] = useState(true);
@@ -25,6 +25,7 @@ export default function Configuracion() {
   }
 
   async function actualizarTasaMora(valor: string) {
+    if (role === 'contador') return;
     setTasaMora(valor);
     const num = parseFloat(valor);
     if (isNaN(num)) return;
@@ -33,6 +34,7 @@ export default function Configuracion() {
 
   async function guardarConcepto(e: React.FormEvent) {
     e.preventDefault();
+    if (role === 'contador') return alert("No tienes permiso para modificar conceptos de pago.");
     if (!nuevo.nombre || !nuevo.m1) return;
     const datos = {
       nombre: nuevo.nombre.trim().toUpperCase(),
@@ -255,6 +257,7 @@ export default function Configuracion() {
                   <button
                     type="button"
                     onClick={async () => {
+                      if (role === 'contador') return alert("No tienes permiso para eliminar conceptos.");
                       if (confirm("¿Eliminar para siempre?")) {
                         await supabase.from("conceptos_pago").delete().eq("id", editandoId);
                         setShowModal(false); cargarDatos();

@@ -9,7 +9,7 @@ import {
   CheckCircle2, Plus, DollarSign, Clock
 } from "lucide-react";
 
-export default function Ingresos() {
+export default function Ingresos({ role }: { role?: string }) {
   const [residentes, setResidentes] = useState<any[]>([]);
   const [deudas, setDeudas] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -130,13 +130,8 @@ export default function Ingresos() {
   }
 
   async function sugerirSiguienteRecibo(): Promise<string> {
-    const { data } = await supabase
-      .from("pagos").select("numero_recibo")
-      .order("created_at", { ascending: false }).limit(20);
-    if (data && data.length > 0) {
-      const nums = data.map(p => parseInt(p.numero_recibo.replace(/\D/g, "")) || 0);
-      return (Math.max(...nums) + 1).toString();
-    }
+    const { data, error } = await supabase.rpc("siguiente_numero_recibo");
+    if (!error && data) return data as string;
     return "1";
   }
 
@@ -175,6 +170,7 @@ export default function Ingresos() {
   // ── CARGO MANUAL ──────────────────────────────────────────────────────────
   async function guardarCargoManual(e: React.FormEvent) {
     e.preventDefault();
+    if (role === 'contador') return alert("No tienes permiso para registrar cargos.");
     if (!resSeleccionado || !formManual.valor || !formManual.concepto) return;
     setGuardandoManual(true);
     const [a, m] = formManual.mes.split("-");
@@ -200,6 +196,7 @@ export default function Ingresos() {
   // ── ANTICIPO + RECIBO DE CAJA ─────────────────────────────────────────────
   async function guardarAnticipo(e: React.FormEvent) {
     e.preventDefault();
+    if (role === 'contador') return alert("No tienes permiso para registrar anticipos.");
     if (!resSeleccionado || !formAnticipo.concepto_id || !formAnticipo.mes) return;
     if (valorAnticipo <= 0)
       return alert("Sin vehículos registrados para este concepto.");
@@ -296,6 +293,7 @@ export default function Ingresos() {
 
   // ── PAGO NORMAL ───────────────────────────────────────────────────────────
   async function procesarPago() {
+    if (role === 'contador') return alert("No tienes permiso para registrar pagos.");
     if (totalAPagarRecibo <= 0 || !formRecibo.numero)
       return alert("Verifica montos y número de recibo.");
     setProcesando(true);

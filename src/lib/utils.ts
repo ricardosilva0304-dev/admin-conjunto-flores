@@ -15,15 +15,25 @@ export function mesColStr(): string {
 }
 
 export function numeroALetras(num: number): string {
-  const unidades = (n: number) => ['CERO', 'UN', 'DOS', 'TRES', 'CUATRO', 'CINCO', 'SEIS', 'SIETE', 'OCHO', 'NUEVE'][n];
-  const decenas = (n: number) => {
-    if (n <= 20) return ['DIEZ', 'ONCE', 'DOCE', 'TRECE', 'CATORCE', 'QUINCE', 'DIECISEIS', 'DIECISIETE', 'DIECIOCHO', 'DIECINUEVE', 'VEINTE'][n - 10];
-    const prefijos = ['', '', 'VEINTI', 'TREINTA Y ', 'CUARENTA Y ', 'CINCUENTA Y ', 'SESENTA Y ', 'SETENTA Y ', 'OCHENTA Y ', 'NOVENTA Y '];
-    return prefijos[Math.floor(n / 10)] + (n % 10 > 0 ? unidades(n % 10) : '');
-  };
-  const centenas = (n: number) => n === 100 ? 'CIEN' : ['CIENTO', 'DOSCIENTOS', 'TRESCIENTOS', 'CUATROCIENTOS', 'QUINIENTOS', 'SEISCIENTOS', 'SETECIENTOS', 'OCHOCIENTOS', 'NOVECIENTOS'][Math.floor(n / 100) - 1] + (n % 100 > 0 ? ' ' + decenas(n % 100) : '');
+  const unidades = (n: number): string =>
+    ['CERO', 'UN', 'DOS', 'TRES', 'CUATRO', 'CINCO', 'SEIS', 'SIETE', 'OCHO', 'NUEVE'][n];
 
-  const convertirSeccion = (n: number) => {
+  const decenas = (n: number): string => {
+    if (n < 10) return unidades(n);
+    if (n === 10) return 'DIEZ';
+    if (n <= 20) return ['ONCE', 'DOCE', 'TRECE', 'CATORCE', 'QUINCE', 'DIECISEIS', 'DIECISIETE', 'DIECIOCHO', 'DIECINUEVE', 'VEINTE'][n - 11];
+    if (n < 30) return 'VEINTI' + unidades(n % 10);
+    const base = ['', '', '', 'TREINTA', 'CUARENTA', 'CINCUENTA', 'SESENTA', 'SETENTA', 'OCHENTA', 'NOVENTA'][Math.floor(n / 10)];
+    return base + (n % 10 > 0 ? ' Y ' + unidades(n % 10) : '');
+  };
+
+  const centenas = (n: number): string => {
+    if (n === 100) return 'CIEN';
+    const base = ['', 'CIENTO', 'DOSCIENTOS', 'TRESCIENTOS', 'CUATROCIENTOS', 'QUINIENTOS', 'SEISCIENTOS', 'SETECIENTOS', 'OCHOCIENTOS', 'NOVECIENTOS'][Math.floor(n / 100)];
+    return base + (n % 100 > 0 ? ' ' + decenas(n % 100) : '');
+  };
+
+  const convertirSeccion = (n: number): string => {
     if (n < 10) return unidades(n);
     if (n < 100) return decenas(n);
     return centenas(n);
@@ -34,7 +44,7 @@ export function numeroALetras(num: number): string {
 
   if (absoluto >= 1000000) {
     const millones = Math.floor(absoluto / 1000000);
-    resultado += (millones === 1 ? 'UN MILLÓN ' : convertirSeccion(millones) + ' MILLONES ');
+    resultado += (millones === 1 ? 'UN MILLON ' : convertirSeccion(millones) + ' MILLONES ');
     absoluto %= 1000000;
   }
   if (absoluto >= 1000) {
@@ -44,34 +54,34 @@ export function numeroALetras(num: number): string {
   }
   if (absoluto > 0) resultado += convertirSeccion(absoluto);
 
-  return (resultado || 'CERO') + ' PESOS M/CTE';
+  return (resultado.trim() || 'CERO') + ' PESOS M/CTE';
 }
 
 /**
- * LÓGICA DE CÁLCULO DE PRECIOS
+ * LOGICA DE CALCULO DE PRECIOS
  *
  * Tramos vigentes 2025 en adelante:
- *   Día  1 – 10  →  precio_m1  (tarifa puntual)
- *   Día 11 – 31  →  precio_m2  (tarifa tardía)
- *   Mes vencido  →  precio_m2  (siempre tarifa tardía si el mes ya pasó)
+ *   Dia  1 - 10  ->  precio_m1  (tarifa puntual)
+ *   Dia 11 - 31  ->  precio_m2  (tarifa tardia)
+ *   Mes vencido  ->  precio_m2  (siempre tarifa tardia si el mes ya paso)
  *
- * Modos manuales desde Causación:
- *   M1   → fuerza tarifa puntual
- *   M2   → fuerza tarifa tardía
- *   M3   → reservado / mismo valor que M2 (compatibilidad con datos anteriores)
- *   AUTO → aplica la lógica automática por fecha
+ * Modos manuales desde Causacion:
+ *   M1   -> fuerza tarifa puntual
+ *   M2   -> fuerza tarifa tardia
+ *   M3   -> reservado / mismo valor que M2 (compatibilidad con datos anteriores)
+ *   AUTO -> aplica la logica automatica por fecha
  */
 export function calcularValorDeudaHoy(deuda: any) {
   if (Number(deuda.saldo_pendiente) <= 0) {
     return Number(deuda.saldo_pendiente) || 0;
   }
 
-  // Cargo manual sin causación → devuelve el saldo directo
+  // Cargo manual sin causacion -> devuelve el saldo directo
   if (!deuda.causaciones_globales) return Number(deuda.saldo_pendiente) || 0;
 
   const m1 = Number(deuda.precio_m1 || deuda.monto_original || 0);
   const m2 = Number(deuda.precio_m2 || m1);
-  // m3 se mantiene por compatibilidad pero apunta a m2 en la nueva lógica
+  // m3 se mantiene por compatibilidad pero apunta a m2 en la nueva logica
   const m3 = Number(deuda.precio_m3 || m2);
 
   const pagadoYa = m1 - (Number(deuda.saldo_pendiente) || 0);
@@ -84,10 +94,9 @@ export function calcularValorDeudaHoy(deuda: any) {
   } else if (modo === 'M2') {
     precioTarifa = m2;
   } else if (modo === 'M3') {
-    // Compatibilidad con causaciones antiguas — usa m3 si existe, si no m2
     precioTarifa = m3;
   } else {
-    // AUTOMÁTICO: día 1-10 → m1, día 11 en adelante → m2
+    // AUTOMATICO: dia 1-10 -> m1, dia 11 en adelante -> m2
     const hoy = hoyCol();
     const dia = hoy.getDate();
     const mesAct = hoy.getMonth() + 1;
@@ -95,7 +104,7 @@ export function calcularValorDeudaHoy(deuda: any) {
     const [yC, mC] = deuda.causaciones_globales.mes_causado.split("-").map(Number);
 
     if (anioAct > yC || (anioAct === yC && mesAct > mC)) {
-      // Mes ya vencido → tarifa tardía
+      // Mes ya vencido -> tarifa tardia
       precioTarifa = m2;
     } else {
       // Mes en curso

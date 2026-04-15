@@ -16,7 +16,7 @@ const MESES: Record<string, string> = {
   "09": "Septiembre", "10": "Octubre", "11": "Noviembre", "12": "Diciembre"
 };
 
-export default function Egresos() {
+export default function Egresos({ role }: { role?: string }) {
   const [egresos, setEgresos] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -55,13 +55,9 @@ export default function Egresos() {
   }
 
   async function sugerirSiguienteEgreso() {
-    const { data } = await supabase.from("egresos").select("recibo_n").order("created_at", { ascending: false }).limit(5);
-    if (data && data.length > 0) {
-      const numeros = data.map(e => parseInt(e.recibo_n?.replace(/\D/g, "")) || 0);
-      setForm((f: any) => ({ ...f, recibo_n: (Math.max(...numeros) + 1).toString() }));
-    } else {
-      setForm((f: any) => ({ ...f, recibo_n: "1" }));
-    }
+    const { data, error } = await supabase.rpc("siguiente_numero_egreso");
+    const siguiente = (!error && data) ? data as string : "1";
+    setForm((f: any) => ({ ...f, recibo_n: siguiente }));
   }
 
   const agregarItem = () => setItems([...items, { concepto: "", valor: "" }]);
@@ -76,6 +72,7 @@ export default function Egresos() {
 
   async function guardarEgreso(e: React.FormEvent) {
     e.preventDefault();
+    if (role === 'contador') return alert("No tienes permiso para registrar egresos.");
     if (!form.pagado_a || items.some(i => !i.concepto || !i.valor)) return alert("Completa todos los campos");
     setProcesando(true);
     const conceptoFinal = items.map(i => `${i.concepto.toUpperCase()}|$${Number(i.valor).toLocaleString('es-CO')}`).join("||");
@@ -283,6 +280,7 @@ export default function Egresos() {
                             </button>
                             <button
                               onClick={async () => {
+                                if (role === 'contador') return alert("No tienes permiso para eliminar egresos.");
                                 if (confirm("¿Eliminar este egreso?")) {
                                   await supabase.from("egresos").delete().eq("id", e.id);
                                   cargarEgresos();
