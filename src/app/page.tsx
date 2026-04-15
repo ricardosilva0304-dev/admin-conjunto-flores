@@ -26,11 +26,10 @@ import {
 
 export default function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [authLoading, setAuthLoading] = useState(true); // true mientras verificamos sesión guardada
   const [activeTab, setActiveTab] = useState("resumen");
 
-  // 1. CAMBIO AQUÍ: Se reemplazó "cedula" por "correo"
   const [correo, setCorreo] = useState("");
-
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -38,6 +37,42 @@ export default function App() {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [userRole, setUserRole] = useState("");
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
+  // ── RESTAURAR SESIÓN AL RECARGAR ──────────────────────────────────────────
+  // onAuthStateChange se dispara al montar (con la sesión guardada en localStorage)
+  // y cada vez que el JWT cambia (login, logout, expiración).
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        if (session?.user) {
+          // Hay sesión activa → buscar perfil
+          const { data: profileData } = await supabase
+            .from("perfiles_admin")
+            .select("nombre, rol")
+            .eq("auth_user_id", session.user.id)
+            .single();
+
+          if (profileData) {
+            setAdminName(profileData.nombre);
+            setUserRole(profileData.rol);
+            setIsLoggedIn(true);
+          } else {
+            // JWT válido pero sin perfil → cerrar sesión
+            await supabase.auth.signOut();
+            setIsLoggedIn(false);
+          }
+        } else {
+          // Sin sesión (logout, expiración, etc.)
+          setIsLoggedIn(false);
+          setAdminName("");
+          setUserRole("");
+        }
+        setAuthLoading(false);
+      }
+    );
+
+    return () => subscription.unsubscribe();
+  }, []);
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
@@ -55,49 +90,30 @@ export default function App() {
     setError("");
 
     try {
-      // 1. Autenticar al usuario usando Supabase Auth (correo y contraseña)
-      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+      const { error: authError } = await supabase.auth.signInWithPassword({
         email: correo,
         password: password,
       });
 
-      if (authError || !authData.user) {
+      if (authError) {
         setError("El correo o la contraseña son incorrectos.");
-        setLoading(false);
-        return;
       }
-
-      // 2. Si el login es exitoso, usamos el ID del usuario (authData.user.id) 
-      // para buscar su nombre y su rol en tu tabla 'perfiles_admin'
-      const { data: profileData, error: profileError } = await supabase
-        .from("perfiles_admin")
-        .select("*")
-        .eq("auth_user_id", authData.user.id)
-        .single();
-
-      if (profileError || !profileData) {
-        // Si entra aquí, es porque no vinculaste el auth_user_id en la base de datos
-        setError("El usuario no tiene un perfil asignado en la base de datos.");
-        await supabase.auth.signOut(); // Cerramos la sesión por seguridad
-      } else {
-        // 3. ¡Todo correcto! Guardamos el nombre y el ROL (admin o contador)
-        setAdminName(profileData.nombre);
-        setUserRole(profileData.rol);
-        setIsLoggedIn(true);
-      }
-    } catch (err) {
+      // Si el login es exitoso, onAuthStateChange (montado arriba) se dispara
+      // automáticamente, carga el perfil y actualiza isLoggedIn.
+    } catch {
       setError("Error de conexión.");
     } finally {
       setLoading(false);
     }
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     if (confirm("¿Estás segura de que deseas cerrar sesión?")) {
-      setIsLoggedIn(false);
-      setAdminName("");
       setActiveTab("resumen");
       setIsSidebarOpen(false);
+      // Cierra la sesión en Supabase: invalida el JWT y borra localStorage.
+      // onAuthStateChange detecta el evento y limpia isLoggedIn, adminName y userRole.
+      await supabase.auth.signOut();
     }
   };
 
@@ -118,6 +134,16 @@ export default function App() {
   const currentMeta = sectionMeta[activeTab] || { label: activeTab, labelShort: activeTab, icon: <Info size={20} /> };
 
   // ── LOGIN ──────────────────────────────────────────────────────────
+  // Mientras onAuthStateChange verifica la sesión guardada, mostramos pantalla neutra.
+  // Evita el flash de login cuando el usuario ya tiene sesión activa.
+  if (authLoading) {
+    return (
+      <main className="min-h-screen bg-[#09090b] flex items-center justify-center">
+        <Loader2 className="animate-spin text-emerald-500" size={32} />
+      </main>
+    );
+  }
+
   if (!isLoggedIn) {
     return (
       <main className="min-h-screen bg-[#09090b] flex items-center justify-center p-6 relative overflow-hidden font-sans text-white">
