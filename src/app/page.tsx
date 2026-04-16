@@ -39,59 +39,31 @@ export default function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   // ── RESTAURAR SESIÓN AL RECARGAR ──────────────────────────────────────────
+  // Solo se usa para restaurar sesión guardada al recargar la página.
+  // El login y logout manejan su propio estado directamente.
   useEffect(() => {
-    let resolved = false;
+    const restoreSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
 
-    // Timeout de seguridad: si en 4s no resuelve nada, mostramos login.
-    // Protege contra CSP, red lenta o cualquier bloqueo externo.
-    const timeout = setTimeout(() => {
-      if (!resolved) {
-        resolved = true;
-        setAuthLoading(false);
+      if (session?.user) {
+        const { data: profileData } = await supabase
+          .from("perfiles_admin")
+          .select("nombre, rol")
+          .eq("auth_user_id", session.user.id)
+          .single();
+
+        if (profileData) {
+          setAdminName(profileData.nombre);
+          setUserRole(profileData.rol);
+          setIsLoggedIn(true);
+        }
+        // Si no hay perfil, simplemente no entramos (muestra login)
       }
-    }, 4000);
 
-    const loadProfile = async (userId: string) => {
-      const { data: profileData } = await supabase
-        .from("perfiles_admin")
-        .select("nombre, rol")
-        .eq("auth_user_id", userId)
-        .single();
-
-      if (profileData) {
-        setAdminName(profileData.nombre);
-        setUserRole(profileData.rol);
-        setIsLoggedIn(true);
-      } else {
-        await supabase.auth.signOut();
-        setIsLoggedIn(false);
-      }
+      setAuthLoading(false); // siempre quita el spinner
     };
 
-    // onAuthStateChange dispara INITIAL_SESSION al montar con la sesión guardada
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        if (session?.user) {
-          await loadProfile(session.user.id);
-        } else {
-          setIsLoggedIn(false);
-          setAdminName("");
-          setUserRole("");
-        }
-
-        // Quita el spinner la primera vez que resuelve
-        if (!resolved) {
-          resolved = true;
-          clearTimeout(timeout);
-          setAuthLoading(false);
-        }
-      }
-    );
-
-    return () => {
-      clearTimeout(timeout);
-      subscription.unsubscribe();
-    };
+    restoreSession();
   }, []);
 
   useEffect(() => {
@@ -110,16 +82,35 @@ export default function App() {
     setError("");
 
     try {
-      const { error: authError } = await supabase.auth.signInWithPassword({
+      // 1. Autenticar
+      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
         email: correo,
         password: password,
       });
 
-      if (authError) {
+      if (authError || !authData.user) {
         setError("El correo o la contraseña son incorrectos.");
+        return;
       }
-      // Si el login es exitoso, onAuthStateChange (montado arriba) se dispara
-      // automáticamente, carga el perfil y actualiza isLoggedIn.
+
+      // 2. Cargar perfil directamente — sin esperar onAuthStateChange
+      const { data: profileData, error: profileError } = await supabase
+        .from("perfiles_admin")
+        .select("nombre, rol")
+        .eq("auth_user_id", authData.user.id)
+        .single();
+
+      if (profileError || !profileData) {
+        setError("El usuario no tiene un perfil asignado en la base de datos.");
+        await supabase.auth.signOut();
+        return;
+      }
+
+      // 3. Todo OK — actualizar estado
+      setAdminName(profileData.nombre);
+      setUserRole(profileData.rol);
+      setIsLoggedIn(true);
+
     } catch {
       setError("Error de conexión.");
     } finally {
@@ -129,11 +120,14 @@ export default function App() {
 
   const handleLogout = async () => {
     if (confirm("¿Estás segura de que deseas cerrar sesión?")) {
+      // Invalida el JWT en Supabase y borra localStorage
+      await supabase.auth.signOut();
+      // Limpiar estado local
+      setIsLoggedIn(false);
+      setAdminName("");
+      setUserRole("");
       setActiveTab("resumen");
       setIsSidebarOpen(false);
-      // Cierra la sesión en Supabase: invalida el JWT y borra localStorage.
-      // onAuthStateChange detecta el evento y limpia isLoggedIn, adminName y userRole.
-      await supabase.auth.signOut();
     }
   };
 
