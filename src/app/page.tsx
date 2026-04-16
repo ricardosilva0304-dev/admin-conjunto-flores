@@ -40,61 +40,58 @@ export default function App() {
 
   // ── RESTAURAR SESIÓN AL RECARGAR ──────────────────────────────────────────
   useEffect(() => {
-    // 1. Verificar sesión existente con getSession() — funciona siempre,
-    //    sin depender de que onAuthStateChange se dispare.
-    const initAuth = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
+    let resolved = false;
 
-      if (session?.user) {
-        const { data: profileData } = await supabase
-          .from("perfiles_admin")
-          .select("nombre, rol")
-          .eq("auth_user_id", session.user.id)
-          .single();
-
-        if (profileData) {
-          setAdminName(profileData.nombre);
-          setUserRole(profileData.rol);
-          setIsLoggedIn(true);
-        } else {
-          await supabase.auth.signOut();
-        }
+    // Timeout de seguridad: si en 4s no resuelve nada, mostramos login.
+    // Protege contra CSP, red lenta o cualquier bloqueo externo.
+    const timeout = setTimeout(() => {
+      if (!resolved) {
+        resolved = true;
+        setAuthLoading(false);
       }
+    }, 4000);
 
-      // Siempre quita el spinner al terminar, haya sesión o no
-      setAuthLoading(false);
+    const loadProfile = async (userId: string) => {
+      const { data: profileData } = await supabase
+        .from("perfiles_admin")
+        .select("nombre, rol")
+        .eq("auth_user_id", userId)
+        .single();
+
+      if (profileData) {
+        setAdminName(profileData.nombre);
+        setUserRole(profileData.rol);
+        setIsLoggedIn(true);
+      } else {
+        await supabase.auth.signOut();
+        setIsLoggedIn(false);
+      }
     };
 
-    initAuth();
-
-    // 2. onAuthStateChange para cambios posteriores (login, logout, expiración)
+    // onAuthStateChange dispara INITIAL_SESSION al montar con la sesión guardada
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        if (event === "INITIAL_SESSION") return; // ya lo manejó initAuth
         if (session?.user) {
-          const { data: profileData } = await supabase
-            .from("perfiles_admin")
-            .select("nombre, rol")
-            .eq("auth_user_id", session.user.id)
-            .single();
-
-          if (profileData) {
-            setAdminName(profileData.nombre);
-            setUserRole(profileData.rol);
-            setIsLoggedIn(true);
-          } else {
-            await supabase.auth.signOut();
-            setIsLoggedIn(false);
-          }
+          await loadProfile(session.user.id);
         } else {
           setIsLoggedIn(false);
           setAdminName("");
           setUserRole("");
         }
+
+        // Quita el spinner la primera vez que resuelve
+        if (!resolved) {
+          resolved = true;
+          clearTimeout(timeout);
+          setAuthLoading(false);
+        }
       }
     );
 
-    return () => subscription.unsubscribe();
+    return () => {
+      clearTimeout(timeout);
+      subscription.unsubscribe();
+    };
   }, []);
 
   useEffect(() => {
