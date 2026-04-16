@@ -39,13 +39,39 @@ export default function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   // ── RESTAURAR SESIÓN AL RECARGAR ──────────────────────────────────────────
-  // onAuthStateChange se dispara al montar (con la sesión guardada en localStorage)
-  // y cada vez que el JWT cambia (login, logout, expiración).
   useEffect(() => {
+    // 1. Verificar sesión existente con getSession() — funciona siempre,
+    //    sin depender de que onAuthStateChange se dispare.
+    const initAuth = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+
+      if (session?.user) {
+        const { data: profileData } = await supabase
+          .from("perfiles_admin")
+          .select("nombre, rol")
+          .eq("auth_user_id", session.user.id)
+          .single();
+
+        if (profileData) {
+          setAdminName(profileData.nombre);
+          setUserRole(profileData.rol);
+          setIsLoggedIn(true);
+        } else {
+          await supabase.auth.signOut();
+        }
+      }
+
+      // Siempre quita el spinner al terminar, haya sesión o no
+      setAuthLoading(false);
+    };
+
+    initAuth();
+
+    // 2. onAuthStateChange para cambios posteriores (login, logout, expiración)
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
+        if (event === "INITIAL_SESSION") return; // ya lo manejó initAuth
         if (session?.user) {
-          // Hay sesión activa → buscar perfil
           const { data: profileData } = await supabase
             .from("perfiles_admin")
             .select("nombre, rol")
@@ -57,17 +83,14 @@ export default function App() {
             setUserRole(profileData.rol);
             setIsLoggedIn(true);
           } else {
-            // JWT válido pero sin perfil → cerrar sesión
             await supabase.auth.signOut();
             setIsLoggedIn(false);
           }
         } else {
-          // Sin sesión (logout, expiración, etc.)
           setIsLoggedIn(false);
           setAdminName("");
           setUserRole("");
         }
-        setAuthLoading(false);
       }
     );
 
