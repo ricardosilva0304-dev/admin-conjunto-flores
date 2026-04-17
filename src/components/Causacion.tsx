@@ -4,10 +4,11 @@ import { supabase } from "@/lib/supabase";
 import { calcularValorDeudaHoy } from "@/lib/utils";
 import {
   Zap, History, Trash2, Eye, X, Loader2,
-  CheckCircle2, Calendar, LayoutGrid, Search, ChevronDown, ChevronUp, Printer
+  CheckCircle2, Calendar, Search, ChevronDown, ChevronUp, Printer
 } from "lucide-react";
 
-function imprimirAuditoria(causacionActiva: any, deudasDetalle: any[], calcularValorDeudaHoy: (d: any) => number) {
+// ── IMPRESIÓN: solo pendientes y abonados ─────────────────────────────────────
+function imprimirCausacion(causacionActiva: any, deudasDetalle: any[], calcFn: (d: any) => number) {
   const hoy = new Date();
   const fechaStr = hoy.toLocaleDateString("es-CO", { day: "2-digit", month: "long", year: "numeric" }).toUpperCase();
 
@@ -17,112 +18,109 @@ function imprimirAuditoria(causacionActiva: any, deudasDetalle: any[], calcularV
     return orden[letra] ?? 99;
   };
 
-  const sorted = [...deudasDetalle].sort((a, b) => {
-    const ti = torreIndex(a.unidad) - torreIndex(b.unidad);
-    if (ti !== 0) return ti;
-    return (a.unidad || "").localeCompare(b.unidad || "");
-  });
+  const sinPagar = [...deudasDetalle]
+    .filter(d => Number(d.saldo_pendiente) > 0)
+    .sort((a, b) => {
+      const ti = torreIndex(a.unidad) - torreIndex(b.unidad);
+      return ti !== 0 ? ti : (a.unidad || "").localeCompare(b.unidad || "");
+    });
 
-  const porTorre: Record<string, any[]> = {};
-  sorted.forEach(d => {
-    const t = d.unidad?.charAt(1) ? `Torre ${d.unidad.charAt(1)}` : "Otras";
-    if (!porTorre[t]) porTorre[t] = [];
-    porTorre[t].push(d);
-  });
+  const abonados = sinPagar.filter(d => Number(d.monto_original) > Number(d.saldo_pendiente));
+  const pendientes = sinPagar.filter(d => Number(d.monto_original) <= Number(d.saldo_pendiente));
 
-  const fmt = (n: number) => `$${n.toLocaleString("es-CO")}`;
-  const totalRecaudado = deudasDetalle.reduce((acc, d) => acc + (Number(d.monto_original) - Number(d.saldo_pendiente)), 0);
-  const totalPorCobrar = deudasDetalle.reduce((acc, d) => acc + calcularValorDeudaHoy(d), 0);
+  const fmt = (n: number) => `$${Math.round(n).toLocaleString("es-CO")}`;
+  const totalPorCobrar = sinPagar.reduce((acc, d) => acc + calcFn(d), 0);
+  const totalPagado = deudasDetalle.reduce((acc, d) => acc + (Number(d.monto_original) - Number(d.saldo_pendiente)), 0);
+  const totalUnidades = deudasDetalle.length;
+  const totalPagadas = deudasDetalle.filter(d => Number(d.saldo_pendiente) === 0).length;
 
-  let html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"/>
-  <title>Auditoría – ${causacionActiva?.concepto_nombre}</title>
+  const filas = (lista: any[]) => lista.map(d => {
+    const abonado = Number(d.monto_original) - Number(d.saldo_pendiente);
+    const saldo = calcFn(d);
+    const tieneAbono = abonado > 0;
+    return `<tr>
+      <td class="uni">${d.unidad}</td>
+      <td>${d.residentes?.nombre || "—"}</td>
+      ${tieneAbono ? `<td class="num muted">Abonó: ${fmt(abonado)}</td>` : `<td></td>`}
+      <td class="num debe">${fmt(saldo)}</td>
+    </tr>`;
+  }).join("");
+
+  const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"/>
+  <title>${causacionActiva?.concepto_nombre} — Saldos Pendientes</title>
   <style>
-    @page { margin: 18mm 15mm; }
+    @page { margin: 16mm 14mm; size: letter; }
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 9.5pt; color: #1e293b; background: #fff; }
-    .enc { display: flex; align-items: flex-start; justify-content: space-between; padding-bottom: 10px; border-bottom: 2.5px solid #0f172a; margin-bottom: 12px; }
-    .enc h1 { font-size: 17pt; font-weight: 900; text-transform: uppercase; line-height: 1; letter-spacing: -0.5px; }
-    .enc .sub { font-size: 7.5pt; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 2px; margin-top: 3px; }
-    .enc .der { text-align: right; }
-    .enc .concepto { font-size: 9pt; font-weight: 800; text-transform: uppercase; }
-    .enc .fecha { font-size: 7.5pt; color: #94a3b8; font-weight: 600; margin-top: 3px; }
-    .resumen { display: flex; gap: 10px; margin-bottom: 14px; }
-    .card { flex: 1; padding: 8px 14px; border-radius: 8px; }
-    .card.verde { background: #f0fdf4; border: 1.5px solid #bbf7d0; }
-    .card.rojo  { background: #fff1f2; border: 1.5px solid #fecdd3; }
-    .card .lbl { font-size: 7pt; font-weight: 800; text-transform: uppercase; letter-spacing: 1.5px; }
-    .card.verde .lbl { color: #15803d; }
-    .card.rojo  .lbl { color: #be123c; }
-    .card .val { font-size: 14pt; font-weight: 900; margin-top: 2px; }
-    .card.verde .val { color: #166534; }
-    .card.rojo  .val { color: #9f1239; }
-    .torre { font-size: 8pt; font-weight: 900; text-transform: uppercase; letter-spacing: 3px; color: #fff; background: #0f172a; padding: 5px 12px; border-radius: 6px; margin: 12px 0 6px; display: inline-block; }
-    .sec-lbl { font-size: 7pt; font-weight: 800; text-transform: uppercase; letter-spacing: 1.5px; margin: 8px 0 4px; padding: 3px 8px; border-radius: 4px; display: inline-block; }
-    .s-pag { background: #dcfce7; color: #166534; }
-    .s-abo { background: #fff7ed; color: #9a3412; }
-    .s-pen { background: #fef2f2; color: #991b1b; }
-    table { width: 100%; border-collapse: collapse; margin-bottom: 4px; }
-    th { font-size: 7pt; font-weight: 800; text-transform: uppercase; letter-spacing: 0.8px; color: #94a3b8; padding: 4px 8px; border-bottom: 1px solid #e2e8f0; text-align: left; }
-    th:last-child, td:last-child { text-align: right; }
-    td { font-size: 8.5pt; padding: 5px 8px; border-bottom: 1px solid #f1f5f9; vertical-align: middle; }
+    body { font-family: "Segoe UI", Arial, sans-serif; font-size: 9pt; color: #1a1a2e; background: #fff; }
+    .header { display: flex; justify-content: space-between; align-items: flex-end; padding-bottom: 10px; border-bottom: 2px solid #1a1a2e; margin-bottom: 14px; }
+    .header h1 { font-size: 18pt; font-weight: 900; letter-spacing: -0.5px; line-height: 1; }
+    .header .sub { font-size: 7.5pt; color: #6b7280; font-weight: 700; text-transform: uppercase; letter-spacing: 2px; margin-top: 4px; }
+    .header .right { text-align: right; }
+    .header .concepto { font-size: 10pt; font-weight: 800; text-transform: uppercase; }
+    .header .fecha { font-size: 7pt; color: #9ca3af; margin-top: 3px; }
+    .resumen { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 16px; }
+    .kpi { padding: 8px 10px; border-radius: 6px; border: 1px solid; }
+    .kpi.azul  { background: #eff6ff; border-color: #bfdbfe; }
+    .kpi.verde { background: #f0fdf4; border-color: #bbf7d0; }
+    .kpi.rojo  { background: #fff1f2; border-color: #fecdd3; }
+    .kpi.gris  { background: #f9fafb; border-color: #e5e7eb; }
+    .kpi .lbl  { font-size: 6.5pt; font-weight: 800; text-transform: uppercase; letter-spacing: 1.2px; color: #6b7280; }
+    .kpi .val  { font-size: 13pt; font-weight: 900; margin-top: 2px; }
+    .kpi.azul  .val { color: #1d4ed8; }
+    .kpi.verde .val { color: #15803d; }
+    .kpi.rojo  .val { color: #be123c; }
+    .kpi.gris  .val { color: #374151; }
+    .sec-title { font-size: 7pt; font-weight: 800; text-transform: uppercase; letter-spacing: 2px; padding: 4px 10px; border-radius: 4px; display: inline-block; margin: 12px 0 6px; }
+    .sec-title.abono    { background: #fff7ed; color: #c2410c; }
+    .sec-title.pendiente { background: #fef2f2; color: #b91c1c; }
+    table { width: 100%; border-collapse: collapse; }
+    thead tr { border-bottom: 1.5px solid #e5e7eb; }
+    th { font-size: 6.5pt; font-weight: 800; text-transform: uppercase; letter-spacing: 0.8px; color: #9ca3af; padding: 4px 6px; text-align: left; }
+    th.num { text-align: right; }
+    td { font-size: 8.5pt; padding: 5px 6px; border-bottom: 1px solid #f3f4f6; vertical-align: middle; }
     tr:last-child td { border-bottom: none; }
-    .uni { font-weight: 900; font-size: 8pt; background: #0f172a; color: #fff; padding: 2px 6px; border-radius: 4px; }
-    .uni.v { background: #16a34a; }
-    .nom { font-weight: 700; }
-    .gris { color: #94a3b8; font-size: 7.5pt; }
-    .mp { color: #16a34a; font-weight: 900; }
-    .mr { color: #dc2626; font-weight: 900; }
-    .pie { margin-top: 16px; border-top: 1.5px solid #e2e8f0; padding-top: 8px; display: flex; justify-content: space-between; }
-    .pie p { font-size: 7pt; font-weight: 700; color: #cbd5e1; text-transform: uppercase; letter-spacing: 2px; }
+    td.uni { font-weight: 900; font-size: 8pt; background: #1a1a2e; color: #fff; padding: 2px 7px; border-radius: 4px; white-space: nowrap; }
+    td.num { text-align: right; }
+    td.debe { font-weight: 900; color: #dc2626; }
+    td.muted { color: #9ca3af; font-size: 7.5pt; }
+    .nota { font-size: 7pt; color: #9ca3af; margin-bottom: 14px; font-style: italic; }
+    .footer { margin-top: 18px; border-top: 1px solid #e5e7eb; padding-top: 8px; display: flex; justify-content: space-between; }
+    .footer p { font-size: 6.5pt; font-weight: 700; color: #d1d5db; text-transform: uppercase; letter-spacing: 2px; }
     @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
   </style></head><body>
-  <div class="enc">
-    <div><h1>Auditoría Detallada</h1><p class="sub">Parque de las Flores · Admin Pro</p></div>
-    <div class="der"><div class="concepto">${causacionActiva?.concepto_nombre}</div><div class="fecha">Generado: ${fechaStr}</div></div>
+  <div class="header">
+    <div>
+      <h1>Saldos Pendientes</h1>
+      <div class="sub">Parque de las Flores · Administración</div>
+    </div>
+    <div class="right">
+      <div class="concepto">${causacionActiva?.concepto_nombre}</div>
+      <div class="fecha">Impreso: ${fechaStr}</div>
+    </div>
   </div>
   <div class="resumen">
-    <div class="card verde"><div class="lbl">Recaudado</div><div class="val">${fmt(totalRecaudado)}</div></div>
-    <div class="card rojo"><div class="lbl">Por Cobrar</div><div class="val">${fmt(totalPorCobrar)}</div></div>
-  </div>`;
-
-  Object.entries(porTorre).forEach(([torre, deudas]) => {
-    const pagados = deudas.filter(d => Number(d.saldo_pendiente) === 0);
-    const abonados = deudas.filter(d => Number(d.saldo_pendiente) > 0 && Number(d.monto_original) > Number(d.saldo_pendiente));
-    const pendientes = deudas.filter(d => Number(d.saldo_pendiente) > 0 && Number(d.monto_original) <= Number(d.saldo_pendiente));
-
-    html += `<div class="torre">${torre}</div>`;
-
-    const renderGrupo = (lista: any[], tipo: "pagado" | "abono" | "pendiente") => {
-      if (lista.length === 0) return "";
-      const labels = { pagado: "✓ Pagados", abono: "◑ Con Abono — Saldo Pendiente", pendiente: "✗ Sin Pago" };
-      const cls = { pagado: "s-pag", abono: "s-abo", pendiente: "s-pen" };
-      let rows = lista.map(d => {
-        const valorHoy = calcularValorDeudaHoy(d);
-        const abonado = Number(d.monto_original) - Number(d.saldo_pendiente);
-        if (tipo === "pagado") return `<tr>
-          <td><span class="uni v">${d.unidad}</span></td>
-          <td class="nom">${d.residentes?.nombre || "—"}</td>
-          <td class="mp">${fmt(Number(d.monto_original))}</td></tr>`;
-        if (tipo === "abono") return `<tr>
-          <td><span class="uni">${d.unidad}</span></td>
-          <td class="nom">${d.residentes?.nombre || "—"}<br><span class="gris">Abonó: ${fmt(abonado)}</span></td>
-          <td class="mr">${fmt(valorHoy)}</td></tr>`;
-        return `<tr>
-          <td><span class="uni">${d.unidad}</span></td>
-          <td class="nom">${d.residentes?.nombre || "—"}</td>
-          <td class="mr">${fmt(valorHoy)}</td></tr>`;
-      }).join("");
-      return `<div class="sec-lbl ${cls[tipo]}">${labels[tipo]} (${lista.length})</div>
-        <table><thead><tr><th>Unidad</th><th>Residente</th><th>${tipo === "pagado" ? "Valor" : "Saldo"}</th></tr></thead>
-        <tbody>${rows}</tbody></table>`;
-    };
-
-    html += renderGrupo(pagados, "pagado");
-    html += renderGrupo(abonados, "abono");
-    html += renderGrupo(pendientes, "pendiente");
-  });
-
-  html += `<div class="pie"><p>Admin Pro · Parque de las Flores</p><p>Total: ${deudasDetalle.length} unidades</p></div>
+    <div class="kpi azul"><div class="lbl">Total unidades</div><div class="val">${totalUnidades}</div></div>
+    <div class="kpi verde"><div class="lbl">Ya pagaron</div><div class="val">${totalPagadas}</div></div>
+    <div class="kpi rojo"><div class="lbl">Sin pagar</div><div class="val">${sinPagar.length}</div></div>
+    <div class="kpi gris"><div class="lbl">Por cobrar</div><div class="val" style="font-size:10pt">${fmt(totalPorCobrar)}</div></div>
+  </div>
+  <p class="nota">Este documento muestra únicamente unidades con saldo pendiente. Las ${totalPagadas} unidades que ya cancelaron no aparecen.</p>
+  ${abonados.length > 0 ? `
+    <div class="sec-title abono">Con abono — saldo parcial (${abonados.length})</div>
+    <table>
+      <thead><tr><th>Unidad</th><th>Residente</th><th class="num">Abonado</th><th class="num">Saldo debe</th></tr></thead>
+      <tbody>${filas(abonados)}</tbody>
+    </table>` : ""}
+  ${pendientes.length > 0 ? `
+    <div class="sec-title pendiente">Sin ningún pago (${pendientes.length})</div>
+    <table>
+      <thead><tr><th>Unidad</th><th>Residente</th><th></th><th class="num">Valor debe</th></tr></thead>
+      <tbody>${filas(pendientes)}</tbody>
+    </table>` : ""}
+  <div class="footer">
+    <p>Admin · Parque de las Flores</p>
+    <p>Recaudado: ${fmt(totalPagado)} / Por cobrar: ${fmt(totalPorCobrar)}</p>
+  </div>
   </body></html>`;
 
   const win = window.open("", "_blank", "width=900,height=700");
@@ -138,18 +136,16 @@ export default function Causacion({ role }: { role?: string }) {
   const [historial, setHistorial] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [generando, setGenerando] = useState(false);
-
   const [showDetalles, setShowDetalles] = useState(false);
   const [causacionActiva, setCausacionActiva] = useState<any>(null);
   const [deudasDetalle, setDeudasDetalle] = useState<any[]>([]);
   const [loadingDetalle, setLoadingDetalle] = useState(false);
   const [busquedaDetalle, setBusquedaDetalle] = useState("");
-
+  const [filtroModal, setFiltroModal] = useState<"TODOS" | "PENDIENTE" | "ABONO" | "PAGADO">("TODOS");
   const [conceptoId, setConceptoId] = useState("");
   const [mesDeuda, setMesDeuda] = useState("");
   const [fechaLimite, setFechaLimite] = useState("");
   const [filtroTipo, setFiltroTipo] = useState("TODOS");
-
   const [mesesAbiertos, setMesesAbiertos] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
@@ -166,16 +162,13 @@ export default function Causacion({ role }: { role?: string }) {
     const [c, r, h] = await Promise.all([
       supabase.from("conceptos_pago").select("*"),
       supabase.from("residentes").select("*").neq("torre", "Torre 1"),
-      supabase.from("causaciones_globales").select("*").order('mes_causado', { ascending: false })
+      supabase.from("causaciones_globales").select("*").order("mes_causado", { ascending: false })
     ]);
     if (c.data) setConceptos(c.data);
     if (r.data) setResidentes(r.data);
     if (h.data) {
       setHistorial(h.data);
-      if (h.data.length > 0) {
-        const primerMes = h.data[0].mes_causado;
-        setMesesAbiertos({ [primerMes]: true });
-      }
+      if (h.data.length > 0) setMesesAbiertos({ [h.data[0].mes_causado]: true });
     }
     setLoading(false);
   }
@@ -183,24 +176,39 @@ export default function Causacion({ role }: { role?: string }) {
   const historialAgrupado = useMemo(() => {
     const grupos: Record<string, any[]> = {};
     historial.forEach(h => {
-      const mes = h.mes_causado;
-      if (!grupos[mes]) grupos[mes] = [];
-      grupos[mes].push(h);
+      if (!grupos[h.mes_causado]) grupos[h.mes_causado] = [];
+      grupos[h.mes_causado].push(h);
     });
     return grupos;
   }, [historial]);
 
   const mesesOrdenados = Object.keys(historialAgrupado).sort().reverse();
 
+  const residentesAfectados = useMemo(() => residentes.filter(r => {
+    if (filtroTipo === "TODOS") return true;
+    if (filtroTipo === "CARRO") return (r.carros || 0) > 0;
+    if (filtroTipo === "MOTO") return (r.motos || 0) > 0;
+    if (filtroTipo === "BICI") return (r.bicis || 0) > 0;
+    return false;
+  }), [residentes, filtroTipo]);
+
   const deudasFiltradas = useMemo(() => {
-    return deudasDetalle.filter((d: any) =>
+    let lista = deudasDetalle.filter(d =>
       d.unidad?.toLowerCase().includes(busquedaDetalle.toLowerCase()) ||
       d.residentes?.nombre?.toLowerCase().includes(busquedaDetalle.toLowerCase())
     );
-  }, [deudasDetalle, busquedaDetalle]);
+    if (filtroModal === "PENDIENTE") lista = lista.filter(d => Number(d.saldo_pendiente) > 0 && Number(d.monto_original) <= Number(d.saldo_pendiente));
+    if (filtroModal === "ABONO") lista = lista.filter(d => Number(d.saldo_pendiente) > 0 && Number(d.monto_original) > Number(d.saldo_pendiente));
+    if (filtroModal === "PAGADO") lista = lista.filter(d => Number(d.saldo_pendiente) === 0);
+    return lista;
+  }, [deudasDetalle, busquedaDetalle, filtroModal]);
+
+  const cntPagado = useMemo(() => deudasDetalle.filter(d => Number(d.saldo_pendiente) === 0).length, [deudasDetalle]);
+  const cntAbono = useMemo(() => deudasDetalle.filter(d => Number(d.saldo_pendiente) > 0 && Number(d.monto_original) > Number(d.saldo_pendiente)).length, [deudasDetalle]);
+  const cntPendiente = useMemo(() => deudasDetalle.filter(d => Number(d.saldo_pendiente) > 0 && Number(d.monto_original) <= Number(d.saldo_pendiente)).length, [deudasDetalle]);
 
   async function cambiarModo(id: number, nuevoModo: string) {
-    if (role === 'contador') return alert("No tienes permiso para modificar causaciones.");
+    if (role === "contador") return alert("No tienes permiso para modificar causaciones.");
     setHistorial(prev => prev.map(h => h.id === id ? { ...h, tipo_cobro: nuevoModo } : h));
     await supabase.from("causaciones_globales").update({ tipo_cobro: nuevoModo }).eq("id", id);
   }
@@ -210,64 +218,38 @@ export default function Causacion({ role }: { role?: string }) {
     setShowDetalles(true);
     setLoadingDetalle(true);
     setBusquedaDetalle("");
+    setFiltroModal("TODOS");
     const { data } = await supabase
       .from("deudas_residentes")
-      .select(`*, residentes(nombre), causaciones_globales(mes_causado, tipo_cobro)`)
+      .select("*, residentes(nombre), causaciones_globales(mes_causado, tipo_cobro)")
       .eq("causacion_id", causacion.id)
-      .order('unidad', { ascending: true });
+      .order("unidad", { ascending: true });
     if (data) setDeudasDetalle(data);
     setLoadingDetalle(false);
   }
 
   async function generarCausacion() {
-    if (role === 'contador') return alert("No tienes permiso para generar causaciones.");
+    if (role === "contador") return alert("No tienes permiso para generar causaciones.");
     if (!conceptoId || !mesDeuda || !fechaLimite) return;
     const concepto = conceptos.find(c => c.id === parseInt(conceptoId));
     if (!concepto || !confirm(`¿Confirmar cobros para ${residentesAfectados.length} unidades?`)) return;
-
     setGenerando(true);
     try {
       const [anio, mesNum] = mesDeuda.split("-");
-      const mesesNombres = ["ENERO", "FEBRERO", "MARZO", "ABRIL", "MAYO", "JUNIO", "JULIO", "AGOSTO", "SEPTIEMBRE", "OCTUBRE", "NOVIEMBRE", "DICIEMBRE"];
-      const periodoTexto = `${mesesNombres[parseInt(mesNum) - 1]} ${anio}`;
+      const MESES = ["ENERO", "FEBRERO", "MARZO", "ABRIL", "MAYO", "JUNIO", "JULIO", "AGOSTO", "SEPTIEMBRE", "OCTUBRE", "NOVIEMBRE", "DICIEMBRE"];
+      const periodoTexto = `${MESES[parseInt(mesNum) - 1]} ${anio}`;
       const nombreConPeriodo = `${concepto.nombre.trim().toUpperCase()} (${periodoTexto})`;
-
-      // Nombre con el que se guardaron los anticipos para este concepto+mes
       const nombreAnticipo = `ANTICIPO - ${concepto.nombre.trim().toUpperCase()} (${periodoTexto})`;
-
-      // Consultar todos los anticipos existentes para este concepto+mes de una sola vez
-      const { data: anticiposExistentes } = await supabase
-        .from("deudas_residentes")
-        .select("id, residente_id, saldo_pendiente, precio_m1")
-        .eq("concepto_nombre", nombreAnticipo);
-
-      // Indexar por residente_id para búsqueda O(1)
+      const { data: anticiposExistentes } = await supabase.from("deudas_residentes").select("id, residente_id, saldo_pendiente, precio_m1").eq("concepto_nombre", nombreAnticipo);
       const anticiposPorResidente: Record<number, any> = {};
-      (anticiposExistentes || []).forEach(a => {
-        anticiposPorResidente[a.residente_id] = a;
-      });
-
-      // Crear el lote de causación
-      const { data: lote, error: errLote } = await supabase
-        .from("causaciones_globales")
-        .insert([{
-          mes_causado: mesDeuda,
-          concepto_nombre: nombreConPeriodo,
-          total_residentes: residentesAfectados.length,
-          fecha_limite: fechaLimite,
-          tipo_cobro: 'NORMAL'
-        }])
-        .select()
-        .single();
-
+      (anticiposExistentes || []).forEach(a => { anticiposPorResidente[a.residente_id] = a; });
+      const { data: lote, error: errLote } = await supabase.from("causaciones_globales")
+        .insert([{ mes_causado: mesDeuda, concepto_nombre: nombreConPeriodo, total_residentes: residentesAfectados.length, fecha_limite: fechaLimite, tipo_cobro: "NORMAL" }])
+        .select().single();
       if (errLote) throw errLote;
-
-      // Construir deudas considerando anticipos
       const deudasAInsertar: any[] = [];
       const anticiposAActualizar: Array<{ id: number; nuevoSaldo: number }> = [];
-
       for (const res of residentesAfectados) {
-        // Calcular factor vehículos
         let factor = 1;
         const nombreC = concepto.nombre.toUpperCase();
         if (concepto.cobro_por_vehiculo) {
@@ -276,97 +258,31 @@ export default function Causacion({ role }: { role?: string }) {
           else if (nombreC.includes("BICI")) factor = Number(res.bicis) || 0;
         }
         if (factor === 0) continue;
-
         const montoBase = (Number(concepto.monto_1_10) || 0) * factor;
         const montoM2 = (Number(concepto.monto_11_20) || montoBase) * factor;
         const montoM3 = (Number(concepto.monto_21_adelante) || montoBase) * factor;
-
         const anticipo = anticiposPorResidente[res.id];
-
         if (anticipo) {
-          // El residente pagó anticipado
-          const valorPagado = Math.abs(Number(anticipo.saldo_pendiente)); // es negativo en DB
-
+          const valorPagado = Math.abs(Number(anticipo.saldo_pendiente));
           if (valorPagado >= montoBase) {
-            // Anticipo cubre el total: insertar con saldo 0 (ya pagado)
-            deudasAInsertar.push({
-              causacion_id: lote.id,
-              residente_id: res.id,
-              unidad: `T${res.torre.slice(-1)}-${res.apartamento}`,
-              concepto_nombre: nombreConPeriodo,
-              monto_original: montoBase,
-              precio_m1: montoBase,
-              precio_m2: montoM2,
-              precio_m3: montoM3,
-              saldo_pendiente: 0,
-              fecha_vencimiento: fechaLimite,
-              estado: "PAGADO"
-            });
-            // Consumir el anticipo completamente (saldo → 0)
+            deudasAInsertar.push({ causacion_id: lote.id, residente_id: res.id, unidad: `T${res.torre.slice(-1)}-${res.apartamento}`, concepto_nombre: nombreConPeriodo, monto_original: montoBase, precio_m1: montoBase, precio_m2: montoM2, precio_m3: montoM3, saldo_pendiente: 0, fecha_vencimiento: fechaLimite, estado: "PAGADO" });
             anticiposAActualizar.push({ id: anticipo.id, nuevoSaldo: 0 });
-
           } else {
-            // Anticipo parcial: insertar solo la diferencia
-            // Esto ocurre si subió el precio (ej: pagó $146k pero ahora vale $156k → debe $10k)
             const diferencia = montoBase - valorPagado;
-            deudasAInsertar.push({
-              causacion_id: lote.id,
-              residente_id: res.id,
-              unidad: `T${res.torre.slice(-1)}-${res.apartamento}`,
-              concepto_nombre: nombreConPeriodo,
-              monto_original: montoBase,
-              precio_m1: diferencia,  // solo debe la diferencia
-              precio_m2: montoM2 - valorPagado,
-              precio_m3: montoM3 - valorPagado,
-              saldo_pendiente: diferencia,
-              fecha_vencimiento: fechaLimite,
-              estado: "PENDIENTE"
-            });
-            // Consumir el anticipo completamente
+            deudasAInsertar.push({ causacion_id: lote.id, residente_id: res.id, unidad: `T${res.torre.slice(-1)}-${res.apartamento}`, concepto_nombre: nombreConPeriodo, monto_original: montoBase, precio_m1: diferencia, precio_m2: montoM2 - valorPagado, precio_m3: montoM3 - valorPagado, saldo_pendiente: diferencia, fecha_vencimiento: fechaLimite, estado: "PENDIENTE" });
             anticiposAActualizar.push({ id: anticipo.id, nuevoSaldo: 0 });
           }
-
         } else {
-          // Sin anticipo: flujo normal
-          deudasAInsertar.push({
-            causacion_id: lote.id,
-            residente_id: res.id,
-            unidad: `T${res.torre.slice(-1)}-${res.apartamento}`,
-            concepto_nombre: nombreConPeriodo,
-            monto_original: montoBase,
-            precio_m1: montoBase,
-            precio_m2: montoM2,
-            precio_m3: montoM3,
-            saldo_pendiente: montoBase,
-            fecha_vencimiento: fechaLimite,
-            estado: "PENDIENTE"
-          });
+          deudasAInsertar.push({ causacion_id: lote.id, residente_id: res.id, unidad: `T${res.torre.slice(-1)}-${res.apartamento}`, concepto_nombre: nombreConPeriodo, monto_original: montoBase, precio_m1: montoBase, precio_m2: montoM2, precio_m3: montoM3, saldo_pendiente: montoBase, fecha_vencimiento: fechaLimite, estado: "PENDIENTE" });
         }
       }
-
-      // Insertar todas las deudas de una sola vez
-      if (deudasAInsertar.length > 0) {
-        await supabase.from("deudas_residentes").insert(deudasAInsertar);
-      }
-
-      // Actualizar los anticipos consumidos (marcar saldo en 0)
+      if (deudasAInsertar.length > 0) await supabase.from("deudas_residentes").insert(deudasAInsertar);
       for (const { id, nuevoSaldo } of anticiposAActualizar) {
-        await supabase
-          .from("deudas_residentes")
-          .update({ saldo_pendiente: nuevoSaldo, estado: "APLICADO" })
-          .eq("id", id);
+        await supabase.from("deudas_residentes").update({ saldo_pendiente: nuevoSaldo, estado: "APLICADO" }).eq("id", id);
       }
-
-      const conAnticipo = anticiposAActualizar.length;
-      const sinAnticipo = deudasAInsertar.length - conAnticipo;
-
       await cargarDatos();
       setConceptoId("");
-      alert(
-        `✅ Causación completada.\n` +
-        `· ${sinAnticipo} cobros normales generados\n` +
-        (conAnticipo > 0 ? `· ${conAnticipo} anticipos aplicados automáticamente` : "")
-      );
+      alert(`Causación completada.\n· ${deudasAInsertar.length - anticiposAActualizar.length} cobros normales\n${anticiposAActualizar.length > 0 ? `· ${anticiposAActualizar.length} anticipos aplicados` : ""}`);
     } catch (err: any) {
       alert(err.message);
     } finally {
@@ -374,15 +290,15 @@ export default function Causacion({ role }: { role?: string }) {
     }
   }
 
-  const residentesAfectados = residentes.filter(r => {
-    if (filtroTipo === "TODOS") return true;
-    if (filtroTipo === "CARRO") return (r.carros || 0) > 0;
-    if (filtroTipo === "MOTO") return (r.motos || 0) > 0;
-    if (filtroTipo === "BICI") return (r.bicis || 0) > 0;
-    return false;
-  });
-
   const MESES_NOMBRES = ["ENERO", "FEBRERO", "MARZO", "ABRIL", "MAYO", "JUNIO", "JULIO", "AGOSTO", "SEPTIEMBRE", "OCTUBRE", "NOVIEMBRE", "DICIEMBRE"];
+  const fmt = (n: number) => `$${Math.round(n).toLocaleString("es-CO")}`;
+  const conteoFiltro = (key: string) => residentes.filter(r => {
+    if (key === "TODOS") return true;
+    if (key === "CARRO") return (r.carros || 0) > 0;
+    if (key === "MOTO") return (r.motos || 0) > 0;
+    if (key === "BICI") return (r.bicis || 0) > 0;
+    return false;
+  }).length;
 
   if (loading) return (
     <div className="flex h-64 items-center justify-center">
@@ -391,186 +307,132 @@ export default function Causacion({ role }: { role?: string }) {
   );
 
   return (
-    <div className="max-w-6xl mx-auto space-y-5 sm:space-y-8 pb-24 px-0 font-sans text-slate-800">
+    <div className="max-w-5xl mx-auto space-y-4 pb-24 font-sans text-slate-800">
 
-      {/* ── GENERADOR ────────────────────────────────────────── */}
-      <section className="bg-white p-4 sm:p-8 rounded-2xl sm:rounded-[2.5rem] border border-slate-100 shadow-sm">
-        <div className="flex items-center gap-3 mb-5 sm:mb-8">
-          <div className="w-9 h-9 sm:w-10 sm:h-10 bg-emerald-500 rounded-xl flex items-center justify-center text-slate-900 shadow-lg shadow-emerald-500/20 flex-shrink-0">
-            <Zap size={18} strokeWidth={2.5} />
+      {/* ── GENERADOR ──────────────────────────────────────────────────────── */}
+      <section className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
+        <div className="flex items-center gap-3 px-4 sm:px-6 py-4 border-b border-slate-100">
+          <div className="w-8 h-8 bg-slate-900 rounded-lg flex items-center justify-center flex-shrink-0">
+            <Zap size={15} className="text-emerald-400" strokeWidth={2.5} />
           </div>
           <div>
-            <h2 className="text-slate-900 font-black text-xs sm:text-sm uppercase tracking-widest leading-none">
-              Generar Cobros Masivos
-            </h2>
-            <p className="text-slate-400 text-[9px] sm:text-[10px] font-bold uppercase mt-0.5 tracking-tighter">
-              Planificación financiera del mes · Los anticipos se aplican automáticamente
-            </p>
+            <h2 className="text-slate-900 font-bold text-sm leading-none">Generar cobros masivos</h2>
+            <p className="text-slate-400 text-[10px] mt-0.5">Los anticipos se aplican automáticamente</p>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-12 gap-3 sm:gap-4 items-end">
-          <div className="sm:col-span-2 md:col-span-4 space-y-1.5">
-            <label className="text-[9px] font-black text-slate-400 uppercase ml-1 tracking-widest">Concepto de pago</label>
-            <select
-              className="w-full bg-slate-50 border border-slate-100 p-3.5 sm:p-4 rounded-2xl text-sm font-bold outline-none focus:bg-white transition-all shadow-inner"
-              value={conceptoId}
-              onChange={(e) => setConceptoId(e.target.value)}
-            >
-              <option value="">Selecciona servicio...</option>
-              {conceptos.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
-            </select>
+        <div className="p-4 sm:p-6 space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Concepto</label>
+              <select
+                className="w-full bg-slate-50 border border-slate-200 px-3 py-2.5 rounded-xl text-sm font-medium outline-none focus:border-slate-400 focus:bg-white transition-all"
+                value={conceptoId}
+                onChange={e => setConceptoId(e.target.value)}
+              >
+                <option value="">Seleccionar...</option>
+                {conceptos.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
+              </select>
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Mes</label>
+              <input type="month" className="w-full bg-slate-50 border border-slate-200 px-3 py-2.5 rounded-xl text-sm font-medium outline-none focus:border-slate-400 focus:bg-white transition-all" onChange={e => setMesDeuda(e.target.value)} />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Fecha límite</label>
+              <input type="date" className="w-full bg-slate-50 border border-slate-200 px-3 py-2.5 rounded-xl text-sm font-medium outline-none focus:border-slate-400 focus:bg-white transition-all" onChange={e => setFechaLimite(e.target.value)} />
+            </div>
           </div>
 
-          <div className="md:col-span-3 space-y-1.5">
-            <label className="text-[9px] font-black text-slate-400 uppercase ml-1 tracking-widest">Mes</label>
-            <input
-              type="month"
-              className="w-full bg-slate-50 border border-slate-100 p-3.5 sm:p-4 rounded-2xl text-sm font-bold outline-none focus:bg-white transition-all shadow-inner"
-              onChange={(e) => setMesDeuda(e.target.value)}
-            />
-          </div>
-
-          <div className="md:col-span-3 space-y-1.5">
-            <label className="text-[9px] font-black text-slate-400 uppercase ml-1 tracking-widest">Vencimiento</label>
-            <input
-              type="date"
-              className="w-full bg-slate-50 border border-slate-100 p-3.5 sm:p-4 rounded-2xl text-sm font-bold outline-none focus:bg-white transition-all shadow-inner"
-              onChange={(e) => setFechaLimite(e.target.value)}
-            />
-          </div>
-
-          <div className="sm:col-span-2 md:col-span-2">
+          <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
+            <div className="flex-1 grid grid-cols-4 gap-1 bg-slate-100 p-1 rounded-xl">
+              {[
+                { key: "TODOS", label: "General" },
+                { key: "CARRO", label: "Carros" },
+                { key: "MOTO", label: "Motos" },
+                { key: "BICI", label: "Bicis" },
+              ].map(({ key, label }) => {
+                const activo = filtroTipo === key;
+                const count = conteoFiltro(key);
+                return (
+                  <button key={key} onClick={() => setFiltroTipo(key)}
+                    className={`flex items-center justify-center gap-1.5 py-2 rounded-lg text-[11px] font-semibold transition-all ${activo ? "bg-white text-slate-900 shadow-sm" : "text-slate-400 hover:text-slate-600"}`}
+                  >
+                    <span className="hidden sm:inline">{label}</span>
+                    <span className="sm:hidden">{label.slice(0, 3)}</span>
+                    <span className={`text-[9px] font-bold tabular-nums px-1.5 py-0.5 rounded-md ${activo ? "bg-emerald-500 text-white" : "bg-slate-200 text-slate-500"}`}>{count}</span>
+                  </button>
+                );
+              })}
+            </div>
             <button
               onClick={generarCausacion}
-              disabled={generando || !conceptoId}
-              className="w-full bg-slate-900 text-white p-3.5 sm:p-4 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-emerald-600 transition-all active:scale-95 shadow-xl disabled:opacity-30 flex items-center justify-center"
+              disabled={generando || !conceptoId || !mesDeuda || !fechaLimite}
+              className="sm:w-36 bg-slate-900 text-white py-2.5 px-5 rounded-xl font-semibold text-sm hover:bg-emerald-600 transition-all active:scale-95 disabled:opacity-30 flex items-center justify-center gap-2 flex-shrink-0"
             >
-              {generando ? <Loader2 className="animate-spin" size={18} /> : "PROCESAR"}
+              {generando ? <Loader2 className="animate-spin" size={15} /> : <><Zap size={14} />Procesar</>}
             </button>
           </div>
         </div>
-
-        {/* Filtros de tipo */}
-        <div className="mt-4 sm:mt-6 flex bg-slate-100 p-1 rounded-2xl gap-1">
-          {[
-            { key: 'TODOS', label: 'General' },
-            { key: 'CARRO', label: 'Carros' },
-            { key: 'MOTO', label: 'Motos' },
-            { key: 'BICI', label: 'Bicis' },
-          ].map(({ key, label }) => {
-            const count = residentes.filter(r => {
-              if (key === "TODOS") return true;
-              if (key === "CARRO") return (r.carros || 0) > 0;
-              if (key === "MOTO") return (r.motos || 0) > 0;
-              if (key === "BICI") return (r.bicis || 0) > 0;
-              return false;
-            }).length;
-            const activo = filtroTipo === key;
-            return (
-              <button
-                key={key}
-                onClick={() => setFiltroTipo(key)}
-                className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-[10px] sm:text-xs font-black transition-all ${activo ? "bg-white text-slate-900 shadow-md" : "text-slate-400 hover:text-slate-600"}`}
-              >
-                {label}
-                <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-lg ${activo ? "bg-emerald-500 text-white" : "bg-slate-200 text-slate-500"}`}>
-                  {count}
-                </span>
-              </button>
-            );
-          })}
-        </div>
       </section>
 
-      {/* ── HISTORIAL AGRUPADO ───────────────────────────────── */}
-      <div className="space-y-3 sm:space-y-4">
+      {/* ── HISTORIAL ──────────────────────────────────────────────────────── */}
+      <div className="space-y-2">
         {mesesOrdenados.map(mesKey => {
           const [anio, mesNum] = mesKey.split("-");
           const nombreMes = `${MESES_NOMBRES[parseInt(mesNum) - 1]} ${anio}`;
           const abierto = mesesAbiertos[mesKey] ?? false;
           const items = historialAgrupado[mesKey];
-
           return (
-            <div key={mesKey} className="bg-white border border-slate-100 rounded-2xl overflow-hidden shadow-sm">
-
+            <div key={mesKey} className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
               <button
                 onClick={() => setMesesAbiertos(prev => ({ ...prev, [mesKey]: !prev[mesKey] }))}
-                className="w-full flex items-center justify-between px-4 sm:px-6 py-3.5 sm:py-4 hover:bg-slate-50 transition-colors group"
+                className="w-full flex items-center justify-between px-4 sm:px-5 py-3.5 hover:bg-slate-50 transition-colors"
               >
-                <div className="flex items-center gap-3">
-                  <div className="flex items-center gap-2 bg-slate-900 text-white px-3 sm:px-4 py-1.5 rounded-full">
-                    <Calendar size={11} className="text-emerald-400" />
-                    <span className="text-[9px] sm:text-[10px] font-black uppercase tracking-[0.15em]">{nombreMes}</span>
-                  </div>
-                  <span className="text-[9px] text-slate-400 font-bold">{items.length} concepto{items.length !== 1 ? 's' : ''}</span>
+                <div className="flex items-center gap-2.5">
+                  <Calendar size={13} className="text-slate-400 flex-shrink-0" />
+                  <span className="font-bold text-slate-800 text-sm">{nombreMes}</span>
+                  <span className="text-[10px] text-slate-400 font-medium">{items.length} concepto{items.length !== 1 ? "s" : ""}</span>
                 </div>
-                {abierto
-                  ? <ChevronUp size={15} className="text-slate-300 flex-shrink-0" />
-                  : <ChevronDown size={15} className="text-slate-300 flex-shrink-0" />
-                }
+                {abierto ? <ChevronUp size={14} className="text-slate-300" /> : <ChevronDown size={14} className="text-slate-300" />}
               </button>
 
               {abierto && (
-                <div className="border-t border-slate-100 p-3 sm:p-4 grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div className="border-t border-slate-100 divide-y divide-slate-100">
                   {items.map(h => (
-                    <div key={h.id} className="border border-slate-100 p-4 sm:p-5 rounded-2xl flex flex-col gap-4 hover:border-emerald-200 hover:shadow-md transition-all group">
-
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="flex items-center gap-3 min-w-0">
-                          <div className="w-10 h-10 sm:w-12 sm:h-12 bg-slate-50 rounded-xl flex items-center justify-center text-slate-400 group-hover:bg-emerald-50 group-hover:text-emerald-600 transition-colors flex-shrink-0">
-                            <History size={18} />
-                          </div>
-                          <div className="min-w-0">
-                            <h4 className="font-black text-xs sm:text-sm text-slate-900 uppercase tracking-tight leading-tight truncate">
-                              {h.concepto_nombre}
-                            </h4>
-                            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">
-                              {h.total_residentes} unidades
-                            </p>
-                          </div>
+                    <div key={h.id} className="px-4 sm:px-5 py-3.5 flex flex-col sm:flex-row sm:items-center gap-3">
+                      <div className="flex items-center gap-3 flex-1 min-w-0">
+                        <div className="w-8 h-8 bg-slate-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                          <History size={14} className="text-slate-400" />
                         </div>
-                        <div className="flex gap-1.5 flex-shrink-0">
-                          <button
-                            onClick={() => verDetalles(h)}
-                            className="p-2 sm:p-2.5 bg-slate-50 text-slate-400 rounded-xl hover:bg-emerald-500 hover:text-white transition-all"
-                            title="Ver detalles"
-                          >
-                            <Eye size={15} />
-                          </button>
-                          <button
-                            onClick={async () => {
-                              if (role === 'contador') return alert("No tienes permiso para eliminar causaciones.");
-                              if (confirm("¿Borrar esta causación?")) {
-                                await supabase.from("causaciones_globales").delete().eq("id", h.id);
-                                cargarDatos();
-                              }
-                            }}
-                            className="p-2 sm:p-2.5 bg-slate-50 text-slate-300 rounded-xl hover:bg-rose-500 hover:text-white transition-all"
-                            title="Eliminar"
-                          >
-                            <Trash2 size={15} />
-                          </button>
+                        <div className="min-w-0">
+                          <p className="font-semibold text-sm text-slate-800 truncate">{h.concepto_nombre}</p>
+                          <p className="text-[10px] text-slate-400">{h.total_residentes} unidades</p>
                         </div>
                       </div>
-
-                      <div className="flex items-center justify-between pt-3 border-t border-slate-50">
-                        <span className="text-[8px] sm:text-[9px] font-black text-slate-300 uppercase tracking-widest">Regla:</span>
-                        <div className="flex bg-slate-50 p-1 rounded-xl border border-slate-100 gap-0.5">
-                          {['M1', 'M2', 'NORMAL'].map(m => {
-                            const active = (h.tipo_cobro || 'NORMAL') === m;
-                            const label = m === 'NORMAL' ? 'Automático' : m === 'M1' ? 'Con Descuento' : 'Sin Descuento';
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <div className="flex bg-slate-100 p-0.5 rounded-lg gap-0.5">
+                          {[{ key: "M1", label: "Desc." }, { key: "M2", label: "S/Desc." }, { key: "NORMAL", label: "Auto" }].map(({ key, label }) => {
+                            const active = (h.tipo_cobro || "NORMAL") === key;
                             return (
-                              <button
-                                key={m}
-                                onClick={() => cambiarModo(h.id, m)}
-                                className={`px-2 sm:px-3 py-1 rounded-lg text-[8px] sm:text-[9px] font-black transition-all ${active ? "bg-slate-900 text-white shadow-md" : "text-slate-400 hover:text-slate-600"}`}
-                              >
-                                {label}
-                              </button>
+                              <button key={key} onClick={() => cambiarModo(h.id, key)}
+                                className={`px-2.5 py-1 rounded-md text-[10px] font-semibold transition-all ${active ? "bg-slate-900 text-white shadow-sm" : "text-slate-400 hover:text-slate-600"}`}
+                              >{label}</button>
                             );
                           })}
                         </div>
+                        <button onClick={() => verDetalles(h)} className="p-2 bg-slate-100 text-slate-400 rounded-lg hover:bg-emerald-500 hover:text-white transition-all" title="Ver detalle">
+                          <Eye size={14} />
+                        </button>
+                        <button
+                          onClick={async () => {
+                            if (role === "contador") return alert("Sin permiso.");
+                            if (confirm("¿Borrar esta causación y sus deudas?")) { await supabase.from("causaciones_globales").delete().eq("id", h.id); cargarDatos(); }
+                          }}
+                          className="p-2 bg-slate-100 text-slate-300 rounded-lg hover:bg-rose-500 hover:text-white transition-all" title="Eliminar"
+                        >
+                          <Trash2 size={14} />
+                        </button>
                       </div>
                     </div>
                   ))}
@@ -582,118 +444,120 @@ export default function Causacion({ role }: { role?: string }) {
 
         {mesesOrdenados.length === 0 && (
           <div className="py-20 text-center border-2 border-dashed border-slate-200 rounded-2xl">
-            <CheckCircle2 className="mx-auto text-slate-200 mb-3" size={36} />
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em]">Sin causaciones registradas</p>
+            <CheckCircle2 className="mx-auto text-slate-200 mb-3" size={32} />
+            <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Sin causaciones registradas</p>
           </div>
         )}
       </div>
 
-      {/* ── MODAL DE AUDITORÍA ───────────────────────────────── */}
+      {/* ── MODAL ──────────────────────────────────────────────────────────── */}
       {showDetalles && (
-        <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-md z-[500] flex flex-col items-center justify-end sm:justify-center p-0 sm:p-4 animate-in fade-in duration-300">
-          <div className="bg-white w-full sm:max-w-4xl rounded-t-[2rem] sm:rounded-[2.5rem] shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-bottom-4 sm:zoom-in-95 duration-300 border border-white/20 max-h-[90vh] sm:h-[85vh]">
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-[500] flex flex-col items-center justify-end sm:justify-center p-0 sm:p-4">
+          <div className="bg-white w-full sm:max-w-2xl rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col overflow-hidden max-h-[92vh] sm:max-h-[85vh]">
 
-            <div className="p-4 sm:p-8 border-b border-slate-100 flex items-center justify-between bg-slate-50/50 flex-shrink-0">
-              <div className="flex items-center gap-3 sm:gap-4 min-w-0">
-                <div className="w-10 h-10 sm:w-12 sm:h-12 bg-slate-900 rounded-xl sm:rounded-2xl flex items-center justify-center text-white flex-shrink-0">
-                  <LayoutGrid size={18} />
-                </div>
-                <div className="min-w-0">
-                  <h3 className="font-black text-slate-900 uppercase italic tracking-tighter text-sm sm:text-base">
-                    Auditoría Detallada
-                  </h3>
-                  <p className="text-[9px] sm:text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5 truncate">
-                    {causacionActiva?.concepto_nombre}
-                  </p>
-                </div>
+            <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-slate-100 flex-shrink-0">
+              <div className="min-w-0">
+                <h3 className="font-bold text-slate-900 text-sm leading-none">Detalle de causación</h3>
+                <p className="text-[10px] text-slate-400 mt-0.5 truncate">{causacionActiva?.concepto_nombre}</p>
               </div>
               <div className="flex items-center gap-2 flex-shrink-0">
                 <button
-                  onClick={() => imprimirAuditoria(causacionActiva, deudasDetalle, calcularValorDeudaHoy)}
-                  className="p-2.5 bg-slate-900 text-white rounded-full shadow-sm hover:bg-emerald-600 transition-all flex items-center gap-2 px-4"
-                  title="Imprimir auditoría"
+                  onClick={() => imprimirCausacion(causacionActiva, deudasDetalle, calcularValorDeudaHoy)}
+                  className="flex items-center gap-1.5 px-3 py-2 bg-slate-900 text-white rounded-lg text-xs font-semibold hover:bg-emerald-600 transition-all"
                 >
-                  <Printer size={16} />
-                  <span className="text-[9px] font-black uppercase tracking-widest hidden sm:inline">Imprimir</span>
+                  <Printer size={13} /><span>Imprimir</span>
                 </button>
-                <button
-                  onClick={() => setShowDetalles(false)}
-                  className="p-2.5 bg-white border border-slate-100 text-slate-300 hover:text-rose-500 rounded-full shadow-sm transition-all"
-                >
-                  <X size={20} />
+                <button onClick={() => setShowDetalles(false)} className="p-2 text-slate-300 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition-all">
+                  <X size={18} />
                 </button>
               </div>
             </div>
 
-            <div className="px-4 sm:px-8 py-3 sm:py-5 bg-white border-b border-slate-100 flex flex-col gap-3 flex-shrink-0">
-              <div className="relative group">
-                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-emerald-500 transition-colors" size={15} />
+            <div className="grid grid-cols-3 gap-0 border-b border-slate-100 flex-shrink-0">
+              <div className="px-4 sm:px-6 py-3 border-r border-slate-100">
+                <p className="text-[9px] font-semibold text-slate-400 uppercase tracking-wider">Pagado</p>
+                <p className="font-bold text-emerald-600 text-base tabular-nums">{fmt(deudasDetalle.reduce((acc, d) => acc + (Number(d.monto_original) - Number(d.saldo_pendiente)), 0))}</p>
+              </div>
+              <div className="px-4 sm:px-6 py-3 border-r border-slate-100">
+                <p className="text-[9px] font-semibold text-slate-400 uppercase tracking-wider">Por cobrar</p>
+                <p className="font-bold text-rose-600 text-base tabular-nums">{fmt(deudasDetalle.reduce((acc, d) => acc + Number(d.saldo_pendiente), 0))}</p>
+              </div>
+              <div className="px-4 sm:px-6 py-3">
+                <p className="text-[9px] font-semibold text-slate-400 uppercase tracking-wider">Unidades</p>
+                <p className="font-bold text-slate-700 text-base tabular-nums">{deudasDetalle.length}</p>
+              </div>
+            </div>
+
+            <div className="px-4 sm:px-5 py-3 border-b border-slate-100 space-y-2 flex-shrink-0">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-300" size={13} />
                 <input
-                  placeholder="Buscar por unidad o nombre..."
-                  className="w-full bg-slate-50 border border-slate-100 p-3 sm:p-4 pl-11 rounded-2xl text-xs font-bold outline-none focus:bg-white transition-all shadow-inner"
-                  onChange={(e) => setBusquedaDetalle(e.target.value)}
+                  placeholder="Buscar unidad o nombre..."
+                  className="w-full bg-slate-50 border border-slate-200 py-2 pl-9 pr-3 rounded-lg text-sm outline-none focus:border-slate-400 transition-all"
+                  value={busquedaDetalle}
+                  onChange={e => setBusquedaDetalle(e.target.value)}
                 />
               </div>
-
-              <div className="grid grid-cols-2 gap-2 sm:gap-4">
-                <div className="bg-emerald-50 border border-emerald-100 px-4 sm:px-6 py-2.5 sm:py-3 rounded-xl sm:rounded-2xl">
-                  <p className="text-[7px] sm:text-[8px] font-black text-emerald-600 uppercase tracking-widest">Recaudado</p>
-                  <span className="font-black text-emerald-700 text-base sm:text-lg tabular-nums">
-                    ${deudasDetalle.reduce((acc, d) => acc + (Number(d.monto_original) - Number(d.saldo_pendiente)), 0).toLocaleString()}
-                  </span>
-                </div>
-                <div className="bg-rose-50 border border-rose-100 px-4 sm:px-6 py-2.5 sm:py-3 rounded-xl sm:rounded-2xl">
-                  <p className="text-[7px] sm:text-[8px] font-black text-rose-600 uppercase tracking-widest">Por Cobrar</p>
-                  <span className="font-black text-rose-700 text-base sm:text-lg tabular-nums">
-                    ${deudasDetalle.reduce((acc, d) => acc + Number(d.saldo_pendiente), 0).toLocaleString()}
-                  </span>
-                </div>
+              <div className="flex gap-1">
+                {[
+                  { key: "TODOS", label: "Todos", count: deudasDetalle.length, color: "" },
+                  { key: "PENDIENTE", label: "Sin pago", count: cntPendiente, color: "text-rose-500" },
+                  { key: "ABONO", label: "Con abono", count: cntAbono, color: "text-amber-500" },
+                  { key: "PAGADO", label: "Pagados", count: cntPagado, color: "text-emerald-500" },
+                ].map(({ key, label, count, color }) => (
+                  <button key={key} onClick={() => setFiltroModal(key as any)}
+                    className={`flex-1 py-1.5 rounded-lg text-[10px] font-semibold transition-all flex items-center justify-center gap-1 ${filtroModal === key ? "bg-slate-900 text-white" : "bg-slate-100 text-slate-400 hover:text-slate-600"}`}
+                  >
+                    <span className="hidden sm:inline">{label}</span>
+                    <span className="sm:hidden">{label.split(" ")[0]}</span>
+                    <span className={`tabular-nums ${filtroModal === key ? "text-slate-300" : color}`}>{count}</span>
+                  </button>
+                ))}
               </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-3 sm:p-6 space-y-2 bg-[#F8FAFC]">
+            <div className="flex-1 overflow-y-auto">
               {loadingDetalle ? (
-                <div className="flex flex-col items-center justify-center h-40 opacity-20">
-                  <Loader2 className="animate-spin mb-3" size={32} />
-                  <p className="font-black uppercase text-xs tracking-widest">Cargando...</p>
-                </div>
-              ) : deudasFiltradas.map(d => {
-                const pagado = Number(d.saldo_pendiente) === 0;
-                return (
-                  <div
-                    key={d.id}
-                    className={`bg-white border p-3 sm:p-5 rounded-xl sm:rounded-2xl flex items-center justify-between gap-3 transition-all shadow-sm hover:shadow-md ${pagado ? 'border-emerald-100 opacity-70' : 'border-slate-100 hover:border-emerald-200'}`}
-                  >
-                    <div className="flex items-center gap-3 sm:gap-5 min-w-0">
-                      <div className={`w-12 h-10 sm:w-14 sm:h-12 rounded-lg sm:rounded-xl flex items-center justify-center font-black text-[9px] sm:text-xs flex-shrink-0 ${pagado ? 'bg-emerald-500 text-white' : 'bg-slate-900 text-white'}`}>
-                        {d.unidad}
-                      </div>
-                      <div className="min-w-0">
-                        <p className="font-black text-xs sm:text-sm uppercase text-slate-800 tracking-tight truncate">
-                          {d.residentes?.nombre}
-                        </p>
-                        <span className={`text-[7px] sm:text-[8px] font-black uppercase px-1.5 py-0.5 rounded mt-0.5 inline-block ${pagado ? 'bg-emerald-100 text-emerald-600' : 'bg-rose-50 text-rose-500'}`}>
-                          {pagado ? 'PAGADO' : 'PENDIENTE'}
-                        </span>
-                      </div>
-                    </div>
-                    <p className={`text-sm sm:text-lg font-black tabular-nums flex-shrink-0 ${pagado ? 'text-emerald-500' : 'text-rose-600'}`}>
-                      ${(pagado ? Number(d.monto_original) : calcularValorDeudaHoy(d)).toLocaleString()}
-                    </p>
-                  </div>
-                );
-              })}
-              {deudasFiltradas.length === 0 && !loadingDetalle && (
-                <div className="py-16 text-center opacity-30 italic uppercase text-xs font-black tracking-[0.4em]">
-                  Sin coincidencias
-                </div>
+                <div className="flex items-center justify-center h-40"><Loader2 className="animate-spin text-slate-300" size={24} /></div>
+              ) : deudasFiltradas.length === 0 ? (
+                <div className="py-16 text-center text-sm text-slate-400">Sin coincidencias</div>
+              ) : (
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b border-slate-100">
+                      <th className="px-4 sm:px-5 py-2.5 text-left text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Unidad</th>
+                      <th className="px-2 py-2.5 text-left text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Residente</th>
+                      <th className="px-4 sm:px-5 py-2.5 text-right text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Estado / Valor</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-50">
+                    {deudasFiltradas.map(d => {
+                      const pagado = Number(d.saldo_pendiente) === 0;
+                      const abono = !pagado && Number(d.monto_original) > Number(d.saldo_pendiente);
+                      const abonadoAmt = Number(d.monto_original) - Number(d.saldo_pendiente);
+                      return (
+                        <tr key={d.id} className={`hover:bg-slate-50 transition-colors ${pagado ? "opacity-50" : ""}`}>
+                          <td className="px-4 sm:px-5 py-3">
+                            <span className={`inline-block font-bold text-[11px] px-2 py-1 rounded-md ${pagado ? "bg-emerald-500 text-white" : "bg-slate-900 text-white"}`}>{d.unidad}</span>
+                          </td>
+                          <td className="px-2 py-3">
+                            <p className="font-medium text-sm text-slate-800 leading-none">{d.residentes?.nombre}</p>
+                            {abono && <p className="text-[10px] text-amber-500 mt-0.5">Abonó {fmt(abonadoAmt)}</p>}
+                          </td>
+                          <td className="px-4 sm:px-5 py-3 text-right">
+                            <span className={`font-bold text-sm tabular-nums ${pagado ? "text-emerald-500" : abono ? "text-amber-600" : "text-rose-600"}`}>
+                              {pagado ? fmt(Number(d.monto_original)) : fmt(calcularValorDeudaHoy(d))}
+                            </span>
+                            <p className={`text-[9px] font-semibold mt-0.5 ${pagado ? "text-emerald-400" : abono ? "text-amber-400" : "text-rose-400"}`}>
+                              {pagado ? "PAGADO" : abono ? "PARCIAL" : "PENDIENTE"}
+                            </p>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
               )}
-            </div>
-
-            <div className="p-3 sm:p-4 bg-slate-50 text-center border-t border-slate-100 flex-shrink-0">
-              <p className="text-[8px] sm:text-[9px] font-black text-slate-300 uppercase tracking-[0.4em]">
-                Admin Pro - Parque de las Flores
-              </p>
             </div>
           </div>
         </div>
