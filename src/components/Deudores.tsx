@@ -10,7 +10,6 @@ import {
 
 import EstadoCuenta from "./EstadoCuenta";
 import CuentaCobro from "./CuentaCobro";
-import PazYSalvo from "./PazYSalvo";
 
 export default function Deudores({ role }: { role?: string }) {
   const [residentes, setResidentes] = useState<any[]>([]);
@@ -22,7 +21,6 @@ export default function Deudores({ role }: { role?: string }) {
 
   const [residenteDetalle, setResidenteDetalle] = useState<any>(null);
   const [cobroResidente, setCobroResidente] = useState<any>(null);
-  const [pazSalvoResidente, setPazSalvoResidente] = useState<any>(null);
   const [busquedaManual, setBusquedaManual] = useState("");
   const [formManual, setFormManual] = useState({
     residente_id: "", concepto: "", mes: mesColStr(), valor: ""
@@ -263,15 +261,6 @@ export default function Deudores({ role }: { role?: string }) {
                   >
                     Cobro
                   </button>
-                  <button
-                    onClick={() => setPazSalvoResidente(res)}
-                    disabled={!esAlDia}
-                    title={!esAlDia ? "Solo disponible cuando el apartamento está a paz y salvo" : "Generar Paz y Salvo"}
-                    className={`px-3 sm:px-5 py-2.5 sm:py-3 rounded-xl text-[8px] sm:text-[9px] font-black uppercase tracking-widest transition-all
-                      ${esAlDia ? "bg-emerald-500 text-white shadow-lg shadow-emerald-500/20 hover:bg-emerald-400 active:scale-95" : "bg-slate-50 text-slate-200 cursor-not-allowed"}`}
-                  >
-                    P&S
-                  </button>
                 </div>
               </div>
             </div>
@@ -292,12 +281,6 @@ export default function Deudores({ role }: { role?: string }) {
           residente={cobroResidente}
           deudas={deudas.filter(d => d.residente_id === cobroResidente.id)}
           onClose={() => setCobroResidente(null)}
-        />
-      )}
-      {pazSalvoResidente && (
-        <PazYSalvo
-          residente={pazSalvoResidente}
-          onClose={() => setPazSalvoResidente(null)}
         />
       )}
 

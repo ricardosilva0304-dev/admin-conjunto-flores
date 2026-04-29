@@ -4,36 +4,32 @@ import { supabase } from "@/lib/supabase";
 import { calcularValorDeudaHoy } from "@/lib/utils";
 import {
   Zap, History, Trash2, Eye, X, Loader2,
-  CheckCircle2, Calendar, Search, ChevronDown, ChevronUp, Printer
+  CheckCircle2, Calendar, Search, ChevronDown, ChevronUp, Printer,
+  Car, Bike, Users, TrendingUp
 } from "lucide-react";
 
-// ── IMPRESIÓN: solo pendientes y abonados ─────────────────────────────────────
+// ── IMPRESIÓN ─────────────────────────────────────────────────────────────────
 function imprimirCausacion(causacionActiva: any, deudasDetalle: any[], calcFn: (d: any) => number) {
   const hoy = new Date();
   const fechaStr = hoy.toLocaleDateString("es-CO", { day: "2-digit", month: "long", year: "numeric" }).toUpperCase();
-
   const torreIndex = (unidad: string) => {
     const letra = unidad?.charAt(1);
     const orden: Record<string, number> = { "5": 0, "6": 1, "7": 2, "8": 3 };
     return orden[letra] ?? 99;
   };
-
   const sinPagar = [...deudasDetalle]
     .filter(d => Number(d.saldo_pendiente) > 0)
     .sort((a, b) => {
       const ti = torreIndex(a.unidad) - torreIndex(b.unidad);
       return ti !== 0 ? ti : (a.unidad || "").localeCompare(b.unidad || "");
     });
-
   const abonados = sinPagar.filter(d => Number(d.monto_original) > Number(d.saldo_pendiente));
   const pendientes = sinPagar.filter(d => Number(d.monto_original) <= Number(d.saldo_pendiente));
-
   const fmt = (n: number) => `$${Math.round(n).toLocaleString("es-CO")}`;
   const totalPorCobrar = sinPagar.reduce((acc, d) => acc + calcFn(d), 0);
   const totalPagado = deudasDetalle.reduce((acc, d) => acc + (Number(d.monto_original) - Number(d.saldo_pendiente)), 0);
   const totalUnidades = deudasDetalle.length;
   const totalPagadas = deudasDetalle.filter(d => Number(d.saldo_pendiente) === 0).length;
-
   const filas = (lista: any[]) => lista.map(d => {
     const abonado = Number(d.monto_original) - Number(d.saldo_pendiente);
     const saldo = calcFn(d);
@@ -45,7 +41,6 @@ function imprimirCausacion(causacionActiva: any, deudasDetalle: any[], calcFn: (
       <td class="num debe">${fmt(saldo)}</td>
     </tr>`;
   }).join("");
-
   const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"/>
   <title>${causacionActiva?.concepto_nombre} — Saldos Pendientes</title>
   <style>
@@ -89,14 +84,8 @@ function imprimirCausacion(causacionActiva: any, deudasDetalle: any[], calcFn: (
     @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
   </style></head><body>
   <div class="header">
-    <div>
-      <h1>Saldos Pendientes</h1>
-      <div class="sub">Parque de las Flores · Administración</div>
-    </div>
-    <div class="right">
-      <div class="concepto">${causacionActiva?.concepto_nombre}</div>
-      <div class="fecha">Impreso: ${fechaStr}</div>
-    </div>
+    <div><h1>Saldos Pendientes</h1><div class="sub">Parque de las Flores · Administración</div></div>
+    <div class="right"><div class="concepto">${causacionActiva?.concepto_nombre}</div><div class="fecha">Impreso: ${fechaStr}</div></div>
   </div>
   <div class="resumen">
     <div class="kpi azul"><div class="lbl">Total unidades</div><div class="val">${totalUnidades}</div></div>
@@ -105,24 +94,10 @@ function imprimirCausacion(causacionActiva: any, deudasDetalle: any[], calcFn: (
     <div class="kpi gris"><div class="lbl">Por cobrar</div><div class="val" style="font-size:10pt">${fmt(totalPorCobrar)}</div></div>
   </div>
   <p class="nota">Este documento muestra únicamente unidades con saldo pendiente. Las ${totalPagadas} unidades que ya cancelaron no aparecen.</p>
-  ${abonados.length > 0 ? `
-    <div class="sec-title abono">Con abono — saldo parcial (${abonados.length})</div>
-    <table>
-      <thead><tr><th>Unidad</th><th>Residente</th><th class="num">Abonado</th><th class="num">Saldo debe</th></tr></thead>
-      <tbody>${filas(abonados)}</tbody>
-    </table>` : ""}
-  ${pendientes.length > 0 ? `
-    <div class="sec-title pendiente">Sin ningún pago (${pendientes.length})</div>
-    <table>
-      <thead><tr><th>Unidad</th><th>Residente</th><th></th><th class="num">Valor debe</th></tr></thead>
-      <tbody>${filas(pendientes)}</tbody>
-    </table>` : ""}
-  <div class="footer">
-    <p>Admin · Parque de las Flores</p>
-    <p>Recaudado: ${fmt(totalPagado)} / Por cobrar: ${fmt(totalPorCobrar)}</p>
-  </div>
+  ${abonados.length > 0 ? `<div class="sec-title abono">Con abono — saldo parcial (${abonados.length})</div><table><thead><tr><th>Unidad</th><th>Residente</th><th class="num">Abonado</th><th class="num">Saldo debe</th></tr></thead><tbody>${filas(abonados)}</tbody></table>` : ""}
+  ${pendientes.length > 0 ? `<div class="sec-title pendiente">Sin ningún pago (${pendientes.length})</div><table><thead><tr><th>Unidad</th><th>Residente</th><th></th><th class="num">Valor debe</th></tr></thead><tbody>${filas(pendientes)}</tbody></table>` : ""}
+  <div class="footer"><p>Admin · Parque de las Flores</p><p>Recaudado: ${fmt(totalPagado)} / Por cobrar: ${fmt(totalPorCobrar)}</p></div>
   </body></html>`;
-
   const win = window.open("", "_blank", "width=900,height=700");
   if (!win) return;
   win.document.write(html);
@@ -306,27 +281,41 @@ export default function Causacion({ role }: { role?: string }) {
     </div>
   );
 
-  return (
-    <div className="max-w-5xl mx-auto space-y-4 pb-24 font-sans text-slate-800">
+  const filtroTabs = [
+    { key: "TODOS", label: "General", labelShort: "Gral.", icon: <Users size={13} />, count: conteoFiltro("TODOS") },
+    { key: "CARRO", label: "Carros", labelShort: "Carros", icon: <Car size={13} />, count: conteoFiltro("CARRO") },
+    { key: "MOTO", label: "Motos", labelShort: "Motos", icon: <Zap size={13} />, count: conteoFiltro("MOTO") },
+    { key: "BICI", label: "Bicis", labelShort: "Bicis", icon: <Bike size={13} />, count: conteoFiltro("BICI") },
+  ];
 
-      {/* ── GENERADOR ──────────────────────────────────────────────────────── */}
-      <section className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
-        <div className="flex items-center gap-3 px-4 sm:px-6 py-4 border-b border-slate-100">
-          <div className="w-8 h-8 bg-slate-900 rounded-lg flex items-center justify-center flex-shrink-0">
-            <Zap size={15} className="text-emerald-400" strokeWidth={2.5} />
+  return (
+    <div className="max-w-5xl mx-auto space-y-4 sm:space-y-5 pb-24 font-sans text-slate-800">
+
+      {/* ── GENERADOR ─────────────────────────────────────────────────── */}
+      <section className="bg-white border border-slate-100 rounded-2xl sm:rounded-3xl shadow-sm overflow-hidden">
+
+        <div className="flex items-center gap-3 sm:gap-4 px-4 sm:px-8 py-4 sm:py-5 border-b border-slate-100">
+          <div className="w-9 h-9 sm:w-11 sm:h-11 bg-slate-900 rounded-xl sm:rounded-2xl flex items-center justify-center flex-shrink-0 shadow-lg shadow-slate-900/20">
+            <Zap size={17} className="text-emerald-400" strokeWidth={2.5} />
           </div>
           <div>
-            <h2 className="text-slate-900 font-bold text-sm leading-none">Generar cobros masivos</h2>
-            <p className="text-slate-400 text-[10px] mt-0.5">Los anticipos se aplican automáticamente</p>
+            <h2 className="text-slate-900 font-black text-sm sm:text-base leading-none tracking-tight">
+              Generar cobros masivos
+            </h2>
+            <p className="text-slate-400 text-[10px] sm:text-[11px] font-medium mt-0.5">
+              Los anticipos se aplican automáticamente
+            </p>
           </div>
         </div>
 
-        <div className="p-4 sm:p-6 space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div className="p-4 sm:p-8 space-y-4 sm:space-y-5">
+
+          {/* Campos */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
             <div className="space-y-1.5">
-              <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Concepto</label>
+              <label className="text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-0.5">Concepto</label>
               <select
-                className="w-full bg-slate-50 border border-slate-200 px-3 py-2.5 rounded-xl text-sm font-medium outline-none focus:border-slate-400 focus:bg-white transition-all"
+                className="w-full bg-slate-50 border border-slate-200 px-3 sm:px-4 py-2.5 sm:py-3 rounded-xl sm:rounded-2xl text-xs sm:text-sm font-semibold text-slate-700 outline-none focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-500/10 transition-all appearance-none cursor-pointer"
                 value={conceptoId}
                 onChange={e => setConceptoId(e.target.value)}
               >
@@ -335,32 +324,32 @@ export default function Causacion({ role }: { role?: string }) {
               </select>
             </div>
             <div className="space-y-1.5">
-              <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Mes</label>
-              <input type="month" className="w-full bg-slate-50 border border-slate-200 px-3 py-2.5 rounded-xl text-sm font-medium outline-none focus:border-slate-400 focus:bg-white transition-all" onChange={e => setMesDeuda(e.target.value)} />
+              <label className="text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-0.5">Mes</label>
+              <input type="month" className="w-full bg-slate-50 border border-slate-200 px-3 sm:px-4 py-2.5 sm:py-3 rounded-xl sm:rounded-2xl text-xs sm:text-sm font-semibold text-slate-700 outline-none focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-500/10 transition-all" onChange={e => setMesDeuda(e.target.value)} />
             </div>
             <div className="space-y-1.5">
-              <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Fecha límite</label>
-              <input type="date" className="w-full bg-slate-50 border border-slate-200 px-3 py-2.5 rounded-xl text-sm font-medium outline-none focus:border-slate-400 focus:bg-white transition-all" onChange={e => setFechaLimite(e.target.value)} />
+              <label className="text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-0.5">Fecha límite</label>
+              <input type="date" className="w-full bg-slate-50 border border-slate-200 px-3 sm:px-4 py-2.5 sm:py-3 rounded-xl sm:rounded-2xl text-xs sm:text-sm font-semibold text-slate-700 outline-none focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-500/10 transition-all" onChange={e => setFechaLimite(e.target.value)} />
             </div>
           </div>
 
+          {/* Tipo + botón */}
           <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
-            <div className="flex-1 grid grid-cols-4 gap-1 bg-slate-100 p-1 rounded-xl">
-              {[
-                { key: "TODOS", label: "General" },
-                { key: "CARRO", label: "Carros" },
-                { key: "MOTO", label: "Motos" },
-                { key: "BICI", label: "Bicis" },
-              ].map(({ key, label }) => {
+            <div className="flex-1 grid grid-cols-4 gap-1 bg-slate-100 p-1 rounded-xl sm:rounded-2xl">
+              {filtroTabs.map(({ key, label, labelShort, icon, count }) => {
                 const activo = filtroTipo === key;
-                const count = conteoFiltro(key);
                 return (
                   <button key={key} onClick={() => setFiltroTipo(key)}
-                    className={`flex items-center justify-center gap-1.5 py-2 rounded-lg text-[11px] font-semibold transition-all ${activo ? "bg-white text-slate-900 shadow-sm" : "text-slate-400 hover:text-slate-600"}`}
+                    className={`flex items-center justify-center gap-1 sm:gap-1.5 py-2 sm:py-2.5 rounded-lg sm:rounded-xl text-[10px] sm:text-[11px] font-black transition-all duration-200
+                      ${activo ? "bg-white text-slate-900 shadow-sm shadow-slate-200" : "text-slate-400 hover:text-slate-600"}`}
                   >
-                    <span className="hidden sm:inline">{label}</span>
-                    <span className="sm:hidden">{label.slice(0, 3)}</span>
-                    <span className={`text-[9px] font-bold tabular-nums px-1.5 py-0.5 rounded-md ${activo ? "bg-emerald-500 text-white" : "bg-slate-200 text-slate-500"}`}>{count}</span>
+                    <span className={`flex-shrink-0 ${activo ? "text-emerald-500" : ""}`}>{icon}</span>
+                    <span className="hidden sm:inline uppercase tracking-wide">{label}</span>
+                    <span className="sm:hidden uppercase tracking-wide">{labelShort}</span>
+                    <span className={`text-[9px] font-black tabular-nums px-1.5 py-0.5 rounded-md leading-none
+                      ${activo ? "bg-emerald-500 text-white" : "bg-slate-200 text-slate-500"}`}>
+                      {count}
+                    </span>
                   </button>
                 );
               })}
@@ -368,74 +357,90 @@ export default function Causacion({ role }: { role?: string }) {
             <button
               onClick={generarCausacion}
               disabled={generando || !conceptoId || !mesDeuda || !fechaLimite}
-              className="sm:w-36 bg-slate-900 text-white py-2.5 px-5 rounded-xl font-semibold text-sm hover:bg-emerald-600 transition-all active:scale-95 disabled:opacity-30 flex items-center justify-center gap-2 flex-shrink-0"
+              className="sm:w-40 bg-slate-900 text-white py-2.5 sm:py-3 px-5 sm:px-6 rounded-xl sm:rounded-2xl font-black text-xs sm:text-sm hover:bg-emerald-600 transition-all active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center gap-2 flex-shrink-0 shadow-lg shadow-slate-900/20 hover:shadow-emerald-500/20"
             >
-              {generando ? <Loader2 className="animate-spin" size={15} /> : <><Zap size={14} />Procesar</>}
+              {generando
+                ? <><Loader2 className="animate-spin" size={15} /><span>Procesando...</span></>
+                : <><Zap size={14} strokeWidth={2.5} /><span>Procesar</span></>}
             </button>
           </div>
+
         </div>
       </section>
 
-      {/* ── HISTORIAL ──────────────────────────────────────────────────────── */}
-      <div className="space-y-2">
+      {/* ── HISTORIAL ─────────────────────────────────────────────────── */}
+      <div className="space-y-2 sm:space-y-3">
         {mesesOrdenados.map(mesKey => {
           const [anio, mesNum] = mesKey.split("-");
           const nombreMes = `${MESES_NOMBRES[parseInt(mesNum) - 1]} ${anio}`;
           const abierto = mesesAbiertos[mesKey] ?? false;
           const items = historialAgrupado[mesKey];
           return (
-            <div key={mesKey} className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
+            <div key={mesKey} className="bg-white border border-slate-100 rounded-2xl sm:rounded-3xl shadow-sm overflow-hidden">
+
               <button
                 onClick={() => setMesesAbiertos(prev => ({ ...prev, [mesKey]: !prev[mesKey] }))}
-                className="w-full flex items-center justify-between px-4 sm:px-5 py-3.5 hover:bg-slate-50 transition-colors"
+                className="w-full flex items-center justify-between px-4 sm:px-6 py-3.5 sm:py-4 hover:bg-slate-50 transition-colors group"
               >
-                <div className="flex items-center gap-2.5">
-                  <Calendar size={13} className="text-slate-400 flex-shrink-0" />
-                  <span className="font-bold text-slate-800 text-sm">{nombreMes}</span>
-                  <span className="text-[10px] text-slate-400 font-medium">{items.length} concepto{items.length !== 1 ? "s" : ""}</span>
+                <div className="flex items-center gap-2.5 sm:gap-3">
+                  <div className="w-7 h-7 sm:w-8 sm:h-8 bg-slate-100 rounded-lg sm:rounded-xl flex items-center justify-center flex-shrink-0 group-hover:bg-emerald-50 transition-colors">
+                    <Calendar size={13} className="text-slate-400 group-hover:text-emerald-500 transition-colors" />
+                  </div>
+                  <span className="font-black text-slate-800 text-sm sm:text-base uppercase tracking-tight">{nombreMes}</span>
+                  <span className="text-[9px] sm:text-[10px] font-black text-slate-300 uppercase tracking-wider bg-slate-100 px-2 py-0.5 rounded-full">
+                    {items.length} concepto{items.length !== 1 ? "s" : ""}
+                  </span>
                 </div>
-                {abierto ? <ChevronUp size={14} className="text-slate-300" /> : <ChevronDown size={14} className="text-slate-300" />}
+                <div className={`w-6 h-6 rounded-lg flex items-center justify-center transition-all ${abierto ? "bg-slate-900 text-white" : "bg-slate-100 text-slate-400"}`}>
+                  {abierto ? <ChevronUp size={12} strokeWidth={3} /> : <ChevronDown size={12} strokeWidth={3} />}
+                </div>
               </button>
 
               {abierto && (
-                <div className="border-t border-slate-100 divide-y divide-slate-100">
-                  {items.map(h => (
-                    <div key={h.id} className="px-4 sm:px-5 py-3.5 flex flex-col sm:flex-row sm:items-center gap-3">
-                      <div className="flex items-center gap-3 flex-1 min-w-0">
-                        <div className="w-8 h-8 bg-slate-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                          <History size={14} className="text-slate-400" />
+                <div className="border-t border-slate-100 divide-y divide-slate-50">
+                  {items.map(h => {
+                    const modoActual = h.tipo_cobro || "NORMAL";
+                    return (
+                      <div key={h.id} className="px-4 sm:px-6 py-3 sm:py-4 flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 hover:bg-slate-50/50 transition-colors">
+                        <div className="flex items-center gap-3 flex-1 min-w-0">
+                          <div className="w-8 h-8 sm:w-9 sm:h-9 bg-slate-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                            <History size={14} className="text-slate-400" />
+                          </div>
+                          <div className="min-w-0">
+                            <p className="font-black text-xs sm:text-sm text-slate-800 truncate uppercase tracking-tight">{h.concepto_nombre}</p>
+                            <p className="text-[9px] sm:text-[10px] font-semibold text-slate-400 mt-0.5">{h.total_residentes} unidades</p>
+                          </div>
                         </div>
-                        <div className="min-w-0">
-                          <p className="font-semibold text-sm text-slate-800 truncate">{h.concepto_nombre}</p>
-                          <p className="text-[10px] text-slate-400">{h.total_residentes} unidades</p>
+
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          <div className="flex bg-slate-100 p-0.5 rounded-xl gap-0.5">
+                            {[{ key: "M1", label: "Desc." }, { key: "M2", label: "S/Desc." }, { key: "NORMAL", label: "Auto" }].map(({ key, label }) => {
+                              const active = modoActual === key;
+                              return (
+                                <button key={key} onClick={() => cambiarModo(h.id, key)}
+                                  className={`px-2.5 sm:px-3 py-1.5 rounded-[10px] text-[9px] sm:text-[10px] font-black transition-all duration-200
+                                    ${active ? "bg-slate-900 text-white shadow-sm" : "text-slate-400 hover:text-slate-600"}`}
+                                >{label}</button>
+                              );
+                            })}
+                          </div>
+                          <button onClick={() => verDetalles(h)} title="Ver detalle"
+                            className="w-8 h-8 sm:w-9 sm:h-9 bg-slate-100 text-slate-400 rounded-xl flex items-center justify-center hover:bg-emerald-500 hover:text-white transition-all active:scale-95">
+                            <Eye size={14} />
+                          </button>
+                          <button
+                            onClick={async () => {
+                              if (role === "contador") return alert("Sin permiso.");
+                              if (confirm("¿Borrar esta causación y sus deudas?")) { await supabase.from("causaciones_globales").delete().eq("id", h.id); cargarDatos(); }
+                            }}
+                            title="Eliminar"
+                            className="w-8 h-8 sm:w-9 sm:h-9 bg-slate-100 text-slate-300 rounded-xl flex items-center justify-center hover:bg-rose-500 hover:text-white transition-all active:scale-95">
+                            <Trash2 size={14} />
+                          </button>
                         </div>
                       </div>
-                      <div className="flex items-center gap-2 flex-shrink-0">
-                        <div className="flex bg-slate-100 p-0.5 rounded-lg gap-0.5">
-                          {[{ key: "M1", label: "Desc." }, { key: "M2", label: "S/Desc." }, { key: "NORMAL", label: "Auto" }].map(({ key, label }) => {
-                            const active = (h.tipo_cobro || "NORMAL") === key;
-                            return (
-                              <button key={key} onClick={() => cambiarModo(h.id, key)}
-                                className={`px-2.5 py-1 rounded-md text-[10px] font-semibold transition-all ${active ? "bg-slate-900 text-white shadow-sm" : "text-slate-400 hover:text-slate-600"}`}
-                              >{label}</button>
-                            );
-                          })}
-                        </div>
-                        <button onClick={() => verDetalles(h)} className="p-2 bg-slate-100 text-slate-400 rounded-lg hover:bg-emerald-500 hover:text-white transition-all" title="Ver detalle">
-                          <Eye size={14} />
-                        </button>
-                        <button
-                          onClick={async () => {
-                            if (role === "contador") return alert("Sin permiso.");
-                            if (confirm("¿Borrar esta causación y sus deudas?")) { await supabase.from("causaciones_globales").delete().eq("id", h.id); cargarDatos(); }
-                          }}
-                          className="p-2 bg-slate-100 text-slate-300 rounded-lg hover:bg-rose-500 hover:text-white transition-all" title="Eliminar"
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -443,91 +448,106 @@ export default function Causacion({ role }: { role?: string }) {
         })}
 
         {mesesOrdenados.length === 0 && (
-          <div className="py-20 text-center border-2 border-dashed border-slate-200 rounded-2xl">
-            <CheckCircle2 className="mx-auto text-slate-200 mb-3" size={32} />
-            <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Sin causaciones registradas</p>
+          <div className="py-24 text-center border-2 border-dashed border-slate-200 rounded-2xl sm:rounded-3xl">
+            <div className="w-14 h-14 bg-slate-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+              <TrendingUp className="text-slate-300" size={24} />
+            </div>
+            <p className="text-[10px] font-black text-slate-300 uppercase tracking-[0.3em]">Sin causaciones registradas</p>
           </div>
         )}
       </div>
 
-      {/* ── MODAL ──────────────────────────────────────────────────────────── */}
+      {/* ── MODAL ─────────────────────────────────────────────────────── */}
       {showDetalles && (
-        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-[500] flex flex-col items-center justify-end sm:justify-center p-0 sm:p-4">
-          <div className="bg-white w-full sm:max-w-2xl rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col overflow-hidden max-h-[92vh] sm:max-h-[85vh]">
+        <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-md z-[500] flex flex-col items-center justify-end sm:justify-center p-0 sm:p-4 animate-in fade-in duration-200">
+          <div className="bg-white w-full sm:max-w-2xl rounded-t-[2rem] sm:rounded-[2.5rem] shadow-2xl flex flex-col overflow-hidden max-h-[92vh] sm:max-h-[85vh] animate-in slide-in-from-bottom-4 sm:zoom-in-95 duration-300">
 
-            <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-slate-100 flex-shrink-0">
-              <div className="min-w-0">
-                <h3 className="font-bold text-slate-900 text-sm leading-none">Detalle de causación</h3>
-                <p className="text-[10px] text-slate-400 mt-0.5 truncate">{causacionActiva?.concepto_nombre}</p>
+            {/* Header modal */}
+            <div className="flex items-center justify-between px-5 sm:px-8 py-4 sm:py-5 border-b border-slate-100 flex-shrink-0">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-9 h-9 bg-slate-900 rounded-xl flex items-center justify-center flex-shrink-0">
+                  <Eye size={15} className="text-emerald-400" />
+                </div>
+                <div className="min-w-0">
+                  <h3 className="font-black text-slate-900 text-sm leading-none">Detalle de causación</h3>
+                  <p className="text-[10px] text-slate-400 font-semibold mt-0.5 truncate">{causacionActiva?.concepto_nombre}</p>
+                </div>
               </div>
               <div className="flex items-center gap-2 flex-shrink-0">
                 <button
                   onClick={() => imprimirCausacion(causacionActiva, deudasDetalle, calcularValorDeudaHoy)}
-                  className="flex items-center gap-1.5 px-3 py-2 bg-slate-900 text-white rounded-lg text-xs font-semibold hover:bg-emerald-600 transition-all"
+                  className="flex items-center gap-1.5 px-3 sm:px-4 py-2 sm:py-2.5 bg-slate-900 text-white rounded-xl text-[10px] sm:text-xs font-black hover:bg-emerald-600 transition-all active:scale-95"
                 >
-                  <Printer size={13} /><span>Imprimir</span>
+                  <Printer size={13} />
+                  <span className="hidden sm:inline">Imprimir</span>
                 </button>
-                <button onClick={() => setShowDetalles(false)} className="p-2 text-slate-300 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition-all">
+                <button onClick={() => setShowDetalles(false)}
+                  className="w-9 h-9 flex items-center justify-center text-slate-300 hover:text-slate-600 rounded-xl hover:bg-slate-100 transition-all">
                   <X size={18} />
                 </button>
               </div>
             </div>
 
-            <div className="grid grid-cols-3 gap-0 border-b border-slate-100 flex-shrink-0">
-              <div className="px-4 sm:px-6 py-3 border-r border-slate-100">
-                <p className="text-[9px] font-semibold text-slate-400 uppercase tracking-wider">Pagado</p>
-                <p className="font-bold text-emerald-600 text-base tabular-nums">{fmt(deudasDetalle.reduce((acc, d) => acc + (Number(d.monto_original) - Number(d.saldo_pendiente)), 0))}</p>
-              </div>
-              <div className="px-4 sm:px-6 py-3 border-r border-slate-100">
-                <p className="text-[9px] font-semibold text-slate-400 uppercase tracking-wider">Por cobrar</p>
-                <p className="font-bold text-rose-600 text-base tabular-nums">{fmt(deudasDetalle.reduce((acc, d) => acc + Number(d.saldo_pendiente), 0))}</p>
-              </div>
-              <div className="px-4 sm:px-6 py-3">
-                <p className="text-[9px] font-semibold text-slate-400 uppercase tracking-wider">Unidades</p>
-                <p className="font-bold text-slate-700 text-base tabular-nums">{deudasDetalle.length}</p>
-              </div>
+            {/* KPIs */}
+            <div className="grid grid-cols-3 border-b border-slate-100 flex-shrink-0">
+              {[
+                { label: "Pagado", value: fmt(deudasDetalle.reduce((acc, d) => acc + (Number(d.monto_original) - Number(d.saldo_pendiente)), 0)), color: "text-emerald-600", bg: "bg-emerald-50" },
+                { label: "Por cobrar", value: fmt(deudasDetalle.reduce((acc, d) => acc + Number(d.saldo_pendiente), 0)), color: "text-rose-600", bg: "bg-rose-50" },
+                { label: "Unidades", value: String(deudasDetalle.length), color: "text-slate-700", bg: "bg-slate-50" },
+              ].map(({ label, value, color, bg }, i) => (
+                <div key={label} className={`px-4 sm:px-6 py-3 sm:py-4 ${i < 2 ? "border-r border-slate-100" : ""} ${bg}`}>
+                  <p className="text-[8px] sm:text-[9px] font-black text-slate-400 uppercase tracking-widest mb-0.5">{label}</p>
+                  <p className={`font-black text-base sm:text-lg tabular-nums leading-none ${color}`}>{value}</p>
+                </div>
+              ))}
             </div>
 
-            <div className="px-4 sm:px-5 py-3 border-b border-slate-100 space-y-2 flex-shrink-0">
+            {/* Buscador + tabs */}
+            <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-slate-100 space-y-2.5 flex-shrink-0">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-300" size={13} />
                 <input
                   placeholder="Buscar unidad o nombre..."
-                  className="w-full bg-slate-50 border border-slate-200 py-2 pl-9 pr-3 rounded-lg text-sm outline-none focus:border-slate-400 transition-all"
+                  className="w-full bg-slate-50 border border-slate-200 py-2.5 pl-9 pr-3 rounded-xl sm:rounded-2xl text-xs sm:text-sm font-medium text-slate-700 outline-none focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-500/10 transition-all"
                   value={busquedaDetalle}
                   onChange={e => setBusquedaDetalle(e.target.value)}
                 />
               </div>
-              <div className="flex gap-1">
+              <div className="grid grid-cols-4 gap-1 bg-slate-100 p-1 rounded-xl">
                 {[
-                  { key: "TODOS", label: "Todos", count: deudasDetalle.length, color: "" },
-                  { key: "PENDIENTE", label: "Sin pago", count: cntPendiente, color: "text-rose-500" },
-                  { key: "ABONO", label: "Con abono", count: cntAbono, color: "text-amber-500" },
-                  { key: "PAGADO", label: "Pagados", count: cntPagado, color: "text-emerald-500" },
-                ].map(({ key, label, count, color }) => (
+                  { key: "TODOS", label: "Todos", count: deudasDetalle.length, activeColor: "bg-slate-900 text-white" },
+                  { key: "PENDIENTE", label: "Sin pago", count: cntPendiente, activeColor: "bg-rose-600 text-white" },
+                  { key: "ABONO", label: "Abono", count: cntAbono, activeColor: "bg-amber-500 text-white" },
+                  { key: "PAGADO", label: "Pagados", count: cntPagado, activeColor: "bg-emerald-500 text-white" },
+                ].map(({ key, label, count, activeColor }) => (
                   <button key={key} onClick={() => setFiltroModal(key as any)}
-                    className={`flex-1 py-1.5 rounded-lg text-[10px] font-semibold transition-all flex items-center justify-center gap-1 ${filtroModal === key ? "bg-slate-900 text-white" : "bg-slate-100 text-slate-400 hover:text-slate-600"}`}
+                    className={`py-2 rounded-lg text-[9px] sm:text-[10px] font-black transition-all flex items-center justify-center gap-1
+                      ${filtroModal === key ? activeColor : "text-slate-400 hover:text-slate-600"}`}
                   >
-                    <span className="hidden sm:inline">{label}</span>
-                    <span className="sm:hidden">{label.split(" ")[0]}</span>
-                    <span className={`tabular-nums ${filtroModal === key ? "text-slate-300" : color}`}>{count}</span>
+                    <span>{label}</span>
+                    <span className={`tabular-nums ${filtroModal === key ? "opacity-70" : ""}`}>{count}</span>
                   </button>
                 ))}
               </div>
             </div>
 
+            {/* Tabla */}
             <div className="flex-1 overflow-y-auto">
               {loadingDetalle ? (
-                <div className="flex items-center justify-center h-40"><Loader2 className="animate-spin text-slate-300" size={24} /></div>
+                <div className="flex items-center justify-center h-40">
+                  <Loader2 className="animate-spin text-slate-300" size={24} />
+                </div>
               ) : deudasFiltradas.length === 0 ? (
-                <div className="py-16 text-center text-sm text-slate-400">Sin coincidencias</div>
+                <div className="py-16 text-center">
+                  <p className="text-xs font-black text-slate-300 uppercase tracking-widest">Sin coincidencias</p>
+                </div>
               ) : (
                 <table className="w-full">
                   <thead>
-                    <tr className="border-b border-slate-100">
-                      <th className="px-4 sm:px-5 py-2.5 text-left text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Unidad</th>
-                      <th className="px-2 py-2.5 text-left text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Residente</th>
-                      <th className="px-4 sm:px-5 py-2.5 text-right text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Estado / Valor</th>
+                    <tr className="border-b border-slate-100 bg-slate-50/80">
+                      <th className="px-4 sm:px-6 py-2.5 text-left text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-[0.15em]">Unidad</th>
+                      <th className="px-2 py-2.5 text-left text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-[0.15em]">Residente</th>
+                      <th className="px-4 sm:px-6 py-2.5 text-right text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-[0.15em]">Estado</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-50">
@@ -537,18 +557,21 @@ export default function Causacion({ role }: { role?: string }) {
                       const abonadoAmt = Number(d.monto_original) - Number(d.saldo_pendiente);
                       return (
                         <tr key={d.id} className={`hover:bg-slate-50 transition-colors ${pagado ? "opacity-50" : ""}`}>
-                          <td className="px-4 sm:px-5 py-3">
-                            <span className={`inline-block font-bold text-[11px] px-2 py-1 rounded-md ${pagado ? "bg-emerald-500 text-white" : "bg-slate-900 text-white"}`}>{d.unidad}</span>
+                          <td className="px-4 sm:px-6 py-3">
+                            <span className={`inline-block font-black text-[10px] sm:text-[11px] px-2.5 py-1 rounded-lg
+                              ${pagado ? "bg-emerald-500 text-white" : "bg-slate-900 text-white"}`}>
+                              {d.unidad}
+                            </span>
                           </td>
                           <td className="px-2 py-3">
-                            <p className="font-medium text-sm text-slate-800 leading-none">{d.residentes?.nombre}</p>
-                            {abono && <p className="text-[10px] text-amber-500 mt-0.5">Abonó {fmt(abonadoAmt)}</p>}
+                            <p className="font-semibold text-xs sm:text-sm text-slate-800 leading-none">{d.residentes?.nombre}</p>
+                            {abono && <p className="text-[9px] sm:text-[10px] font-black text-amber-500 mt-0.5">Abonó {fmt(abonadoAmt)}</p>}
                           </td>
-                          <td className="px-4 sm:px-5 py-3 text-right">
-                            <span className={`font-bold text-sm tabular-nums ${pagado ? "text-emerald-500" : abono ? "text-amber-600" : "text-rose-600"}`}>
+                          <td className="px-4 sm:px-6 py-3 text-right">
+                            <span className={`font-black text-xs sm:text-sm tabular-nums ${pagado ? "text-emerald-500" : abono ? "text-amber-600" : "text-rose-600"}`}>
                               {pagado ? fmt(Number(d.monto_original)) : fmt(calcularValorDeudaHoy(d))}
                             </span>
-                            <p className={`text-[9px] font-semibold mt-0.5 ${pagado ? "text-emerald-400" : abono ? "text-amber-400" : "text-rose-400"}`}>
+                            <p className={`text-[8px] sm:text-[9px] font-black uppercase tracking-widest mt-0.5 ${pagado ? "text-emerald-400" : abono ? "text-amber-400" : "text-rose-400"}`}>
                               {pagado ? "PAGADO" : abono ? "PARCIAL" : "PENDIENTE"}
                             </p>
                           </td>
@@ -559,6 +582,7 @@ export default function Causacion({ role }: { role?: string }) {
                 </table>
               )}
             </div>
+
           </div>
         </div>
       )}
