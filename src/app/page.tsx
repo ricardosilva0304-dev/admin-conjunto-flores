@@ -15,6 +15,7 @@ import Reportes from "@/components/Reportes";
 import Egresos from "@/components/Egresos";
 import Deudores from "@/components/Deudores";
 import BalanceHistorial from "@/components/BalanceHistorial";
+import Documentos from "@/components/Documentos";
 
 // --- ICONOS ---
 import {
@@ -140,6 +141,7 @@ export default function App() {
     egresos: { label: "Gestión de Gastos", labelShort: "Egresos", icon: <LogOut size={20} strokeWidth={2.5} /> },
     deudores: { label: "Control Cartera", labelShort: "Cartera", icon: <UserCircle2 size={20} strokeWidth={2.5} /> },
     residentes: { label: "Base Residentes", labelShort: "Residentes", icon: <Users size={20} strokeWidth={2.5} /> },
+    documentos: { label: "Documentos", labelShort: "Docs", icon: <FolderOpen size={20} strokeWidth={2.5} /> },
     zonas: { label: "Reservas Áreas", labelShort: "Zonas", icon: <MapPin size={20} strokeWidth={2.5} /> },
     reportes: { label: "Reporte Mensual", labelShort: "Reportes", icon: <BarChart3 size={20} strokeWidth={2.5} /> },
     config: { label: "Configuración", labelShort: "Config", icon: <Settings size={20} strokeWidth={2.5} /> },
@@ -319,6 +321,7 @@ export default function App() {
           {activeTab === "egresos" && <Egresos role={userRole} />}
           {activeTab === "deudores" && <Deudores role={userRole} />}
           {activeTab === "residentes" && <Residentes role={userRole} />}
+          {activeTab === "documentos" && <Documentos role={userRole} />}
           {activeTab === "zonas" && <ZonasComunes />}
           {activeTab === "reportes" && <Reportes />}
           {activeTab === "config" && <Configuracion role={userRole} />}

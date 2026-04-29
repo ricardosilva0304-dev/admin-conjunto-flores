@@ -2,7 +2,7 @@
 import {
   LayoutDashboard, History, Wallet, Receipt, Zap,
   LogOut, UserCircle2, Users, MapPin, BarChart3, Settings,
-  Flower2, ChevronRight
+  Flower2, ChevronRight, FolderOpen
 } from "lucide-react";
 
 const menuItems = [
@@ -14,6 +14,7 @@ const menuItems = [
   { id: 'egresos', label: 'Egresos', icon: <LogOut size={18} className="rotate-180" /> },
   { id: 'deudores', label: 'Cartera & Mora', icon: <UserCircle2 size={18} /> },
   { id: 'residentes', label: 'Residentes', icon: <Users size={18} /> },
+  { id: 'documentos', label: 'Documentos', icon: <FolderOpen size={18} /> },
   { id: 'zonas', label: 'Reservas Áreas', icon: <MapPin size={18} /> },
   { id: 'reportes', label: 'Reportes Mensuales', icon: <BarChart3 size={18} /> },
   { id: 'config', label: 'Configuración', icon: <Settings size={18} /> },
