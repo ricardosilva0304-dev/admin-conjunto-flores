@@ -2,7 +2,7 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import { PawPrint, FileText, Plus, Eye, Trash2, Search, Loader2, X, ChevronRight } from "lucide-react";
-import MultaMascota from "./Multamascota";
+import MultaMascota from "./MultaMascota";
 import { hoyCol } from "@/lib/utils";
 
 // ── TIPOS ─────────────────────────────────────────────────────────────────────
