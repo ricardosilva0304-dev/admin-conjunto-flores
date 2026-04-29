@@ -22,7 +22,7 @@ import {
   Lock, Fingerprint, Loader2,
   LayoutDashboard, Settings, Users, MapPin, Zap,
   PieChart, Wallet, LogOut, UserCircle2, BarChart3, Receipt,
-  Menu, History, Info, Calendar
+  Menu, History, Info, Calendar, FolderOpen
 } from "lucide-react";
 
 export default function App() {
