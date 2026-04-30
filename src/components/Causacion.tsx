@@ -146,7 +146,7 @@ export default function Causacion({ role }: { role?: string }) {
     setLoading(true);
     const [c, r, h] = await Promise.all([
       supabase.from("conceptos_pago").select("*"),
-      supabase.from("residentes").select("*").neq("torre", "Torre 1"),
+      supabase.from("residentes").select("*"),
       supabase.from("causaciones_globales").select("*").order("mes_causado", { ascending: false })
     ]);
     if (c.data) setConceptos(c.data);
@@ -184,12 +184,29 @@ export default function Causacion({ role }: { role?: string }) {
     return residentesPorTipo.filter(r => residentesSeleccionados.has(r.id));
   }, [residentesPorTipo, modoSeleccion, residentesSeleccionados]);
 
-  // Residentes visibles en el selector (con búsqueda)
+  // Residentes visibles en el selector (con búsqueda y orden 5,6,7,8,1)
+  const ORDEN_TORRES: Record<string, number> = { "Torre 5": 0, "Torre 6": 1, "Torre 7": 2, "Torre 8": 3, "Torre 1": 4 };
+
   const residentesFiltradosSelector = useMemo(() => {
-    const q = busquedaResidente.toLowerCase();
-    return residentesPorTipo.filter(r =>
-      !q || r.nombre?.toLowerCase().includes(q) || r.apartamento?.toLowerCase().includes(q) || r.torre?.toLowerCase().includes(q)
-    );
+    const q = busquedaResidente.toLowerCase().replace(/[-\s]/g, ""); // normaliza "5-101" → "5101"
+    const lista = residentesPorTipo.filter(r => {
+      if (!q) return true;
+      const torreNum = r.torre?.replace(/\D/g, "") || "";           // "Torre 5" → "5"
+      const apto = r.apartamento || "";
+      const codigoUnido = `${torreNum}${apto}`;                     // "5101"
+      return (
+        codigoUnido.includes(q) ||
+        r.nombre?.toLowerCase().includes(q) ||
+        r.torre?.toLowerCase().includes(q)
+      );
+    });
+    // Ordenar: 5, 6, 7, 8, 1 y dentro de cada torre por apartamento
+    return lista.sort((a, b) => {
+      const oa = ORDEN_TORRES[a.torre] ?? 9;
+      const ob = ORDEN_TORRES[b.torre] ?? 9;
+      if (oa !== ob) return oa - ob;
+      return (a.apartamento || "").localeCompare(b.apartamento || "");
+    });
   }, [residentesPorTipo, busquedaResidente]);
 
   function toggleResidente(id: number) {
@@ -350,10 +367,10 @@ export default function Causacion({ role }: { role?: string }) {
   );
 
   const filtroTabs = [
-    { key: "TODOS", label: "General", labelShort: "Gral.", icon: <Users size={13} />, count: conteoFiltro("TODOS") },
-    { key: "CARRO", label: "Carros", labelShort: "Carros", icon: <Car size={13} />, count: conteoFiltro("CARRO") },
-    { key: "MOTO", label: "Motos", labelShort: "Motos", icon: <Zap size={13} />, count: conteoFiltro("MOTO") },
-    { key: "BICI", label: "Bicis", labelShort: "Bicis", icon: <Bike size={13} />, count: conteoFiltro("BICI") },
+    { key: "TODOS", label: "General", icon: <Users size={13} />, count: conteoFiltro("TODOS") },
+    { key: "CARRO", label: "Carros", icon: <Car size={13} />, count: conteoFiltro("CARRO") },
+    { key: "MOTO", label: "Motos", icon: <Zap size={13} />, count: conteoFiltro("MOTO") },
+    { key: "BICI", label: "Bicis", icon: <Bike size={13} />, count: conteoFiltro("BICI") },
   ];
 
   return (
@@ -401,22 +418,24 @@ export default function Causacion({ role }: { role?: string }) {
             </div>
           </div>
 
-          {/* ── FILTRO TIPO (tabs) ── */}
+          {/* ── FILTRO TIPO (pills con scroll) ── */}
           <div>
             <label className="text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-0.5 mb-2 block">Aplicar a</label>
-            <div className="grid grid-cols-4 gap-1 bg-slate-100 p-1 rounded-xl sm:rounded-2xl">
-              {filtroTabs.map(({ key, label, labelShort, icon, count }) => {
+            <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
+              {filtroTabs.map(({ key, label, icon, count }) => {
                 const activo = filtroTipo === key;
                 return (
-                  <button key={key} onClick={() => { setFiltroTipo(key); setResidentesSeleccionados(new Set()); }}
-                    className={`flex items-center justify-center gap-1 py-2 sm:py-2.5 rounded-lg sm:rounded-xl text-[9px] sm:text-[11px] font-black transition-all duration-200
-                      ${activo ? "bg-white text-slate-900 shadow-sm shadow-slate-200" : "text-slate-400 hover:text-slate-600"}`}
+                  <button key={key}
+                    onClick={() => { setFiltroTipo(key); setResidentesSeleccionados(new Set()); }}
+                    className={`flex items-center gap-2 px-3.5 py-2 rounded-xl font-black text-[11px] whitespace-nowrap flex-shrink-0 border transition-all duration-200
+                      ${activo
+                        ? "bg-slate-900 text-white border-slate-900 shadow-md shadow-slate-900/20"
+                        : "bg-white text-slate-500 border-slate-200 hover:border-slate-300 hover:text-slate-700"}`}
                   >
-                    <span className={`flex-shrink-0 ${activo ? "text-emerald-500" : ""}`}>{icon}</span>
-                    <span className="hidden sm:inline uppercase tracking-wide">{label}</span>
-                    <span className="sm:hidden uppercase tracking-wide text-[8px]">{labelShort}</span>
-                    <span className={`text-[8px] sm:text-[9px] font-black tabular-nums px-1 sm:px-1.5 py-0.5 rounded-md leading-none
-                      ${activo ? "bg-emerald-500 text-white" : "bg-slate-200 text-slate-500"}`}>
+                    <span className={activo ? "text-emerald-400" : "text-slate-400"}>{icon}</span>
+                    <span className="uppercase tracking-wide">{label}</span>
+                    <span className={`text-[9px] font-black tabular-nums px-1.5 py-0.5 rounded-lg leading-none
+                      ${activo ? "bg-emerald-500 text-white" : "bg-slate-100 text-slate-500"}`}>
                       {count}
                     </span>
                   </button>
