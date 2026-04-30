@@ -170,13 +170,17 @@ export default function Causacion({ role }: { role?: string }) {
   const mesesOrdenados = Object.keys(historialAgrupado).sort().reverse();
 
   // Residentes filtrados por vehículo
+  // En modo masivo (General/Carros/Motos/Bicis): Torre 1 excluida
+  // En modo selección manual: todas las torres disponibles
   const residentesPorTipo = useMemo(() => residentes.filter(r => {
+    const esTorre1 = r.torre === "Torre 1";
+    if (!modoSeleccion && esTorre1) return false;
     if (filtroTipo === "TODOS") return true;
     if (filtroTipo === "CARRO") return (r.carros || 0) > 0;
     if (filtroTipo === "MOTO") return (r.motos || 0) > 0;
     if (filtroTipo === "BICI") return (r.bicis || 0) > 0;
     return false;
-  }), [residentes, filtroTipo]);
+  }), [residentes, filtroTipo, modoSeleccion]);
 
   // Residentes que finalmente se van a causar
   const residentesAfectados = useMemo(() => {
@@ -352,7 +356,9 @@ export default function Causacion({ role }: { role?: string }) {
 
   const MESES_NOMBRES = ["ENERO", "FEBRERO", "MARZO", "ABRIL", "MAYO", "JUNIO", "JULIO", "AGOSTO", "SEPTIEMBRE", "OCTUBRE", "NOVIEMBRE", "DICIEMBRE"];
   const fmt = (n: number) => `$${Math.round(n).toLocaleString("es-CO")}`;
+  // Conteo para badges: siempre excluye Torre 1 (modo masivo)
   const conteoFiltro = (key: string) => residentes.filter(r => {
+    if (r.torre === "Torre 1") return false;
     if (key === "TODOS") return true;
     if (key === "CARRO") return (r.carros || 0) > 0;
     if (key === "MOTO") return (r.motos || 0) > 0;
