@@ -5,7 +5,7 @@ import { calcularValorDeudaHoy } from "@/lib/utils";
 import {
   Zap, History, Trash2, Eye, X, Loader2,
   CheckCircle2, Calendar, Search, ChevronDown, ChevronUp, Printer,
-  Car, Bike, Users, TrendingUp
+  Car, Bike, Users, TrendingUp, UserCheck, Pencil
 } from "lucide-react";
 
 // ── IMPRESIÓN ─────────────────────────────────────────────────────────────────
@@ -123,6 +123,16 @@ export default function Causacion({ role }: { role?: string }) {
   const [filtroTipo, setFiltroTipo] = useState("TODOS");
   const [mesesAbiertos, setMesesAbiertos] = useState<Record<string, boolean>>({});
 
+  // ── NUEVO: modo selección de residentes ──
+  const [modoSeleccion, setModoSeleccion] = useState(false);   // false = todos, true = elegir
+  const [residentesSeleccionados, setResidentesSeleccionados] = useState<Set<number>>(new Set());
+  const [busquedaResidente, setBusquedaResidente] = useState("");
+
+  // ── NUEVO: modo edición individual ──
+  const [editandoDeuda, setEditandoDeuda] = useState<any | null>(null);
+  const [nuevoMonto, setNuevoMonto] = useState("");
+  const [guardandoEdit, setGuardandoEdit] = useState(false);
+
   useEffect(() => {
     cargarDatos();
     const canal = supabase.channel("causacion-rt")
@@ -159,13 +169,44 @@ export default function Causacion({ role }: { role?: string }) {
 
   const mesesOrdenados = Object.keys(historialAgrupado).sort().reverse();
 
-  const residentesAfectados = useMemo(() => residentes.filter(r => {
+  // Residentes filtrados por vehículo
+  const residentesPorTipo = useMemo(() => residentes.filter(r => {
     if (filtroTipo === "TODOS") return true;
     if (filtroTipo === "CARRO") return (r.carros || 0) > 0;
     if (filtroTipo === "MOTO") return (r.motos || 0) > 0;
     if (filtroTipo === "BICI") return (r.bicis || 0) > 0;
     return false;
   }), [residentes, filtroTipo]);
+
+  // Residentes que finalmente se van a causar
+  const residentesAfectados = useMemo(() => {
+    if (!modoSeleccion) return residentesPorTipo;
+    return residentesPorTipo.filter(r => residentesSeleccionados.has(r.id));
+  }, [residentesPorTipo, modoSeleccion, residentesSeleccionados]);
+
+  // Residentes visibles en el selector (con búsqueda)
+  const residentesFiltradosSelector = useMemo(() => {
+    const q = busquedaResidente.toLowerCase();
+    return residentesPorTipo.filter(r =>
+      !q || r.nombre?.toLowerCase().includes(q) || r.apartamento?.toLowerCase().includes(q) || r.torre?.toLowerCase().includes(q)
+    );
+  }, [residentesPorTipo, busquedaResidente]);
+
+  function toggleResidente(id: number) {
+    setResidentesSeleccionados(prev => {
+      const n = new Set(prev);
+      n.has(id) ? n.delete(id) : n.add(id);
+      return n;
+    });
+  }
+
+  function seleccionarTodos() {
+    setResidentesSeleccionados(new Set(residentesPorTipo.map(r => r.id)));
+  }
+
+  function limpiarSeleccion() {
+    setResidentesSeleccionados(new Set());
+  }
 
   const deudasFiltradas = useMemo(() => {
     let lista = deudasDetalle.filter(d =>
@@ -201,6 +242,31 @@ export default function Causacion({ role }: { role?: string }) {
       .order("unidad", { ascending: true });
     if (data) setDeudasDetalle(data);
     setLoadingDetalle(false);
+  }
+
+  // ── GUARDAR EDICIÓN INDIVIDUAL ──
+  async function guardarEdicion() {
+    if (!editandoDeuda || !nuevoMonto) return;
+    setGuardandoEdit(true);
+    const monto = parseFloat(nuevoMonto.replace(/[^0-9.]/g, ""));
+    if (isNaN(monto)) { setGuardandoEdit(false); return; }
+    await supabase.from("deudas_residentes").update({
+      monto_original: monto,
+      precio_m1: monto,
+      precio_m2: monto,
+      precio_m3: monto,
+      saldo_pendiente: monto,
+    }).eq("id", editandoDeuda.id);
+    // Refrescar detalles
+    const { data } = await supabase
+      .from("deudas_residentes")
+      .select("*, residentes(nombre), causaciones_globales(mes_causado, tipo_cobro)")
+      .eq("causacion_id", causacionActiva.id)
+      .order("unidad", { ascending: true });
+    if (data) setDeudasDetalle(data);
+    setEditandoDeuda(null);
+    setNuevoMonto("");
+    setGuardandoEdit(false);
   }
 
   async function generarCausacion() {
@@ -257,6 +323,8 @@ export default function Causacion({ role }: { role?: string }) {
       }
       await cargarDatos();
       setConceptoId("");
+      setModoSeleccion(false);
+      setResidentesSeleccionados(new Set());
       alert(`Causación completada.\n· ${deudasAInsertar.length - anticiposAActualizar.length} cobros normales\n${anticiposAActualizar.length > 0 ? `· ${anticiposAActualizar.length} anticipos aplicados` : ""}`);
     } catch (err: any) {
       alert(err.message);
@@ -315,7 +383,7 @@ export default function Causacion({ role }: { role?: string }) {
             <div className="space-y-1.5">
               <label className="text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-0.5">Concepto</label>
               <select
-                className="w-full bg-slate-50 border border-slate-200 px-3 sm:px-4 py-2.5 sm:py-3 rounded-xl sm:rounded-2xl text-xs sm:text-sm font-semibold text-slate-700 outline-none focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-500/10 transition-all appearance-none cursor-pointer"
+                className="w-full bg-slate-50 border border-slate-200 px-3 sm:px-4 py-2.5 sm:py-3 rounded-xl sm:rounded-2xl text-xs sm:text-sm font-semibold text-slate-700 outline-none focus:border-emerald-400 focus:bg-white transition-all appearance-none cursor-pointer"
                 value={conceptoId}
                 onChange={e => setConceptoId(e.target.value)}
               >
@@ -325,28 +393,29 @@ export default function Causacion({ role }: { role?: string }) {
             </div>
             <div className="space-y-1.5">
               <label className="text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-0.5">Mes</label>
-              <input type="month" className="w-full bg-slate-50 border border-slate-200 px-3 sm:px-4 py-2.5 sm:py-3 rounded-xl sm:rounded-2xl text-xs sm:text-sm font-semibold text-slate-700 outline-none focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-500/10 transition-all" onChange={e => setMesDeuda(e.target.value)} />
+              <input type="month" className="w-full bg-slate-50 border border-slate-200 px-3 sm:px-4 py-2.5 sm:py-3 rounded-xl sm:rounded-2xl text-xs sm:text-sm font-semibold text-slate-700 outline-none focus:border-emerald-400 focus:bg-white transition-all" onChange={e => setMesDeuda(e.target.value)} />
             </div>
             <div className="space-y-1.5">
               <label className="text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-0.5">Fecha límite</label>
-              <input type="date" className="w-full bg-slate-50 border border-slate-200 px-3 sm:px-4 py-2.5 sm:py-3 rounded-xl sm:rounded-2xl text-xs sm:text-sm font-semibold text-slate-700 outline-none focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-500/10 transition-all" onChange={e => setFechaLimite(e.target.value)} />
+              <input type="date" className="w-full bg-slate-50 border border-slate-200 px-3 sm:px-4 py-2.5 sm:py-3 rounded-xl sm:rounded-2xl text-xs sm:text-sm font-semibold text-slate-700 outline-none focus:border-emerald-400 focus:bg-white transition-all" onChange={e => setFechaLimite(e.target.value)} />
             </div>
           </div>
 
-          {/* Tipo + botón */}
-          <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
-            <div className="flex-1 grid grid-cols-4 gap-1 bg-slate-100 p-1 rounded-xl sm:rounded-2xl">
+          {/* ── FILTRO TIPO (tabs) ── */}
+          <div>
+            <label className="text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-0.5 mb-2 block">Aplicar a</label>
+            <div className="grid grid-cols-4 gap-1 bg-slate-100 p-1 rounded-xl sm:rounded-2xl">
               {filtroTabs.map(({ key, label, labelShort, icon, count }) => {
                 const activo = filtroTipo === key;
                 return (
-                  <button key={key} onClick={() => setFiltroTipo(key)}
-                    className={`flex items-center justify-center gap-1 sm:gap-1.5 py-2 sm:py-2.5 rounded-lg sm:rounded-xl text-[10px] sm:text-[11px] font-black transition-all duration-200
+                  <button key={key} onClick={() => { setFiltroTipo(key); setResidentesSeleccionados(new Set()); }}
+                    className={`flex items-center justify-center gap-1 py-2 sm:py-2.5 rounded-lg sm:rounded-xl text-[9px] sm:text-[11px] font-black transition-all duration-200
                       ${activo ? "bg-white text-slate-900 shadow-sm shadow-slate-200" : "text-slate-400 hover:text-slate-600"}`}
                   >
                     <span className={`flex-shrink-0 ${activo ? "text-emerald-500" : ""}`}>{icon}</span>
                     <span className="hidden sm:inline uppercase tracking-wide">{label}</span>
-                    <span className="sm:hidden uppercase tracking-wide">{labelShort}</span>
-                    <span className={`text-[9px] font-black tabular-nums px-1.5 py-0.5 rounded-md leading-none
+                    <span className="sm:hidden uppercase tracking-wide text-[8px]">{labelShort}</span>
+                    <span className={`text-[8px] sm:text-[9px] font-black tabular-nums px-1 sm:px-1.5 py-0.5 rounded-md leading-none
                       ${activo ? "bg-emerald-500 text-white" : "bg-slate-200 text-slate-500"}`}>
                       {count}
                     </span>
@@ -354,9 +423,37 @@ export default function Causacion({ role }: { role?: string }) {
                 );
               })}
             </div>
+          </div>
+
+          {/* ── TOGGLE SELECCIÓN MANUAL ── */}
+          <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
+            <button
+              onClick={() => { setModoSeleccion(!modoSeleccion); setResidentesSeleccionados(new Set()); }}
+              className={`flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border font-black text-[11px] uppercase tracking-widest transition-all
+                ${modoSeleccion
+                  ? "bg-violet-50 border-violet-300 text-violet-700"
+                  : "bg-slate-50 border-slate-200 text-slate-500 hover:border-slate-300"}`}
+            >
+              <UserCheck size={14} />
+              {modoSeleccion ? "Selección manual activa" : "Elegir residentes específicos"}
+            </button>
+
+            <div className="flex-1 flex items-center justify-end">
+              <span className={`text-[11px] font-black px-3 py-1.5 rounded-xl
+                ${modoSeleccion && residentesSeleccionados.size === 0
+                  ? "bg-amber-50 text-amber-600 border border-amber-200"
+                  : "bg-emerald-50 text-emerald-700 border border-emerald-200"}`}>
+                {modoSeleccion
+                  ? residentesSeleccionados.size === 0
+                    ? "Ningún residente seleccionado"
+                    : `${residentesSeleccionados.size} residente${residentesSeleccionados.size !== 1 ? "s" : ""} seleccionado${residentesSeleccionados.size !== 1 ? "s" : ""}`
+                  : `${residentesPorTipo.length} residente${residentesPorTipo.length !== 1 ? "s" : ""} (todos)`}
+              </span>
+            </div>
+
             <button
               onClick={generarCausacion}
-              disabled={generando || !conceptoId || !mesDeuda || !fechaLimite}
+              disabled={generando || !conceptoId || !mesDeuda || !fechaLimite || (modoSeleccion && residentesSeleccionados.size === 0)}
               className="sm:w-40 bg-slate-900 text-white py-2.5 sm:py-3 px-5 sm:px-6 rounded-xl sm:rounded-2xl font-black text-xs sm:text-sm hover:bg-emerald-600 transition-all active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center gap-2 flex-shrink-0 shadow-lg shadow-slate-900/20 hover:shadow-emerald-500/20"
             >
               {generando
@@ -364,6 +461,65 @@ export default function Causacion({ role }: { role?: string }) {
                 : <><Zap size={14} strokeWidth={2.5} /><span>Procesar</span></>}
             </button>
           </div>
+
+          {/* ── SELECTOR DE RESIDENTES (cuando modoSeleccion = true) ── */}
+          {modoSeleccion && (
+            <div className="border border-violet-200 bg-violet-50/30 rounded-2xl overflow-hidden animate-in slide-in-from-top-2 duration-300">
+              {/* Header del selector */}
+              <div className="flex items-center justify-between px-4 py-3 bg-violet-50 border-b border-violet-100">
+                <p className="text-[10px] font-black uppercase tracking-widest text-violet-700">
+                  Seleccionar residentes
+                </p>
+                <div className="flex gap-2">
+                  <button onClick={seleccionarTodos} className="text-[9px] font-black uppercase tracking-widest text-violet-600 hover:text-violet-800 px-2 py-1 hover:bg-violet-100 rounded-lg transition-colors">
+                    Todos
+                  </button>
+                  <button onClick={limpiarSeleccion} className="text-[9px] font-black uppercase tracking-widest text-slate-400 hover:text-slate-600 px-2 py-1 hover:bg-slate-100 rounded-lg transition-colors">
+                    Limpiar
+                  </button>
+                </div>
+              </div>
+              {/* Búsqueda */}
+              <div className="px-3 py-2.5 border-b border-violet-100">
+                <div className="relative">
+                  <Search size={12} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input
+                    type="text"
+                    placeholder="Buscar residente, torre, apto..."
+                    value={busquedaResidente}
+                    onChange={e => setBusquedaResidente(e.target.value)}
+                    className="w-full pl-8 pr-3 py-2 bg-white border border-slate-200 rounded-xl text-[11px] font-semibold text-slate-700 outline-none focus:border-violet-400 transition"
+                  />
+                </div>
+              </div>
+              {/* Lista */}
+              <div className="max-h-52 overflow-y-auto divide-y divide-violet-50">
+                {residentesFiltradosSelector.map(r => {
+                  const sel = residentesSeleccionados.has(r.id);
+                  return (
+                    <button key={r.id} onClick={() => toggleResidente(r.id)}
+                      className={`w-full flex items-center gap-3 px-4 py-2.5 text-left transition-colors
+                        ${sel ? "bg-violet-100/60" : "hover:bg-white/60"}`}
+                    >
+                      <div className={`w-4 h-4 rounded flex items-center justify-center flex-shrink-0 border transition-all
+                        ${sel ? "bg-violet-600 border-violet-600" : "border-slate-300 bg-white"}`}>
+                        {sel && <CheckCircle2 size={10} className="text-white" strokeWidth={3} />}
+                      </div>
+                      <span className={`text-[10px] font-black px-2 py-0.5 rounded-lg flex-shrink-0
+                        ${sel ? "bg-violet-600 text-white" : "bg-slate-200 text-slate-600"}`}>
+                        T{r.torre?.slice(-1)}-{r.apartamento}
+                      </span>
+                      <span className="text-[11px] font-semibold text-slate-700 truncate">{r.nombre}</span>
+                      {sel && <CheckCircle2 size={14} className="text-violet-500 ml-auto flex-shrink-0" />}
+                    </button>
+                  );
+                })}
+                {residentesFiltradosSelector.length === 0 && (
+                  <p className="text-center py-6 text-[10px] font-black text-slate-300 uppercase tracking-widest">Sin resultados</p>
+                )}
+              </div>
+            </div>
+          )}
 
         </div>
       </section>
@@ -457,7 +613,7 @@ export default function Causacion({ role }: { role?: string }) {
         )}
       </div>
 
-      {/* ── MODAL ─────────────────────────────────────────────────────── */}
+      {/* ── MODAL DETALLE ─────────────────────────────────────────────── */}
       {showDetalles && (
         <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-md z-[500] flex flex-col items-center justify-end sm:justify-center p-0 sm:p-4 animate-in fade-in duration-200">
           <div className="bg-white w-full sm:max-w-2xl rounded-t-[2rem] sm:rounded-[2.5rem] shadow-2xl flex flex-col overflow-hidden max-h-[92vh] sm:max-h-[85vh] animate-in slide-in-from-bottom-4 sm:zoom-in-95 duration-300">
@@ -508,7 +664,7 @@ export default function Causacion({ role }: { role?: string }) {
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-300" size={13} />
                 <input
                   placeholder="Buscar unidad o nombre..."
-                  className="w-full bg-slate-50 border border-slate-200 py-2.5 pl-9 pr-3 rounded-xl sm:rounded-2xl text-xs sm:text-sm font-medium text-slate-700 outline-none focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-500/10 transition-all"
+                  className="w-full bg-slate-50 border border-slate-200 py-2.5 pl-9 pr-3 rounded-xl sm:rounded-2xl text-xs sm:text-sm font-medium text-slate-700 outline-none focus:border-emerald-400 focus:bg-white transition-all"
                   value={busquedaDetalle}
                   onChange={e => setBusquedaDetalle(e.target.value)}
                 />
@@ -548,6 +704,9 @@ export default function Causacion({ role }: { role?: string }) {
                       <th className="px-4 sm:px-6 py-2.5 text-left text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-[0.15em]">Unidad</th>
                       <th className="px-2 py-2.5 text-left text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-[0.15em]">Residente</th>
                       <th className="px-4 sm:px-6 py-2.5 text-right text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-[0.15em]">Estado</th>
+                      {role !== "contador" && (
+                        <th className="px-3 py-2.5 text-center text-[9px] font-black text-slate-400 uppercase tracking-[0.15em]">Edit</th>
+                      )}
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-50">
@@ -575,6 +734,17 @@ export default function Causacion({ role }: { role?: string }) {
                               {pagado ? "PAGADO" : abono ? "PARCIAL" : "PENDIENTE"}
                             </p>
                           </td>
+                          {role !== "contador" && (
+                            <td className="px-3 py-3 text-center">
+                              <button
+                                onClick={() => { setEditandoDeuda(d); setNuevoMonto(String(d.monto_original)); }}
+                                className="w-7 h-7 bg-slate-100 hover:bg-violet-500 hover:text-white text-slate-400 rounded-lg flex items-center justify-center mx-auto transition-all active:scale-95"
+                                title="Editar monto"
+                              >
+                                <Pencil size={11} />
+                              </button>
+                            </td>
+                          )}
                         </tr>
                       );
                     })}
@@ -586,6 +756,60 @@ export default function Causacion({ role }: { role?: string }) {
           </div>
         </div>
       )}
+
+      {/* ── MODAL EDICIÓN INDIVIDUAL ──────────────────────────────────── */}
+      {editandoDeuda && (
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-[600] flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-sm border border-slate-100 animate-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b border-slate-100">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 bg-violet-100 text-violet-600 rounded-xl flex items-center justify-center">
+                  <Pencil size={16} />
+                </div>
+                <div>
+                  <p className="font-black text-slate-900 text-[13px]">Editar causación</p>
+                  <p className="text-[10px] text-slate-400 font-semibold">{editandoDeuda.unidad} · {editandoDeuda.residentes?.nombre}</p>
+                </div>
+              </div>
+              <button onClick={() => setEditandoDeuda(null)} className="p-2 hover:bg-slate-50 rounded-xl text-slate-300 transition-colors">
+                <X size={18} />
+              </button>
+            </div>
+            <div className="px-6 py-5 space-y-4">
+              <div>
+                <label className="text-[9px] font-black uppercase tracking-widest text-slate-400 ml-1 mb-1.5 block">Nuevo monto</label>
+                <input
+                  type="number"
+                  value={nuevoMonto}
+                  onChange={e => setNuevoMonto(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-[15px] font-black text-slate-800 outline-none focus:border-violet-400 transition tabular-nums"
+                  placeholder="0"
+                  autoFocus
+                />
+                <p className="text-[9px] text-slate-400 mt-1.5 ml-1">
+                  Actual: <span className="font-black text-slate-600">{fmt(Number(editandoDeuda.monto_original))}</span>
+                  {" · "}Saldo: <span className="font-black text-rose-500">{fmt(Number(editandoDeuda.saldo_pendiente))}</span>
+                </p>
+              </div>
+              <p className="text-[10px] text-amber-600 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2.5 font-semibold leading-relaxed">
+                ⚠️ Esto actualizará el monto original y el saldo pendiente de esta causación individual.
+              </p>
+            </div>
+            <div className="px-6 pb-6 flex gap-3">
+              <button onClick={() => setEditandoDeuda(null)}
+                className="flex-1 py-3 rounded-2xl border border-slate-200 text-slate-500 font-black text-[11px] uppercase tracking-widest hover:bg-slate-50 transition active:scale-95">
+                Cancelar
+              </button>
+              <button onClick={guardarEdicion} disabled={guardandoEdit}
+                className="flex-1 py-3 rounded-2xl bg-violet-600 hover:bg-violet-500 text-white font-black text-[11px] uppercase tracking-widest transition active:scale-95 disabled:opacity-40 flex items-center justify-center gap-2 shadow-lg shadow-violet-500/20">
+                {guardandoEdit ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
+                {guardandoEdit ? "Guardando..." : "Guardar"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
