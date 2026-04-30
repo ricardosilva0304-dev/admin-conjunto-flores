@@ -5,7 +5,7 @@ import { calcularValorDeudaHoy } from "@/lib/utils";
 import {
   Zap, History, Trash2, Eye, X, Loader2,
   CheckCircle2, Calendar, Search, ChevronDown, ChevronUp, Printer,
-  Car, Bike, Users, TrendingUp, UserCheck, Pencil
+  Car, Bike, Users, TrendingUp, UserCheck, UserPlus
 } from "lucide-react";
 
 // ── IMPRESIÓN ─────────────────────────────────────────────────────────────────
@@ -128,10 +128,11 @@ export default function Causacion({ role }: { role?: string }) {
   const [residentesSeleccionados, setResidentesSeleccionados] = useState<Set<number>>(new Set());
   const [busquedaResidente, setBusquedaResidente] = useState("");
 
-  // ── NUEVO: modo edición individual ──
-  const [editandoDeuda, setEditandoDeuda] = useState<any | null>(null);
-  const [nuevoMonto, setNuevoMonto] = useState("");
-  const [guardandoEdit, setGuardandoEdit] = useState(false);
+  // ── Agregar residente a causación manual ──
+  const [showAgregarResidente, setShowAgregarResidente] = useState(false);
+  const [residentesParaAgregar, setResidentesParaAgregar] = useState<Set<number>>(new Set());
+  const [busquedaAgregar, setBusquedaAgregar] = useState("");
+  const [agregando, setAgregando] = useState(false);
 
   useEffect(() => {
     cargarDatos();
@@ -265,29 +266,54 @@ export default function Causacion({ role }: { role?: string }) {
     setLoadingDetalle(false);
   }
 
-  // ── GUARDAR EDICIÓN INDIVIDUAL ──
-  async function guardarEdicion() {
-    if (!editandoDeuda || !nuevoMonto) return;
-    setGuardandoEdit(true);
-    const monto = parseFloat(nuevoMonto.replace(/[^0-9.]/g, ""));
-    if (isNaN(monto)) { setGuardandoEdit(false); return; }
-    await supabase.from("deudas_residentes").update({
-      monto_original: monto,
-      precio_m1: monto,
-      precio_m2: monto,
-      precio_m3: monto,
-      saldo_pendiente: monto,
-    }).eq("id", editandoDeuda.id);
-    // Refrescar detalles
+  // ── AGREGAR RESIDENTE A CAUSACIÓN MANUAL ──
+  async function agregarResidentesACausacion() {
+    if (!causacionActiva || residentesParaAgregar.size === 0) return;
+    setAgregando(true);
+    // Obtener concepto de la causación activa para calcular montos
+    const residentesExistentes = new Set(deudasDetalle.map((d: any) => d.residente_id));
+    const nuevos = residentes.filter(r => residentesParaAgregar.has(r.id) && !residentesExistentes.has(r.id));
+    if (nuevos.length === 0) { setAgregando(false); return; }
+    const deudasAInsertar = nuevos.map(res => ({
+      causacion_id: causacionActiva.id,
+      residente_id: res.id,
+      unidad: `T${res.torre.slice(-1)}-${res.apartamento}`,
+      concepto_nombre: causacionActiva.concepto_nombre,
+      monto_original: causacionActiva.monto_ref || 0,
+      precio_m1: causacionActiva.monto_ref || 0,
+      precio_m2: causacionActiva.monto_ref || 0,
+      precio_m3: causacionActiva.monto_ref || 0,
+      saldo_pendiente: causacionActiva.monto_ref || 0,
+      fecha_vencimiento: causacionActiva.fecha_limite,
+      estado: "PENDIENTE",
+    }));
+    // Usar monto del primer registro existente como referencia
+    const montoRef = deudasDetalle[0] ? Number(deudasDetalle[0].monto_original) : 0;
+    const deudasConMonto = deudasAInsertar.map(d => ({
+      ...d,
+      monto_original: montoRef,
+      precio_m1: montoRef,
+      precio_m2: montoRef,
+      precio_m3: montoRef,
+      saldo_pendiente: montoRef,
+    }));
+    await supabase.from("deudas_residentes").insert(deudasConMonto);
+    // Actualizar total_residentes en la causacion
+    await supabase.from("causaciones_globales")
+      .update({ total_residentes: deudasDetalle.length + nuevos.length })
+      .eq("id", causacionActiva.id);
+    // Refrescar
     const { data } = await supabase
       .from("deudas_residentes")
       .select("*, residentes(nombre), causaciones_globales(mes_causado, tipo_cobro)")
       .eq("causacion_id", causacionActiva.id)
       .order("unidad", { ascending: true });
     if (data) setDeudasDetalle(data);
-    setEditandoDeuda(null);
-    setNuevoMonto("");
-    setGuardandoEdit(false);
+    setShowAgregarResidente(false);
+    setResidentesParaAgregar(new Set());
+    setBusquedaAgregar("");
+    setAgregando(false);
+    await cargarDatos();
   }
 
   async function generarCausacion() {
@@ -306,7 +332,7 @@ export default function Causacion({ role }: { role?: string }) {
       const anticiposPorResidente: Record<number, any> = {};
       (anticiposExistentes || []).forEach(a => { anticiposPorResidente[a.residente_id] = a; });
       const { data: lote, error: errLote } = await supabase.from("causaciones_globales")
-        .insert([{ mes_causado: mesDeuda, concepto_nombre: nombreConPeriodo, total_residentes: residentesAfectados.length, fecha_limite: fechaLimite, tipo_cobro: "NORMAL" }])
+        .insert([{ mes_causado: mesDeuda, concepto_nombre: nombreConPeriodo, total_residentes: residentesAfectados.length, fecha_limite: fechaLimite, tipo_cobro: modoSeleccion ? "MANUAL" : "NORMAL" }])
         .select().single();
       if (errLote) throw errLote;
       const deudasAInsertar: any[] = [];
@@ -655,6 +681,15 @@ export default function Causacion({ role }: { role?: string }) {
                 </div>
               </div>
               <div className="flex items-center gap-2 flex-shrink-0">
+                {causacionActiva?.tipo_cobro === "MANUAL" && role !== "contador" && (
+                  <button
+                    onClick={() => { setShowAgregarResidente(true); setResidentesParaAgregar(new Set()); setBusquedaAgregar(""); }}
+                    className="flex items-center gap-1.5 px-3 sm:px-4 py-2 sm:py-2.5 bg-violet-600 text-white rounded-xl text-[10px] sm:text-xs font-black hover:bg-violet-500 transition-all active:scale-95"
+                  >
+                    <UserPlus size={13} />
+                    <span className="hidden sm:inline">Agregar</span>
+                  </button>
+                )}
                 <button
                   onClick={() => imprimirCausacion(causacionActiva, deudasDetalle, calcularValorDeudaHoy)}
                   className="flex items-center gap-1.5 px-3 sm:px-4 py-2 sm:py-2.5 bg-slate-900 text-white rounded-xl text-[10px] sm:text-xs font-black hover:bg-emerald-600 transition-all active:scale-95"
@@ -729,9 +764,6 @@ export default function Causacion({ role }: { role?: string }) {
                       <th className="px-4 sm:px-6 py-2.5 text-left text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-[0.15em]">Unidad</th>
                       <th className="px-2 py-2.5 text-left text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-[0.15em]">Residente</th>
                       <th className="px-4 sm:px-6 py-2.5 text-right text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-[0.15em]">Estado</th>
-                      {role !== "contador" && (
-                        <th className="px-3 py-2.5 text-center text-[9px] font-black text-slate-400 uppercase tracking-[0.15em]">Edit</th>
-                      )}
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-50">
@@ -759,17 +791,7 @@ export default function Causacion({ role }: { role?: string }) {
                               {pagado ? "PAGADO" : abono ? "PARCIAL" : "PENDIENTE"}
                             </p>
                           </td>
-                          {role !== "contador" && (
-                            <td className="px-3 py-3 text-center">
-                              <button
-                                onClick={() => { setEditandoDeuda(d); setNuevoMonto(String(d.monto_original)); }}
-                                className="w-7 h-7 bg-slate-100 hover:bg-violet-500 hover:text-white text-slate-400 rounded-lg flex items-center justify-center mx-auto transition-all active:scale-95"
-                                title="Editar monto"
-                              >
-                                <Pencil size={11} />
-                              </button>
-                            </td>
-                          )}
+
                         </tr>
                       );
                     })}
@@ -782,53 +804,106 @@ export default function Causacion({ role }: { role?: string }) {
         </div>
       )}
 
-      {/* ── MODAL EDICIÓN INDIVIDUAL ──────────────────────────────────── */}
-      {editandoDeuda && (
+      {/* ── MODAL AGREGAR RESIDENTE A CAUSACIÓN MANUAL ───────────────── */}
+      {showAgregarResidente && (
         <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-[600] flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-sm border border-slate-100 animate-in zoom-in-95 duration-200">
-            <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b border-slate-100">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md border border-slate-100 animate-in zoom-in-95 duration-200 flex flex-col max-h-[85vh]">
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b border-slate-100 flex-shrink-0">
               <div className="flex items-center gap-3">
                 <div className="w-9 h-9 bg-violet-100 text-violet-600 rounded-xl flex items-center justify-center">
-                  <Pencil size={16} />
+                  <UserPlus size={16} />
                 </div>
                 <div>
-                  <p className="font-black text-slate-900 text-[13px]">Editar causación</p>
-                  <p className="text-[10px] text-slate-400 font-semibold">{editandoDeuda.unidad} · {editandoDeuda.residentes?.nombre}</p>
+                  <p className="font-black text-slate-900 text-[13px]">Agregar residente</p>
+                  <p className="text-[10px] text-slate-400 font-semibold truncate max-w-[200px]">{causacionActiva?.concepto_nombre}</p>
                 </div>
               </div>
-              <button onClick={() => setEditandoDeuda(null)} className="p-2 hover:bg-slate-50 rounded-xl text-slate-300 transition-colors">
+              <button onClick={() => setShowAgregarResidente(false)} className="p-2 hover:bg-slate-50 rounded-xl text-slate-300 transition-colors">
                 <X size={18} />
               </button>
             </div>
-            <div className="px-6 py-5 space-y-4">
-              <div>
-                <label className="text-[9px] font-black uppercase tracking-widest text-slate-400 ml-1 mb-1.5 block">Nuevo monto</label>
+            {/* Búsqueda */}
+            <div className="px-5 pt-4 pb-3 flex-shrink-0">
+              <div className="relative">
+                <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input
-                  type="number"
-                  value={nuevoMonto}
-                  onChange={e => setNuevoMonto(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-[15px] font-black text-slate-800 outline-none focus:border-violet-400 transition tabular-nums"
-                  placeholder="0"
+                  type="text"
+                  placeholder="Buscar por nombre, 5101 o 5-101..."
+                  value={busquedaAgregar}
+                  onChange={e => setBusquedaAgregar(e.target.value)}
+                  className="w-full pl-9 pr-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-[11px] font-semibold text-slate-700 outline-none focus:border-violet-400 transition"
                   autoFocus
                 />
-                <p className="text-[9px] text-slate-400 mt-1.5 ml-1">
-                  Actual: <span className="font-black text-slate-600">{fmt(Number(editandoDeuda.monto_original))}</span>
-                  {" · "}Saldo: <span className="font-black text-rose-500">{fmt(Number(editandoDeuda.saldo_pendiente))}</span>
-                </p>
               </div>
-              <p className="text-[10px] text-amber-600 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2.5 font-semibold leading-relaxed">
-                ⚠️ Esto actualizará el monto original y el saldo pendiente de esta causación individual.
-              </p>
+              {residentesParaAgregar.size > 0 && (
+                <p className="text-[10px] font-black text-violet-600 mt-2 ml-1">
+                  {residentesParaAgregar.size} residente{residentesParaAgregar.size !== 1 ? "s" : ""} seleccionado{residentesParaAgregar.size !== 1 ? "s" : ""}
+                </p>
+              )}
             </div>
-            <div className="px-6 pb-6 flex gap-3">
-              <button onClick={() => setEditandoDeuda(null)}
+            {/* Lista — solo residentes que NO están ya en la causación */}
+            <div className="flex-1 overflow-y-auto divide-y divide-slate-50 px-2">
+              {(() => {
+                const yaEnCausacion = new Set(deudasDetalle.map((d: any) => d.residente_id));
+                const q = busquedaAgregar.toLowerCase().replace(/[-\s]/g, "");
+                const disponibles = residentes
+                  .filter(r => {
+                    if (yaEnCausacion.has(r.id)) return false;
+                    if (!q) return true;
+                    const torreNum = r.torre?.replace(/\D/g, "") || "";
+                    const codigoUnido = `${torreNum}${r.apartamento || ""}`;
+                    return codigoUnido.includes(q) || r.nombre?.toLowerCase().includes(busquedaAgregar.toLowerCase());
+                  })
+                  .sort((a, b) => {
+                    const orden: Record<string, number> = { "Torre 5": 0, "Torre 6": 1, "Torre 7": 2, "Torre 8": 3, "Torre 1": 4 };
+                    const oa = orden[a.torre] ?? 9;
+                    const ob = orden[b.torre] ?? 9;
+                    if (oa !== ob) return oa - ob;
+                    return (a.apartamento || "").localeCompare(b.apartamento || "");
+                  });
+                if (disponibles.length === 0) return (
+                  <p className="text-center py-8 text-[10px] font-black text-slate-300 uppercase tracking-widest">
+                    {busquedaAgregar ? "Sin resultados" : "Todos los residentes ya están en esta causación"}
+                  </p>
+                );
+                return disponibles.map(r => {
+                  const sel = residentesParaAgregar.has(r.id);
+                  return (
+                    <button key={r.id} onClick={() => {
+                      setResidentesParaAgregar(prev => {
+                        const n = new Set(prev);
+                        n.has(r.id) ? n.delete(r.id) : n.add(r.id);
+                        return n;
+                      });
+                    }}
+                      className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left transition-colors
+                        ${sel ? "bg-violet-50" : "hover:bg-slate-50"}`}
+                    >
+                      <div className={`w-4 h-4 rounded flex items-center justify-center flex-shrink-0 border transition-all
+                        ${sel ? "bg-violet-600 border-violet-600" : "border-slate-300 bg-white"}`}>
+                        {sel && <CheckCircle2 size={10} className="text-white" strokeWidth={3} />}
+                      </div>
+                      <span className={`text-[10px] font-black px-2 py-0.5 rounded-lg flex-shrink-0
+                        ${sel ? "bg-violet-600 text-white" : "bg-slate-200 text-slate-600"}`}>
+                        T{r.torre?.slice(-1)}-{r.apartamento}
+                      </span>
+                      <span className="text-[11px] font-semibold text-slate-700 truncate">{r.nombre}</span>
+                    </button>
+                  );
+                });
+              })()}
+            </div>
+            {/* Acciones */}
+            <div className="px-5 py-4 border-t border-slate-100 flex gap-3 flex-shrink-0">
+              <button onClick={() => setShowAgregarResidente(false)}
                 className="flex-1 py-3 rounded-2xl border border-slate-200 text-slate-500 font-black text-[11px] uppercase tracking-widest hover:bg-slate-50 transition active:scale-95">
                 Cancelar
               </button>
-              <button onClick={guardarEdicion} disabled={guardandoEdit}
+              <button onClick={agregarResidentesACausacion} disabled={agregando || residentesParaAgregar.size === 0}
                 className="flex-1 py-3 rounded-2xl bg-violet-600 hover:bg-violet-500 text-white font-black text-[11px] uppercase tracking-widest transition active:scale-95 disabled:opacity-40 flex items-center justify-center gap-2 shadow-lg shadow-violet-500/20">
-                {guardandoEdit ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
-                {guardandoEdit ? "Guardando..." : "Guardar"}
+                {agregando ? <Loader2 size={14} className="animate-spin" /> : <UserPlus size={14} />}
+                {agregando ? "Agregando..." : `Agregar${residentesParaAgregar.size > 0 ? ` (${residentesParaAgregar.size})` : ""}`}
               </button>
             </div>
           </div>
