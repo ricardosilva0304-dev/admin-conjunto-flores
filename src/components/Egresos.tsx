@@ -156,29 +156,6 @@ export default function Egresos({ role }: { role?: string }) {
         </div>
       </section>
 
-      {/* ── KPI STRIP ─────────────────────────────────────────── */}
-      <div className="grid grid-cols-2 gap-3">
-        <div className="bg-rose-600 text-white p-4 sm:p-6 rounded-2xl relative overflow-hidden shadow-lg shadow-rose-600/20">
-          <div className="absolute -right-3 -bottom-3 opacity-10">
-            <TrendingDown size={70} strokeWidth={3} />
-          </div>
-          <p className="text-rose-200 text-[8px] sm:text-[9px] font-black uppercase tracking-[0.2em] mb-1">Total Egresos</p>
-          <h3 className="font-black tabular-nums tracking-tighter text-lg sm:text-2xl md:text-3xl relative z-10">
-            ${totalGeneral.toLocaleString('es-CO')}
-          </h3>
-        </div>
-        <div className="bg-white border border-slate-200 p-4 sm:p-6 rounded-2xl shadow-sm">
-          <div className="w-8 h-8 bg-slate-50 text-slate-400 rounded-lg flex items-center justify-center mb-2 sm:mb-3 border border-slate-100">
-            <Receipt size={16} />
-          </div>
-          <p className="text-slate-400 text-[8px] sm:text-[9px] font-black uppercase tracking-widest mb-1">Facturas</p>
-          <h3 className="text-2xl sm:text-3xl font-black text-slate-800">
-            {egresosFiltrados.length}
-            <span className="text-[10px] text-slate-400 uppercase tracking-widest ml-1">regs.</span>
-          </h3>
-        </div>
-      </div>
-
       {/* ── LISTADO AGRUPADO POR MES ──────────────────────────── */}
       {Object.keys(grupoPorMes).length === 0 ? (
         <div className="py-20 text-center border-2 border-dashed border-slate-200 rounded-2xl bg-slate-50/50">
