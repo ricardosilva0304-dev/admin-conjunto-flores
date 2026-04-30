@@ -8,7 +8,7 @@ import {
 } from "lucide-react";
 
 const ESTRUCTURA_TORRES: any = {
-   "Torre 1": ["101", "102", "103", "104", "105", "106", "107", "108"],
+   "Torre 1": ["101", "102", "103", "104", "105", "106", "107", "108", "109", "110"],
    "Torre 5": generarAptosEstandar(),
    "Torre 6": generarAptosEstandar(),
    "Torre 7": generarAptosEstandar(),
