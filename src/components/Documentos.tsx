@@ -6,7 +6,6 @@ import MultaMascota from "./MultaMascota";
 import PazYSalvo from "./PazYSalvo";
 import { hoyCol } from "@/lib/utils";
 
-
 // ── TIPOS ─────────────────────────────────────────────────────────────────────
 
 interface DocumentoGuardado {
@@ -128,7 +127,25 @@ export default function Documentos({ role }: { role?: string }) {
         const hora = ahora.toLocaleTimeString("es-CO", {
             hour: "2-digit", minute: "2-digit", hour12: false,
         });
-        setForm({ fecha, hora, torre: "", apartamento: "", residente: "", motivo: "" });
+
+        // Para paz y salvo: calcular último día del mes actual
+        let periodoHasta = hora;
+        let cuota = fecha;
+        if (tipo === "paz_y_salvo") {
+            const ultimoDia = new Date(ahora.getFullYear(), ahora.getMonth() + 1, 0).getDate();
+            const nombreMes = ahora.toLocaleDateString("es-CO", { month: "long" });
+            periodoHasta = `Hasta el ${ultimoDia} de ${nombreMes} de ${ahora.getFullYear()}`;
+            cuota = "$146.000 (Ciento Cuarenta y Seis Mil Pesos)";
+        }
+
+        setForm({
+            fecha: tipo === "paz_y_salvo" ? cuota : fecha,
+            hora: tipo === "paz_y_salvo" ? periodoHasta : hora,
+            torre: "",
+            apartamento: "",
+            residente: "",
+            motivo: "",
+        });
         setPlantillaActiva(tipo);
         setError("");
     }
@@ -446,15 +463,15 @@ export default function Documentos({ role }: { role?: string }) {
                                     <label className="text-[9px] font-black uppercase tracking-widest text-slate-400 ml-1 mb-1 block">Período certificado (hasta)</label>
                                     <input type="text" value={form.hora}
                                         onChange={(e) => setForm({ ...form, hora: e.target.value })}
-                                        placeholder="Ej: 30 de abril de 2026"
-                                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-[11px] font-bold text-slate-700 outline-none focus:border-emerald-400 transition" />
+                                        className="w-full bg-slate-50 border border-emerald-300 rounded-xl px-3 py-2.5 text-[11px] font-bold text-slate-700 outline-none focus:border-emerald-500 transition" />
+                                    <p className="text-[9px] text-slate-400 ml-1 mt-1">Auto-calculado · editable si es necesario</p>
                                 </div>
                                 <div>
                                     <label className="text-[9px] font-black uppercase tracking-widest text-slate-400 ml-1 mb-1 block">Cuota de administración</label>
                                     <input type="text" value={form.fecha}
                                         onChange={(e) => setForm({ ...form, fecha: e.target.value })}
-                                        placeholder="Ej: $146.000"
-                                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-[11px] font-bold text-slate-700 outline-none focus:border-emerald-400 transition" />
+                                        className="w-full bg-slate-50 border border-emerald-300 rounded-xl px-3 py-2.5 text-[11px] font-bold text-slate-700 outline-none focus:border-emerald-500 transition" />
+                                    <p className="text-[9px] text-slate-400 ml-1 mt-1">Pre-llenado · editable si cambia el valor</p>
                                 </div>
                             </div>
                         )}
