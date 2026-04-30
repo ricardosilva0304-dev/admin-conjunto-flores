@@ -1,8 +1,9 @@
 "use client";
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
-import { PawPrint, FileText, Plus, Eye, Trash2, Search, Loader2, X, ChevronRight } from "lucide-react";
+import { PawPrint, FileText, Plus, Eye, Trash2, Search, Loader2, X, ChevronRight, ShieldCheck } from "lucide-react";
 import MultaMascota from "./MultaMascota";
+import PazYSalvo from "./PazYSalvo";
 import { hoyCol } from "@/lib/utils";
 
 // ── TIPOS ─────────────────────────────────────────────────────────────────────
@@ -30,7 +31,6 @@ interface FormData {
 }
 
 // ── CATÁLOGO DE PLANTILLAS ────────────────────────────────────────────────────
-// Para agregar una nueva plantilla en el futuro solo agrega un objeto aquí
 
 const PLANTILLAS = [
     {
@@ -38,23 +38,13 @@ const PLANTILLAS = [
         label: "Multa Mascota",
         descripcion: "Requerimiento por incumplimiento de normas de mascotas. Multa $35.000.",
         icono: <PawPrint size={28} />,
-        color: "emerald",
     },
-    // ── PRÓXIMAS PLANTILLAS (descomenta cuando las crees) ──
-    // {
-    //   id: "requerimiento_ruido",
-    //   label: "Requerimiento de Ruido",
-    //   descripcion: "Notificación por perturbación de convivencia o ruido excesivo.",
-    //   icono: <Volume2 size={28} />,
-    //   color: "amber",
-    // },
-    // {
-    //   id: "carta_convivencia",
-    //   label: "Carta de Convivencia",
-    //   descripcion: "Comunicado general de llamado a la sana convivencia.",
-    //   icono: <FileText size={28} />,
-    //   color: "blue",
-    // },
+    {
+        id: "paz_y_salvo",
+        label: "Paz y Salvo",
+        descripcion: "Certificado de paz y salvo por expensas comunes para el propietario.",
+        icono: <ShieldCheck size={28} />,
+    },
 ];
 
 const ESTRUCTURA_TORRES: Record<string, string[]> = {
@@ -75,6 +65,12 @@ function generarAptos() {
 
 const LABEL_TIPO: Record<string, string> = {
     multa_mascota: "Multa Mascota",
+    paz_y_salvo: "Paz y Salvo",
+};
+
+const ICONO_TIPO: Record<string, JSX.Element> = {
+    multa_mascota: <PawPrint size={10} />,
+    paz_y_salvo: <ShieldCheck size={10} />,
 };
 
 // ── COMPONENTE PRINCIPAL ──────────────────────────────────────────────────────
@@ -138,10 +134,19 @@ export default function Documentos({ role }: { role?: string }) {
 
     // ── GUARDAR DOCUMENTO ──
     async function guardarDocumento() {
-        if (!form.fecha || !form.hora || !form.torre || !form.apartamento || !form.residente || !form.motivo) {
-            setError("Por favor completa todos los campos.");
-            return;
+        // Validación según tipo de plantilla
+        if (plantillaActiva === "multa_mascota") {
+            if (!form.fecha || !form.hora || !form.torre || !form.apartamento || !form.residente || !form.motivo) {
+                setError("Por favor completa todos los campos.");
+                return;
+            }
+        } else if (plantillaActiva === "paz_y_salvo") {
+            if (!form.torre || !form.apartamento || !form.residente || !form.motivo || !form.hora || !form.fecha) {
+                setError("Por favor completa todos los campos.");
+                return;
+            }
         }
+
         setGuardando(true);
         setError("");
 
@@ -169,7 +174,6 @@ export default function Documentos({ role }: { role?: string }) {
             return;
         }
 
-        // Cerrar formulario y abrir vista previa automáticamente
         const docCreado: DocumentoGuardado = {
             id: "",
             tipo_documento: plantillaActiva!,
@@ -194,6 +198,8 @@ export default function Documentos({ role }: { role?: string }) {
         [d.residente, d.torre, d.apartamento, d.motivo, LABEL_TIPO[d.tipo_documento] || d.tipo_documento]
             .join(" ").toLowerCase().includes(busqueda.toLowerCase())
     );
+
+    const plantillaInfo = PLANTILLAS.find((p) => p.id === plantillaActiva);
 
     // ── RENDER ──────────────────────────────────────────────────────────────────
     return (
@@ -245,7 +251,6 @@ export default function Documentos({ role }: { role?: string }) {
                     <h2 className="text-[11px] font-black uppercase tracking-[0.2em] text-slate-400">
                         Historial de documentos
                     </h2>
-                    {/* Buscador */}
                     <div className="relative w-full sm:w-64">
                         <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                         <input
@@ -279,7 +284,7 @@ export default function Documentos({ role }: { role?: string }) {
                                     <th className="text-left px-4 py-3 font-black uppercase tracking-wider text-slate-400 text-[9px] hidden md:table-cell">Fecha</th>
                                     <th className="text-left px-4 py-3 font-black uppercase tracking-wider text-slate-400 text-[9px]">Torre / Apto</th>
                                     <th className="text-left px-4 py-3 font-black uppercase tracking-wider text-slate-400 text-[9px] hidden lg:table-cell">Residente</th>
-                                    <th className="text-left px-4 py-3 font-black uppercase tracking-wider text-slate-400 text-[9px] hidden xl:table-cell">Motivo</th>
+                                    <th className="text-left px-4 py-3 font-black uppercase tracking-wider text-slate-400 text-[9px] hidden xl:table-cell">Info</th>
                                     <th className="px-4 py-3 text-[9px]"></th>
                                 </tr>
                             </thead>
@@ -291,7 +296,7 @@ export default function Documentos({ role }: { role?: string }) {
                                         </td>
                                         <td className="px-4 py-3">
                                             <span className="inline-flex items-center gap-1.5 bg-emerald-50 text-emerald-700 font-black text-[9px] uppercase px-2.5 py-1 rounded-lg">
-                                                <PawPrint size={10} />
+                                                {ICONO_TIPO[doc.tipo_documento] ?? <FileText size={10} />}
                                                 {LABEL_TIPO[doc.tipo_documento] || doc.tipo_documento}
                                             </span>
                                         </td>
@@ -329,19 +334,20 @@ export default function Documentos({ role }: { role?: string }) {
                 )}
             </div>
 
-            {/* ══ MODAL: FORMULARIO DE NUEVA MULTA ═════════════════════════════════ */}
+            {/* ══ MODAL: FORMULARIO ═════════════════════════════════════════════════ */}
             {plantillaActiva && (
                 <div className="fixed inset-0 bg-[#0a0c0e]/80 backdrop-blur-sm z-[200] flex items-center justify-center p-4">
-                    <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg border border-slate-100 animate-in zoom-in-95 duration-300">
+                    <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg border border-slate-100 animate-in zoom-in-95 duration-300 max-h-[90vh] overflow-y-auto">
+
                         {/* Header modal */}
-                        <div className="flex items-center justify-between px-7 pt-7 pb-5 border-b border-slate-100">
+                        <div className="flex items-center justify-between px-7 pt-7 pb-5 border-b border-slate-100 sticky top-0 bg-white rounded-t-3xl z-10">
                             <div className="flex items-center gap-3">
                                 <div className="w-10 h-10 bg-emerald-100 text-emerald-600 rounded-xl flex items-center justify-center">
-                                    <PawPrint size={20} />
+                                    {plantillaInfo?.icono}
                                 </div>
                                 <div>
-                                    <p className="font-black text-slate-900 text-[13px]">Nueva Multa Mascota</p>
-                                    <p className="text-[10px] text-slate-400 font-semibold">Completa los datos del infractor</p>
+                                    <p className="font-black text-slate-900 text-[13px]">Nuevo: {plantillaInfo?.label}</p>
+                                    <p className="text-[10px] text-slate-400 font-semibold">Completa los datos del documento</p>
                                 </div>
                             </div>
                             <button onClick={() => setPlantillaActiva(null)} className="p-2 hover:bg-slate-50 rounded-xl text-slate-300 transition-colors">
@@ -349,105 +355,123 @@ export default function Documentos({ role }: { role?: string }) {
                             </button>
                         </div>
 
-                        {/* Campos */}
-                        <div className="px-7 py-6 space-y-4">
-                            {/* Fecha y Hora */}
-                            <div className="grid grid-cols-2 gap-3">
-                                <div>
-                                    <label className="text-[9px] font-black uppercase tracking-widest text-slate-400 ml-1 mb-1 block">Fecha</label>
-                                    <input
-                                        type="text"
-                                        value={form.fecha}
-                                        onChange={(e) => setForm({ ...form, fecha: e.target.value })}
-                                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-[11px] font-bold text-slate-700 outline-none focus:border-emerald-400 transition"
-                                    />
+                        {/* ── CAMPOS MULTA MASCOTA ── */}
+                        {plantillaActiva === "multa_mascota" && (
+                            <div className="px-7 py-6 space-y-4">
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <label className="text-[9px] font-black uppercase tracking-widest text-slate-400 ml-1 mb-1 block">Fecha</label>
+                                        <input type="text" value={form.fecha}
+                                            onChange={(e) => setForm({ ...form, fecha: e.target.value })}
+                                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-[11px] font-bold text-slate-700 outline-none focus:border-emerald-400 transition" />
+                                    </div>
+                                    <div>
+                                        <label className="text-[9px] font-black uppercase tracking-widest text-slate-400 ml-1 mb-1 block">Hora</label>
+                                        <input type="text" value={form.hora}
+                                            onChange={(e) => setForm({ ...form, hora: e.target.value })}
+                                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-[11px] font-bold text-slate-700 outline-none focus:border-emerald-400 transition" />
+                                    </div>
+                                </div>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <label className="text-[9px] font-black uppercase tracking-widest text-slate-400 ml-1 mb-1 block">Torre</label>
+                                        <select value={form.torre} onChange={(e) => setForm({ ...form, torre: e.target.value, apartamento: "" })}
+                                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-[11px] font-bold text-slate-700 outline-none focus:border-emerald-400 transition">
+                                            <option value="">Seleccionar</option>
+                                            {Object.keys(ESTRUCTURA_TORRES).map((t) => <option key={t} value={t}>{t}</option>)}
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="text-[9px] font-black uppercase tracking-widest text-slate-400 ml-1 mb-1 block">Apartamento</label>
+                                        <select value={form.apartamento} onChange={(e) => setForm({ ...form, apartamento: e.target.value })} disabled={!form.torre}
+                                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-[11px] font-bold text-slate-700 outline-none focus:border-emerald-400 transition disabled:opacity-50">
+                                            <option value="">Seleccionar</option>
+                                            {(ESTRUCTURA_TORRES[form.torre] || []).map((a) => <option key={a} value={a}>{a}</option>)}
+                                        </select>
+                                    </div>
                                 </div>
                                 <div>
-                                    <label className="text-[9px] font-black uppercase tracking-widest text-slate-400 ml-1 mb-1 block">Hora</label>
-                                    <input
-                                        type="text"
-                                        value={form.hora}
+                                    <label className="text-[9px] font-black uppercase tracking-widest text-slate-400 ml-1 mb-1 block">Nombre del residente</label>
+                                    <input type="text" value={form.residente}
+                                        onChange={(e) => setForm({ ...form, residente: e.target.value.toUpperCase() })}
+                                        placeholder="Ej: JUAN CARLOS GÓMEZ"
+                                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-[11px] font-bold text-slate-700 uppercase placeholder:normal-case placeholder:text-slate-300 outline-none focus:border-emerald-400 transition" />
+                                </div>
+                                <div>
+                                    <label className="text-[9px] font-black uppercase tracking-widest text-slate-400 ml-1 mb-1 block">Motivo de la multa</label>
+                                    <textarea value={form.motivo} onChange={(e) => setForm({ ...form, motivo: e.target.value })}
+                                        placeholder="Describe el motivo de la multa..." rows={3}
+                                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-[11px] font-bold text-slate-700 outline-none focus:border-emerald-400 transition resize-none" />
+                                </div>
+                            </div>
+                        )}
+
+                        {/* ── CAMPOS PAZ Y SALVO ── */}
+                        {plantillaActiva === "paz_y_salvo" && (
+                            <div className="px-7 py-6 space-y-4">
+                                <div>
+                                    <label className="text-[9px] font-black uppercase tracking-widest text-slate-400 ml-1 mb-1 block">Nombre del propietario</label>
+                                    <input type="text" value={form.residente}
+                                        onChange={(e) => setForm({ ...form, residente: e.target.value.toUpperCase() })}
+                                        placeholder="Ej: JUAN CARLOS GÓMEZ"
+                                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-[11px] font-bold text-slate-700 uppercase placeholder:normal-case placeholder:text-slate-300 outline-none focus:border-emerald-400 transition" />
+                                </div>
+                                <div>
+                                    <label className="text-[9px] font-black uppercase tracking-widest text-slate-400 ml-1 mb-1 block">Número de cédula</label>
+                                    <input type="text" value={form.motivo}
+                                        onChange={(e) => setForm({ ...form, motivo: e.target.value })}
+                                        placeholder="Ej: 1.234.567.890"
+                                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-[11px] font-bold text-slate-700 outline-none focus:border-emerald-400 transition" />
+                                </div>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <label className="text-[9px] font-black uppercase tracking-widest text-slate-400 ml-1 mb-1 block">Torre</label>
+                                        <select value={form.torre} onChange={(e) => setForm({ ...form, torre: e.target.value, apartamento: "" })}
+                                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-[11px] font-bold text-slate-700 outline-none focus:border-emerald-400 transition">
+                                            <option value="">Seleccionar</option>
+                                            {Object.keys(ESTRUCTURA_TORRES).map((t) => <option key={t} value={t}>{t}</option>)}
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="text-[9px] font-black uppercase tracking-widest text-slate-400 ml-1 mb-1 block">Apartamento</label>
+                                        <select value={form.apartamento} onChange={(e) => setForm({ ...form, apartamento: e.target.value })} disabled={!form.torre}
+                                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-[11px] font-bold text-slate-700 outline-none focus:border-emerald-400 transition disabled:opacity-50">
+                                            <option value="">Seleccionar</option>
+                                            {(ESTRUCTURA_TORRES[form.torre] || []).map((a) => <option key={a} value={a}>{a}</option>)}
+                                        </select>
+                                    </div>
+                                </div>
+                                <div>
+                                    <label className="text-[9px] font-black uppercase tracking-widest text-slate-400 ml-1 mb-1 block">Período certificado (hasta)</label>
+                                    <input type="text" value={form.hora}
                                         onChange={(e) => setForm({ ...form, hora: e.target.value })}
-                                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-[11px] font-bold text-slate-700 outline-none focus:border-emerald-400 transition"
-                                    />
-                                </div>
-                            </div>
-
-                            {/* Torre y Apartamento */}
-                            <div className="grid grid-cols-2 gap-3">
-                                <div>
-                                    <label className="text-[9px] font-black uppercase tracking-widest text-slate-400 ml-1 mb-1 block">Torre</label>
-                                    <select
-                                        value={form.torre}
-                                        onChange={(e) => setForm({ ...form, torre: e.target.value, apartamento: "" })}
-                                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-[11px] font-bold text-slate-700 outline-none focus:border-emerald-400 transition"
-                                    >
-                                        <option value="">Seleccionar</option>
-                                        {Object.keys(ESTRUCTURA_TORRES).map((t) => (
-                                            <option key={t} value={t}>{t}</option>
-                                        ))}
-                                    </select>
+                                        placeholder="Ej: 30 de abril de 2026"
+                                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-[11px] font-bold text-slate-700 outline-none focus:border-emerald-400 transition" />
                                 </div>
                                 <div>
-                                    <label className="text-[9px] font-black uppercase tracking-widest text-slate-400 ml-1 mb-1 block">Apartamento</label>
-                                    <select
-                                        value={form.apartamento}
-                                        onChange={(e) => setForm({ ...form, apartamento: e.target.value })}
-                                        disabled={!form.torre}
-                                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-[11px] font-bold text-slate-700 outline-none focus:border-emerald-400 transition disabled:opacity-50"
-                                    >
-                                        <option value="">Seleccionar</option>
-                                        {(ESTRUCTURA_TORRES[form.torre] || []).map((a) => (
-                                            <option key={a} value={a}>{a}</option>
-                                        ))}
-                                    </select>
+                                    <label className="text-[9px] font-black uppercase tracking-widest text-slate-400 ml-1 mb-1 block">Cuota de administración</label>
+                                    <input type="text" value={form.fecha}
+                                        onChange={(e) => setForm({ ...form, fecha: e.target.value })}
+                                        placeholder="Ej: $146.000"
+                                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-[11px] font-bold text-slate-700 outline-none focus:border-emerald-400 transition" />
                                 </div>
                             </div>
+                        )}
 
-                            {/* Residente */}
-                            <div>
-                                <label className="text-[9px] font-black uppercase tracking-widest text-slate-400 ml-1 mb-1 block">Nombre del residente</label>
-                                <input
-                                    type="text"
-                                    value={form.residente}
-                                    onChange={(e) => setForm({ ...form, residente: e.target.value.toUpperCase() })}
-                                    placeholder="Ej: JUAN CARLOS GÓMEZ"
-                                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-[11px] font-bold text-slate-700 outline-none focus:border-emerald-400 transition uppercase placeholder:normal-case placeholder:text-slate-300"
-                                />
+                        {error && (
+                            <div className="px-7 pb-2">
+                                <p className="text-rose-500 text-center text-[10px] font-black bg-rose-50 py-3 rounded-xl border border-rose-100">{error}</p>
                             </div>
-
-                            {/* Motivo */}
-                            <div>
-                                <label className="text-[9px] font-black uppercase tracking-widest text-slate-400 ml-1 mb-1 block">Motivo de la multa</label>
-                                <textarea
-                                    value={form.motivo}
-                                    onChange={(e) => setForm({ ...form, motivo: e.target.value })}
-                                    placeholder="Describe el motivo de la multa..."
-                                    rows={3}
-                                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-[11px] font-bold text-slate-700 outline-none focus:border-emerald-400 transition resize-none"
-                                />
-                            </div>
-
-                            {error && (
-                                <p className="text-rose-500 text-center text-[10px] font-black bg-rose-50 py-3 rounded-xl border border-rose-100">
-                                    {error}
-                                </p>
-                            )}
-                        </div>
+                        )}
 
                         {/* Acciones */}
-                        <div className="px-7 pb-7 flex gap-3">
-                            <button
-                                onClick={() => setPlantillaActiva(null)}
-                                className="flex-1 py-3 rounded-2xl border border-slate-200 text-slate-500 font-black text-[11px] uppercase tracking-widest hover:bg-slate-50 transition active:scale-95"
-                            >
+                        <div className="px-7 pb-7 pt-2 flex gap-3">
+                            <button onClick={() => setPlantillaActiva(null)}
+                                className="flex-1 py-3 rounded-2xl border border-slate-200 text-slate-500 font-black text-[11px] uppercase tracking-widest hover:bg-slate-50 transition active:scale-95">
                                 Cancelar
                             </button>
-                            <button
-                                onClick={guardarDocumento}
-                                disabled={guardando}
-                                className="flex-1 py-3 rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-black font-black text-[11px] uppercase tracking-widest transition active:scale-95 disabled:opacity-40 flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20"
-                            >
+                            <button onClick={guardarDocumento} disabled={guardando}
+                                className="flex-1 py-3 rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-black font-black text-[11px] uppercase tracking-widest transition active:scale-95 disabled:opacity-40 flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20">
                                 {guardando ? <Loader2 size={16} className="animate-spin" /> : null}
                                 {guardando ? "Guardando..." : "Guardar y Ver"}
                             </button>
@@ -456,10 +480,27 @@ export default function Documentos({ role }: { role?: string }) {
                 </div>
             )}
 
-            {/* ══ VISTA PREVIA DEL DOCUMENTO ═══════════════════════════════════════ */}
-            {vistaPrevia && vistaPrevia.tipo_documento === "multa_mascota" && (
+            {/* ══ VISTA PREVIA ══════════════════════════════════════════════════════ */}
+            {vistaPrevia?.tipo_documento === "multa_mascota" && (
                 <MultaMascota
                     datos={vistaPrevia}
+                    onClose={() => setVistaPrevia(null)}
+                />
+            )}
+            {vistaPrevia?.tipo_documento === "paz_y_salvo" && (
+                <PazYSalvo
+                    datos={{
+                        numero: vistaPrevia.numero,
+                        propietario: vistaPrevia.residente,
+                        cedula: vistaPrevia.motivo,
+                        torre: vistaPrevia.torre,
+                        apartamento: vistaPrevia.apartamento,
+                        periodo: vistaPrevia.hora,
+                        cuota: vistaPrevia.fecha,
+                        fecha_expedicion: new Date(vistaPrevia.created_at).toLocaleDateString("es-CO", {
+                            day: "2-digit", month: "long", year: "numeric",
+                        }),
+                    }}
                     onClose={() => setVistaPrevia(null)}
                 />
             )}
