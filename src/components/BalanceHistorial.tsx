@@ -151,42 +151,6 @@ export default function BalanceHistorial() {
                   </div>
                 </div>
               </div>
-
-              {/* ── Columna derecha: Bancos + Ingresos brutos apilados ── */}
-              <div className="md:col-span-1 flex flex-row md:flex-col gap-4">
-
-                {/* En Bancos */}
-                <div className="flex-1 bg-white rounded-2xl p-5 flex flex-col justify-between border border-slate-100 shadow-sm">
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="bg-blue-50 p-1.5 rounded-lg">
-                      <Landmark size={14} className="text-blue-500" />
-                    </div>
-                    <span className="text-[9px] font-black tracking-[0.18em] text-slate-400 uppercase">Bancos</span>
-                  </div>
-                  <div>
-                    <p className="text-lg sm:text-xl font-black text-slate-900 tabular-nums tracking-tight">
-                      {fmt(resumen.banco)}
-                    </p>
-                    <p className="text-[9px] text-slate-400 font-semibold mt-1 uppercase tracking-wider">Transferencias</p>
-                  </div>
-                </div>
-
-                {/* Ingresos Brutos */}
-                <div className="flex-1 bg-slate-900 rounded-2xl p-5 flex flex-col justify-between relative overflow-hidden">
-                  <div className="absolute -top-4 -right-4 w-20 h-20 rounded-full bg-white/5" />
-                  <div className="relative z-10">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-[9px] font-black tracking-[0.18em] text-slate-400 uppercase">Bruto total</span>
-                      <ArrowUpRight size={13} className="text-emerald-400" />
-                    </div>
-                    <p className="text-lg sm:text-xl font-black text-white tabular-nums tracking-tight">
-                      {fmt(resumen.total)}
-                    </p>
-                    <p className="text-[9px] text-slate-500 font-semibold mt-1 uppercase tracking-wider">Ingresos del mes</p>
-                  </div>
-                </div>
-
-              </div>
             </div>
 
             {/* ── TABLA EGRESOS ── */}
