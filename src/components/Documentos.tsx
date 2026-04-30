@@ -1,10 +1,11 @@
 "use client";
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import { PawPrint, FileText, Plus, Eye, Trash2, Search, Loader2, X, ChevronRight, ShieldCheck } from "lucide-react";
 import MultaMascota from "./MultaMascota";
 import PazYSalvo from "./PazYSalvo";
 import { hoyCol } from "@/lib/utils";
+
 
 // ── TIPOS ─────────────────────────────────────────────────────────────────────
 
@@ -68,7 +69,7 @@ const LABEL_TIPO: Record<string, string> = {
     paz_y_salvo: "Paz y Salvo",
 };
 
-const ICONO_TIPO: Record<string, JSX.Element> = {
+const ICONO_TIPO: Record<string, React.ReactElement> = {
     multa_mascota: <PawPrint size={10} />,
     paz_y_salvo: <ShieldCheck size={10} />,
 };
