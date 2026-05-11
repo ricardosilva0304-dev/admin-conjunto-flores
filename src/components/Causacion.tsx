@@ -638,7 +638,11 @@ export default function Causacion({ role }: { role?: string }) {
                           <button
                             onClick={async () => {
                               if (role === "contador") return alert("Sin permiso.");
-                              if (confirm("¿Borrar esta causación y sus deudas?")) { await supabase.from("causaciones_globales").delete().eq("id", h.id); cargarDatos(); }
+                              if (confirm("¿Borrar esta causación y sus deudas?")) {
+                                await supabase.from("deudas_residentes").delete().eq("causacion_id", h.id);
+                                await supabase.from("causaciones_globales").delete().eq("id", h.id);
+                                cargarDatos();
+                              }
                             }}
                             title="Eliminar"
                             className="w-8 h-8 sm:w-9 sm:h-9 bg-slate-100 text-slate-300 rounded-xl flex items-center justify-center hover:bg-rose-500 hover:text-white transition-all active:scale-95">

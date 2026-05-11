@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
 import ReciboCaja from "./ReciboCaja";
 import { calcularValorDeudaHoy, formatPeriodo, fechaColStr, mesColStr, hoyCol } from "@/lib/utils";
@@ -115,14 +115,14 @@ export default function Ingresos({ role }: { role?: string }) {
     setNuevaLinea({ concepto_id: "", mes: "" });
   }
 
-  function getValorLinea(l: LineaAnticipo): number {
+  const getValorLinea = useCallback((l: LineaAnticipo): number => {
     const v = Number(l.valorPersonalizado);
     return v > 0 ? v : l.valorSugerido;
-  }
+  }, []);
 
   const totalAnticipo = useMemo(
     () => lineasAnticipo.reduce((acc, l) => acc + getValorLinea(l), 0),
-    [lineasAnticipo]
+    [lineasAnticipo, getValorLinea]
   );
 
   function minMesAnticipo(): string {
