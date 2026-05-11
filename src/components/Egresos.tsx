@@ -43,6 +43,7 @@ export default function Egresos({ role }: { role?: string }) {
   async function cargarEgresos() {
     setLoading(true);
     const { data } = await supabase.from("egresos").select("*").order('fecha', { ascending: false });
+    if (data) data.sort((a: any, b: any) => Number(b.recibo_n || 0) - Number(a.recibo_n || 0));
     if (data) {
       setEgresos(data);
       // Abrir el mes más reciente por defecto

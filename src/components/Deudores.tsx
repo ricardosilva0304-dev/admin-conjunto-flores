@@ -57,8 +57,8 @@ export default function Deudores({ role }: { role?: string }) {
       const term = busqueda.toLowerCase().trim();
       const coincideTorre = filtroTorre === "TODAS" || r.torre === filtroTorre;
       if (!term) return coincideTorre;
-      if (term.includes("-")) {
-        const [t, a] = term.split("-");
+      if (term.includes("-") || /^\d{4,}$/.test(term)) {
+        const [t, a] = term.includes("-") ? term.split("-") : [term[0], term.slice(1)];
         return r.torre.includes(t) && r.apartamento.startsWith(a) && coincideTorre;
       }
       return (r.nombre.toLowerCase().includes(term) || r.apartamento.includes(term)) && coincideTorre;

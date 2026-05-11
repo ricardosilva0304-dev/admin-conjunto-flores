@@ -137,8 +137,8 @@ export default function Residentes({ role }: { role?: string }) {
       const term = busqueda.toLowerCase().trim();
       if (filtroTorre !== "TODAS" && r.torre !== filtroTorre) return false;
       if (!term) return true;
-      if (term.includes("-")) {
-         const [tPart, aPart] = term.split("-");
+      if (term.includes("-") || /^\d{4,}$/.test(term)) {
+         const [tPart, aPart] = term.includes("-") ? term.split("-") : [term[0], term.slice(1)];
          return r.torre.includes(tPart) && r.apartamento.startsWith(aPart);
       }
       return r.nombre.toLowerCase().includes(term) || r.apartamento.includes(term);
