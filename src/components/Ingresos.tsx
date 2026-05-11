@@ -6,7 +6,8 @@ import { calcularValorDeudaHoy, formatPeriodo, fechaColStr, mesColStr, hoyCol } 
 import {
   Search, Wallet, Loader2, X, Receipt,
   Calendar, ChevronRight, Hash, CreditCard,
-  CheckCircle2, Plus, DollarSign, Clock
+  CheckCircle2, Plus, DollarSign, Clock,
+  Trash2, AlertCircle, ChevronDown, Pencil
 } from "lucide-react";
 
 export default function Ingresos({ role }: { role?: string }) {
@@ -40,74 +41,125 @@ export default function Ingresos({ role }: { role?: string }) {
   const [showAnticipoModal, setShowAnticipoModal] = useState(false);
   const [guardandoAnticipo, setGuardandoAnticipo] = useState(false);
   const [conceptosPago, setConceptosPago] = useState<any[]>([]);
-  const [formAnticipo, setFormAnticipo] = useState({
-    concepto_id: "",
-    mes: "",
+  const [anticiposActivos, setAnticimposActivos] = useState<any[]>([]);
+
+  // Tipo de una línea en el carrito de anticipos
+  type LineaAnticipo = {
+    id: string; // key temporal
+    concepto_id: string;
+    mes: string;
+    valorSugerido: number;
+    valorPersonalizado: string; // string para el input, "" = usa sugerido
+    editandoValor: boolean;
+    valorM2: number;
+    valorM3: number;
+  };
+
+  const [lineasAnticipo, setLineasAnticipo] = useState<LineaAnticipo[]>([]);
+  const [formAnticipoBase, setFormAnticipoBase] = useState({
     metodo: "Transferencia",
     referencia: "",
     fechaRecibo: fechaColStr(),
     fechaTransaccion: fechaColStr(),
     numeroRecibo: "",
   });
+  // Línea que se está configurando (selector añadir)
+  const [nuevaLinea, setNuevaLinea] = useState({ concepto_id: "", mes: "" });
 
-  // Precio m1 (con descuento) — lo que el residente paga hoy
-  const valorAnticipo = useMemo(() => {
-    if (!formAnticipo.concepto_id || !resSeleccionado) return 0;
-    const c = conceptosPago.find(c => c.id === parseInt(formAnticipo.concepto_id));
-    if (!c) return 0;
-    const precio = Number(c.monto_1_10) || 0;
-    if (c.cobro_por_vehiculo) {
+  const MESES_NOMBRES = ["ENERO", "FEBRERO", "MARZO", "ABRIL", "MAYO", "JUNIO",
+    "JULIO", "AGOSTO", "SEPTIEMBRE", "OCTUBRE", "NOVIEMBRE", "DICIEMBRE"];
+
+  function mesLabel(mes: string) {
+    if (!mes) return "";
+    const [a, m] = mes.split("-");
+    return `${MESES_NOMBRES[parseInt(m) - 1]} ${a}`;
+  }
+
+  function calcularValoresPorConcepto(concepto_id: string): { m1: number; m2: number; m3: number } {
+    const c = conceptosPago.find(c => c.id === parseInt(concepto_id));
+    if (!c || !resSeleccionado) return { m1: 0, m2: 0, m3: 0 };
+    const escalar = (precio: number) => {
+      if (!c.cobro_por_vehiculo) return precio;
       const n = c.nombre.toUpperCase();
       if (n.includes("CARRO")) return precio * (Number(resSeleccionado.carros) || 0);
       if (n.includes("MOTO")) return precio * (Number(resSeleccionado.motos) || 0);
       if (n.includes("BICI")) return precio * (Number(resSeleccionado.bicis) || 0);
       return 0;
-    }
-    return precio;
-  }, [formAnticipo.concepto_id, resSeleccionado, conceptosPago]);
+    };
+    return {
+      m1: escalar(Number(c.monto_1_10) || 0),
+      m2: escalar(Number(c.monto_11_20) || Number(c.monto_1_10) || 0),
+      m3: escalar(Number(c.monto_21_adelante) || Number(c.monto_1_10) || 0),
+    };
+  }
 
-  // Precios m2/m3 — se guardan en la deuda para que calcularValorDeudaHoy
-  // escale correctamente si la diferencia queda pendiente después del día 10
-  const valorAnticipoM2 = useMemo(() => {
-    if (!formAnticipo.concepto_id || !resSeleccionado) return 0;
-    const c = conceptosPago.find(c => c.id === parseInt(formAnticipo.concepto_id));
-    if (!c) return 0;
-    const precio = Number(c.monto_11_20) || Number(c.monto_1_10) || 0;
-    if (c.cobro_por_vehiculo) {
-      const n = c.nombre.toUpperCase();
-      if (n.includes("CARRO")) return precio * (Number(resSeleccionado.carros) || 0);
-      if (n.includes("MOTO")) return precio * (Number(resSeleccionado.motos) || 0);
-      if (n.includes("BICI")) return precio * (Number(resSeleccionado.bicis) || 0);
-      return 0;
-    }
-    return precio;
-  }, [formAnticipo.concepto_id, resSeleccionado, conceptosPago]);
+  function agregarLineaAnticipo() {
+    if (!nuevaLinea.concepto_id || !nuevaLinea.mes) return;
+    // Evitar duplicado
+    const existe = lineasAnticipo.find(
+      l => l.concepto_id === nuevaLinea.concepto_id && l.mes === nuevaLinea.mes
+    );
+    if (existe) return alert(`⚠️ Ya agregaste ese concepto para ${mesLabel(nuevaLinea.mes)}.`);
+    const vals = calcularValoresPorConcepto(nuevaLinea.concepto_id);
+    const linea: LineaAnticipo = {
+      id: `${nuevaLinea.concepto_id}-${nuevaLinea.mes}-${Date.now()}`,
+      concepto_id: nuevaLinea.concepto_id,
+      mes: nuevaLinea.mes,
+      valorSugerido: vals.m1,
+      valorPersonalizado: "",
+      editandoValor: false,
+      valorM2: vals.m2,
+      valorM3: vals.m3,
+    };
+    setLineasAnticipo(prev => [...prev, linea]);
+    setNuevaLinea({ concepto_id: "", mes: "" });
+  }
 
-  const valorAnticipoM3 = useMemo(() => {
-    if (!formAnticipo.concepto_id || !resSeleccionado) return 0;
-    const c = conceptosPago.find(c => c.id === parseInt(formAnticipo.concepto_id));
-    if (!c) return 0;
-    const precio = Number(c.monto_21_adelante) || Number(c.monto_1_10) || 0;
-    if (c.cobro_por_vehiculo) {
-      const n = c.nombre.toUpperCase();
-      if (n.includes("CARRO")) return precio * (Number(resSeleccionado.carros) || 0);
-      if (n.includes("MOTO")) return precio * (Number(resSeleccionado.motos) || 0);
-      if (n.includes("BICI")) return precio * (Number(resSeleccionado.bicis) || 0);
-      return 0;
-    }
-    return precio;
-  }, [formAnticipo.concepto_id, resSeleccionado, conceptosPago]);
+  function getValorLinea(l: LineaAnticipo): number {
+    const v = Number(l.valorPersonalizado);
+    return v > 0 ? v : l.valorSugerido;
+  }
 
-  const mesAnticipoLabel = useMemo(() => {
-    if (!formAnticipo.mes) return "";
-    const [a, m] = formAnticipo.mes.split("-");
-    const n = ["ENERO", "FEBRERO", "MARZO", "ABRIL", "MAYO", "JUNIO",
-      "JULIO", "AGOSTO", "SEPTIEMBRE", "OCTUBRE", "NOVIEMBRE", "DICIEMBRE"];
-    return `${n[parseInt(m) - 1]} ${a}`;
-  }, [formAnticipo.mes]);
+  const totalAnticipo = useMemo(
+    () => lineasAnticipo.reduce((acc, l) => acc + getValorLinea(l), 0),
+    [lineasAnticipo]
+  );
+
+  function minMesAnticipo(): string {
+    const d = hoyCol();
+    d.setMonth(d.getMonth() + 1);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+  }
+
+  async function cargarAnticimposActivos(resId: number) {
+    const { data } = await supabase
+      .from("deudas_residentes")
+      .select("id, concepto_nombre, saldo_pendiente, fecha_vencimiento")
+      .eq("residente_id", resId)
+      .eq("estado", "ANTICIPO")
+      .lt("saldo_pendiente", 0);
+    setAnticimposActivos(data || []);
+  }
+
+  const [ultimoRecibo, setUltimoRecibo] = useState<{ numero: string; fecha: string; nombre: string; monto: number } | null>(null);
+
+  async function cargarUltimoRecibo() {
+    const { data } = await supabase
+      .from("pagos")
+      .select("numero_recibo, fecha_pago, monto_total, unidad")
+      .order("id", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (data) setUltimoRecibo({
+      numero: data.numero_recibo,
+      fecha: data.fecha_pago,
+      nombre: data.unidad,
+      monto: data.monto_total,
+    });
+  }
 
   useEffect(() => {
-    cargarResidentes(); cargarConceptos();
+    cargarResidentes(); cargarConceptos(); cargarUltimoRecibo();
     const canal = supabase.channel("ingresos-rt")
       .on("postgres_changes", { event: "*", schema: "public", table: "deudas_residentes" }, () => {
         if (resSeleccionado) cargarDeudasResidente(resSeleccionado);
@@ -156,6 +208,7 @@ export default function Ingresos({ role }: { role?: string }) {
       ordenadas.forEach((d: any) => (init[d.id] = ""));
       setAbonos(init);
     }
+    await cargarAnticimposActivos(res.id);
     const sig = await sugerirSiguienteRecibo();
     setFormRecibo(prev => ({ ...prev, numero: sig }));
   }
@@ -193,90 +246,101 @@ export default function Ingresos({ role }: { role?: string }) {
     setGuardandoManual(false);
   }
 
-  // ── ANTICIPO + RECIBO DE CAJA ─────────────────────────────────────────────
+  // ── ANTICIPO MULTI-LÍNEA + RECIBO DE CAJA ────────────────────────────────
   async function guardarAnticipo(e: React.FormEvent) {
     e.preventDefault();
     if (role === 'contador') return alert("No tienes permiso para registrar anticipos.");
-    if (!resSeleccionado || !formAnticipo.concepto_id || !formAnticipo.mes) return;
-    if (valorAnticipo <= 0)
-      return alert("Sin vehículos registrados para este concepto.");
-    if (!formAnticipo.numeroRecibo)
-      return alert("Ingresa el número de recibo.");
+    if (!resSeleccionado || lineasAnticipo.length === 0) return;
+    if (totalAnticipo <= 0) return alert("El total a anticipar debe ser mayor a $0.");
+    if (!formAnticipoBase.numeroRecibo) return alert("Ingresa el número de recibo.");
 
-    const concepto = conceptosPago.find(c => c.id === parseInt(formAnticipo.concepto_id));
-    if (!concepto) return;
+    // Validar que ninguna línea tenga valor 0
+    for (const l of lineasAnticipo) {
+      if (getValorLinea(l) <= 0) {
+        const c = conceptosPago.find(c => c.id === parseInt(l.concepto_id));
+        return alert(`⚠️ El valor de "${c?.nombre}" para ${mesLabel(l.mes)} no puede ser $0.`);
+      }
+    }
 
-    const nombreAnticipo =
-      `ANTICIPO - ${concepto.nombre.trim().toUpperCase()} (${mesAnticipoLabel})`;
+    // Validar duplicados en BD para cada línea
+    const unidad = `T${resSeleccionado.torre.slice(-1)}-${resSeleccionado.apartamento}`;
+    for (const l of lineasAnticipo) {
+      const c = conceptosPago.find(c => c.id === parseInt(l.concepto_id));
+      if (!c) continue;
+      const nombreAnticipo = `ANTICIPO - ${c.nombre.trim().toUpperCase()} (${mesLabel(l.mes)})`;
+      const { data: existente } = await supabase
+        .from("deudas_residentes").select("id")
+        .eq("residente_id", resSeleccionado.id)
+        .eq("concepto_nombre", nombreAnticipo).maybeSingle();
+      if (existente)
+        return alert(`⚠️ Ya existe un anticipo de "${c.nombre}" para ${mesLabel(l.mes)}.`);
+    }
 
-    // Duplicado anticipo
-    const { data: existente } = await supabase
-      .from("deudas_residentes").select("id")
-      .eq("residente_id", resSeleccionado.id)
-      .eq("concepto_nombre", nombreAnticipo).maybeSingle();
-    if (existente)
-      return alert(`⚠️ Ya existe un anticipo de "${concepto.nombre}" para ${mesAnticipoLabel}.`);
-
-    // Duplicado recibo
+    // Validar duplicado de recibo
     const { data: reciboExiste } = await supabase
       .from("pagos").select("numero_recibo")
-      .eq("numero_recibo", formAnticipo.numeroRecibo).maybeSingle();
-    if (reciboExiste)
-      return alert("⚠️ Este número de recibo ya existe.");
+      .eq("numero_recibo", formAnticipoBase.numeroRecibo).maybeSingle();
+    if (reciboExiste) return alert("⚠️ Este número de recibo ya existe.");
 
     setGuardandoAnticipo(true);
     try {
-      const unidad = `T${resSeleccionado.torre.slice(-1)}-${resSeleccionado.apartamento}`;
+      // 1 — Insertar una deuda-crédito por cada línea
+      const conceptosTexto: string[] = [];
+      for (const l of lineasAnticipo) {
+        const c = conceptosPago.find(c => c.id === parseInt(l.concepto_id))!;
+        const nombreAnticipo = `ANTICIPO - ${c.nombre.trim().toUpperCase()} (${mesLabel(l.mes)})`;
+        const valorFinal = getValorLinea(l);
+        const { error: errDeuda } = await supabase.from("deudas_residentes").insert([{
+          residente_id: resSeleccionado.id,
+          unidad,
+          concepto_nombre: nombreAnticipo,
+          monto_original: -valorFinal,
+          saldo_pendiente: -valorFinal,
+          precio_m1: valorFinal,
+          precio_m2: l.valorM2,
+          precio_m3: l.valorM3,
+          fecha_vencimiento: `${l.mes}-01`,
+          estado: "ANTICIPO",
+        }]);
+        if (errDeuda) throw errDeuda;
+        conceptosTexto.push(`${nombreAnticipo}|$${valorFinal.toLocaleString("es-CO")}`);
+      }
 
-      // 1 — Guardar crédito en deudas_residentes (saldo NEGATIVO)
-      const { error: errDeuda } = await supabase.from("deudas_residentes").insert([{
-        residente_id: resSeleccionado.id,
-        unidad,
-        concepto_nombre: nombreAnticipo,
-        monto_original: -valorAnticipo,
-        saldo_pendiente: -valorAnticipo,  // negativo = crédito
-        precio_m1: valorAnticipo,
-        precio_m2: valorAnticipoM2,
-        precio_m3: valorAnticipoM3,
-        fecha_vencimiento: `${formAnticipo.mes}-01`,
-        estado: "ANTICIPO",
-      }]);
-      if (errDeuda) throw errDeuda;
-
-      // 2 — Registrar pago en tabla pagos
-      const conceptoTexto = `${nombreAnticipo}|$${valorAnticipo.toLocaleString("es-CO")}`;
+      // 2 — Registrar un único pago con todos los conceptos
+      const conceptoTextoJoin = conceptosTexto.join("||");
       const { error: errPago } = await supabase.from("pagos").insert([{
         residente_id: resSeleccionado.id,
         unidad,
-        numero_recibo: formAnticipo.numeroRecibo,
-        monto_total: valorAnticipo,
-        fecha_pago: formAnticipo.fechaRecibo || fechaColStr(),
-        metodo_pago: formAnticipo.metodo,
-        comprobante: formAnticipo.referencia.toUpperCase(),
-        fecha_transaccion: formAnticipo.fechaTransaccion,
-        concepto_texto: conceptoTexto,
+        numero_recibo: formAnticipoBase.numeroRecibo,
+        monto_total: totalAnticipo,
+        fecha_pago: formAnticipoBase.fechaRecibo || fechaColStr(),
+        metodo_pago: formAnticipoBase.metodo,
+        comprobante: formAnticipoBase.referencia.toUpperCase(),
+        fecha_transaccion: formAnticipoBase.fechaTransaccion,
+        concepto_texto: conceptoTextoJoin,
         saldo_anterior: totalDeudaAcumulada,
       }]);
       if (errPago) throw errPago;
 
       // 3 — Abrir ReciboCaja
       setDatosRecibo({
-        numero: formAnticipo.numeroRecibo,
-        fecha: formAnticipo.fechaRecibo || fechaColStr(),
+        numero: formAnticipoBase.numeroRecibo,
+        fecha: formAnticipoBase.fechaRecibo || fechaColStr(),
         nombre: resSeleccionado.nombre,
         unidad,
-        valor: valorAnticipo,
-        concepto: conceptoTexto,
-        metodo: formAnticipo.metodo,
-        comprobante: formAnticipo.referencia,
-        fechaTransaccion: formAnticipo.fechaTransaccion,
+        valor: totalAnticipo,
+        concepto: conceptoTextoJoin,
+        metodo: formAnticipoBase.metodo,
+        comprobante: formAnticipoBase.referencia,
+        fechaTransaccion: formAnticipoBase.fechaTransaccion,
         saldoAnterior: totalDeudaAcumulada,
         email: resSeleccionado.email,
       });
 
       setShowAnticipoModal(false);
-      setFormAnticipo({
-        concepto_id: "", mes: "",
+      setLineasAnticipo([]);
+      setNuevaLinea({ concepto_id: "", mes: "" });
+      setFormAnticipoBase({
         metodo: "Transferencia", referencia: "",
         fechaRecibo: fechaColStr(),
         fechaTransaccion: fechaColStr(),
@@ -378,6 +442,27 @@ export default function Ingresos({ role }: { role?: string }) {
     <div className="max-w-6xl mx-auto space-y-4 sm:space-y-6 pb-24 px-3 sm:px-4 md:px-6 lg:px-0 font-sans text-slate-800">
       {datosRecibo && <ReciboCaja datos={datosRecibo} onClose={() => setDatosRecibo(null)} />}
 
+      {/* ── ÚLTIMO RECIBO ─────────────────────────────────────── */}
+      {ultimoRecibo && (
+        <div className="bg-slate-50 border border-slate-100 rounded-2xl px-5 py-3 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 bg-white border border-slate-200 rounded-xl flex items-center justify-center flex-shrink-0">
+              <Receipt size={14} className="text-slate-400" />
+            </div>
+            <div>
+              <p className="text-[8px] font-black text-slate-300 uppercase tracking-widest leading-none mb-0.5">Último recibo</p>
+              <p className="text-xs font-black text-slate-700">N° {ultimoRecibo.numero}
+                <span className="font-bold text-slate-400 ml-2">{ultimoRecibo.nombre}</span>
+              </p>
+            </div>
+          </div>
+          <div className="text-right flex-shrink-0">
+            <p className="text-xs font-black text-emerald-600 tabular-nums">${ultimoRecibo.monto.toLocaleString("es-CO")}</p>
+            <p className="text-[8px] font-bold text-slate-300">{ultimoRecibo.fecha}</p>
+          </div>
+        </div>
+      )}
+
       {/* ── BUSCADOR ─────────────────────────────────────────────── */}
       <section className="bg-white p-4 sm:p-6 rounded-2xl border border-slate-100 shadow-sm relative z-[40]">
         <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] block mb-2">
@@ -455,7 +540,9 @@ export default function Ingresos({ role }: { role?: string }) {
                   <button
                     onClick={async () => {
                       const sig = await sugerirSiguienteRecibo();
-                      setFormAnticipo(prev => ({ ...prev, numeroRecibo: sig, concepto_id: "", mes: "" }));
+                      setFormAnticipoBase(prev => ({ ...prev, numeroRecibo: sig }));
+                      setLineasAnticipo([]);
+                      setNuevaLinea({ concepto_id: "", mes: "" });
                       setShowAnticipoModal(true);
                     }}
                     className="bg-amber-500 hover:bg-amber-600 text-white px-2.5 py-1.5 rounded-lg text-[9px] font-black uppercase flex items-center gap-1 transition-all active:scale-95">
@@ -514,22 +601,54 @@ export default function Ingresos({ role }: { role?: string }) {
             </div>
 
             {/* Totales */}
-            <div className="grid grid-cols-2 gap-3">
-              <div className="bg-emerald-600 p-4 sm:p-5 rounded-2xl text-white shadow-lg flex items-center justify-between">
-                <div>
-                  <p className="text-emerald-100 text-[9px] font-black uppercase tracking-widest mb-1">Total a Recibir</p>
-                  <h4 className="text-xl sm:text-2xl font-black tabular-nums">${totalAPagarRecibo.toLocaleString()}</h4>
+            <div className="space-y-3">
+              {/* Panel anticipos activos */}
+              {anticiposActivos.length > 0 && (
+                <div className="bg-amber-50 border border-amber-100 rounded-2xl p-4">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Clock size={12} className="text-amber-500" />
+                    <p className="text-[9px] font-black text-amber-600 uppercase tracking-widest">
+                      Anticipos activos — se aplicarán en causación
+                    </p>
+                  </div>
+                  <div className="space-y-2">
+                    {anticiposActivos.map(a => {
+                      const credito = Math.abs(Number(a.saldo_pendiente));
+                      return (
+                        <div key={a.id} className="flex items-center justify-between bg-white rounded-xl px-3 py-2.5 border border-amber-100">
+                          <p className="text-[10px] font-bold text-slate-600 uppercase leading-tight flex-1 mr-2 break-words">
+                            {a.concepto_nombre}
+                          </p>
+                          <span className="text-[10px] font-black text-amber-700 tabular-nums flex-shrink-0">
+                            ${credito.toLocaleString("es-CO")} CR
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <p className="text-[9px] text-amber-400 font-semibold mt-2.5 text-right">
+                    Total crédito: ${anticiposActivos.reduce((acc, a) => acc + Math.abs(Number(a.saldo_pendiente)), 0).toLocaleString("es-CO")}
+                  </p>
                 </div>
-                <div className="w-9 h-9 bg-white/20 rounded-xl flex items-center justify-center flex-shrink-0">
-                  <Wallet size={17} />
+              )}
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="bg-emerald-600 p-4 sm:p-5 rounded-2xl text-white shadow-lg flex items-center justify-between">
+                  <div>
+                    <p className="text-emerald-100 text-[9px] font-black uppercase tracking-widest mb-1">Total a Recibir</p>
+                    <h4 className="text-xl sm:text-2xl font-black tabular-nums">${totalAPagarRecibo.toLocaleString()}</h4>
+                  </div>
+                  <div className="w-9 h-9 bg-white/20 rounded-xl flex items-center justify-center flex-shrink-0">
+                    <Wallet size={17} />
+                  </div>
                 </div>
-              </div>
-              <div className="bg-slate-900 p-4 sm:p-5 rounded-2xl text-white shadow-lg flex items-center justify-between">
-                <div>
-                  <p className="text-slate-400 text-[9px] font-black uppercase tracking-widest mb-1">Saldo Estimado</p>
-                  <h4 className="text-xl sm:text-2xl font-black tabular-nums opacity-60">
-                    ${Math.abs(totalDeudaAcumulada - totalAPagarRecibo).toLocaleString()}
-                  </h4>
+                <div className="bg-slate-900 p-4 sm:p-5 rounded-2xl text-white shadow-lg flex items-center justify-between">
+                  <div>
+                    <p className="text-slate-400 text-[9px] font-black uppercase tracking-widest mb-1">Saldo Estimado</p>
+                    <h4 className="text-xl sm:text-2xl font-black tabular-nums opacity-60">
+                      ${Math.abs(totalDeudaAcumulada - totalAPagarRecibo).toLocaleString()}
+                    </h4>
+                  </div>
                 </div>
               </div>
             </div>
@@ -677,17 +796,17 @@ export default function Ingresos({ role }: { role?: string }) {
         </div>
       )}
 
-      {/* ── MODAL PAGO ANTICIPADO ─────────────────────────────────── */}
+      {/* ── MODAL PAGO ANTICIPADO (MULTI-LÍNEA) ─────────────────── */}
       {showAnticipoModal && resSeleccionado && (
         <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-md z-[500] flex items-end sm:items-center justify-center p-0 sm:p-4">
-          <div className="bg-white w-full sm:max-w-lg rounded-t-3xl sm:rounded-2xl shadow-2xl overflow-hidden animate-in slide-in-from-bottom-4 sm:zoom-in-95 duration-200 flex flex-col max-h-[95vh]">
+          <div className="bg-white w-full sm:max-w-xl rounded-t-3xl sm:rounded-2xl shadow-2xl overflow-hidden animate-in slide-in-from-bottom-4 sm:zoom-in-95 duration-200 flex flex-col max-h-[95vh]">
 
             {/* Header */}
             <div className="bg-amber-50 px-5 py-4 border-b border-amber-100 flex justify-between items-center flex-shrink-0">
               <div>
                 <h3 className="font-black text-slate-900 uppercase text-xs tracking-[0.2em] flex items-center gap-2">
                   <div className="w-1.5 h-4 bg-amber-500 rounded-full" />
-                  Pago Anticipado
+                  Pagos Anticipados
                 </h3>
                 <p className="text-[9px] font-bold text-slate-400 uppercase mt-0.5">
                   {resSeleccionado.nombre} · T{resSeleccionado.torre.slice(-1)}-{resSeleccionado.apartamento}
@@ -698,137 +817,228 @@ export default function Ingresos({ role }: { role?: string }) {
               </button>
             </div>
 
-            <form onSubmit={guardarAnticipo} className="flex-1 overflow-y-auto p-5 space-y-4">
+            <form onSubmit={guardarAnticipo} className="flex-1 overflow-y-auto p-5 space-y-5">
 
-              {/* Concepto + Mes */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="space-y-1.5">
-                  <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block">Concepto</label>
-                  <select
-                    className="w-full bg-slate-50 border border-slate-100 p-3 rounded-xl font-bold text-sm outline-none focus:bg-white appearance-none"
-                    value={formAnticipo.concepto_id}
-                    onChange={e => setFormAnticipo({ ...formAnticipo, concepto_id: e.target.value })}
-                    required
-                  >
-                    <option value="">Seleccionar...</option>
-                    {conceptosPago.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
-                  </select>
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block">Mes Futuro</label>
-                  <div className="relative">
-                    <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-300" size={12} />
-                    <input type="month"
-                      className="w-full bg-slate-50 border border-slate-100 p-3 pl-8 rounded-xl font-bold text-sm outline-none focus:bg-white"
-                      value={formAnticipo.mes}
-                      min={(() => { const d = hoyCol(); d.setMonth(d.getMonth() + 1); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`; })()}
-                      onChange={e => setFormAnticipo({ ...formAnticipo, mes: e.target.value })}
-                      required
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Preview valor */}
-              {formAnticipo.concepto_id && formAnticipo.mes && (
-                <div className={`rounded-xl p-4 border ${valorAnticipo > 0 ? "bg-amber-50 border-amber-100" : "bg-rose-50 border-rose-100"}`}>
-                  {valorAnticipo > 0 ? (
-                    <>
-                      <p className="text-[9px] font-black text-amber-600 uppercase tracking-widest mb-0.5">
-                        Valor con descuento — días 1 al 10
-                      </p>
-                      <p className="text-2xl font-black text-amber-700 tabular-nums">
-                        ${valorAnticipo.toLocaleString("es-CO")}
-                      </p>
-                      <p className="text-[10px] text-amber-500 font-semibold mt-1">
-                        {mesAnticipoLabel} · Se aplica al generar la causación
-                      </p>
-                    </>
-                  ) : (
-                    <p className="text-[9px] font-black text-rose-500 uppercase tracking-widest">
-                      Sin vehículos para este concepto
-                    </p>
-                  )}
-                </div>
-              )}
-
-              {/* Datos del recibo */}
-              <div className="border-t border-slate-100 pt-4 space-y-3">
-                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Datos del Recibo</p>
-
-                {/* Fecha del recibo */}
-                <div className="space-y-1">
-                  <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block">Fecha del Recibo</label>
-                  <div className="relative">
-                    <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-300" size={12} />
-                    <input type="date"
-                      className="w-full bg-slate-50 border border-slate-100 p-3 pl-8 rounded-xl outline-none font-bold text-sm focus:bg-white"
-                      value={formAnticipo.fechaRecibo}
-                      onChange={e => setFormAnticipo({ ...formAnticipo, fechaRecibo: e.target.value })}
-                    />
-                  </div>
-                </div>
-
-                {/* N° recibo */}
-                <div className="space-y-1">
-                  <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block">N° de Recibo</label>
-                  <div className="relative">
-                    <Hash className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-300" size={12} />
-                    <input
-                      className="w-full bg-slate-50 border border-slate-100 p-3 pl-8 rounded-xl outline-none font-black text-slate-900 text-sm"
-                      value={formAnticipo.numeroRecibo}
-                      onChange={e => setFormAnticipo({ ...formAnticipo, numeroRecibo: e.target.value })}
-                      required
-                    />
-                  </div>
-                </div>
-
-                {/* Medio de pago */}
-                <div className="space-y-1">
-                  <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block">Medio de Pago</label>
-                  <div className="flex bg-slate-100 p-1 rounded-xl gap-1">
-                    {["Transferencia", "Efectivo"].map(m => (
-                      <button key={m} type="button"
-                        onClick={() => setFormAnticipo({ ...formAnticipo, metodo: m })}
-                        className={`flex-1 py-2 rounded-lg text-[9px] font-black transition-all ${formAnticipo.metodo === m ? "bg-white text-slate-900 shadow border" : "text-slate-400"}`}>
-                        {m.toUpperCase()}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Referencia + Fecha consignación */}
+              {/* ── AGREGAR LÍNEA ─────────────────────────────────── */}
+              <div className="bg-slate-50 rounded-2xl p-4 space-y-3 border border-slate-100">
+                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
+                  <Plus size={10} /> Agregar concepto
+                </p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="space-y-1">
-                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block">Referencia</label>
-                    <input
-                      className="w-full bg-slate-50 border border-slate-100 p-3 rounded-xl outline-none font-bold text-sm focus:bg-white"
-                      placeholder="Ref bancaria..."
-                      value={formAnticipo.referencia}
-                      onChange={e => setFormAnticipo({ ...formAnticipo, referencia: e.target.value })}
-                    />
+                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block">Concepto</label>
+                    <select
+                      className="w-full bg-white border border-slate-200 p-3 rounded-xl font-bold text-sm outline-none focus:border-amber-400 appearance-none"
+                      value={nuevaLinea.concepto_id}
+                      onChange={e => setNuevaLinea(prev => ({ ...prev, concepto_id: e.target.value }))}
+                    >
+                      <option value="">Seleccionar...</option>
+                      {conceptosPago.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
+                    </select>
                   </div>
                   <div className="space-y-1">
-                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block">Fecha Consignación</label>
+                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block">Mes futuro</label>
                     <div className="relative">
                       <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-300" size={12} />
-                      <input type="date"
-                        className="w-full bg-slate-50 border border-slate-100 p-3 pl-8 rounded-xl outline-none font-bold text-sm focus:bg-white"
-                        value={formAnticipo.fechaTransaccion}
-                        onChange={e => setFormAnticipo({ ...formAnticipo, fechaTransaccion: e.target.value })}
+                      <input type="month"
+                        className="w-full bg-white border border-slate-200 p-3 pl-8 rounded-xl font-bold text-sm outline-none focus:border-amber-400"
+                        value={nuevaLinea.mes}
+                        min={minMesAnticipo()}
+                        onChange={e => setNuevaLinea(prev => ({ ...prev, mes: e.target.value }))}
                       />
                     </div>
                   </div>
                 </div>
+                {/* Preview del valor sugerido */}
+                {nuevaLinea.concepto_id && nuevaLinea.mes && (() => {
+                  const vals = calcularValoresPorConcepto(nuevaLinea.concepto_id);
+                  return vals.m1 > 0 ? (
+                    <div className="flex items-center justify-between bg-amber-50 rounded-xl px-3 py-2 border border-amber-100">
+                      <span className="text-[9px] font-black text-amber-600 uppercase">Valor con descuento (días 1-10)</span>
+                      <span className="text-sm font-black text-amber-700 tabular-nums">${vals.m1.toLocaleString("es-CO")}</span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2 bg-rose-50 rounded-xl px-3 py-2 border border-rose-100">
+                      <AlertCircle size={11} className="text-rose-400 flex-shrink-0" />
+                      <span className="text-[9px] font-black text-rose-500 uppercase">Sin vehículos para este concepto</span>
+                    </div>
+                  );
+                })()}
+                <button type="button" onClick={agregarLineaAnticipo}
+                  disabled={!nuevaLinea.concepto_id || !nuevaLinea.mes}
+                  className="w-full bg-amber-500 hover:bg-amber-600 disabled:opacity-30 text-white font-black py-2.5 rounded-xl text-[9px] uppercase tracking-widest transition-all active:scale-[0.98] flex items-center justify-center gap-1.5">
+                  <Plus size={11} /> Agregar al recibo
+                </button>
               </div>
 
-              <button type="submit" disabled={guardandoAnticipo || valorAnticipo <= 0}
-                className="w-full bg-amber-500 hover:bg-amber-600 text-white font-black py-4 rounded-xl uppercase text-[10px] tracking-[0.15em] shadow-lg active:scale-[0.98] disabled:opacity-40 transition-all flex items-center justify-center gap-2">
-                {guardandoAnticipo
-                  ? <Loader2 className="animate-spin" size={15} />
-                  : <><Clock size={13} /> REGISTRAR Y GENERAR RECIBO</>
-                }
-              </button>
+              {/* ── CARRITO DE LÍNEAS ─────────────────────────────── */}
+              {lineasAnticipo.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
+                    Conceptos en este recibo ({lineasAnticipo.length})
+                  </p>
+                  {lineasAnticipo.map((l, idx) => {
+                    const c = conceptosPago.find(c => c.id === parseInt(l.concepto_id));
+                    const valorFinal = getValorLinea(l);
+                    const esPersonalizado = Number(l.valorPersonalizado) > 0;
+                    return (
+                      <div key={l.id} className="bg-white border border-slate-200 rounded-xl p-3 flex items-start gap-3">
+                        {/* Número */}
+                        <span className="w-5 h-5 bg-amber-100 text-amber-700 rounded-full flex-shrink-0 flex items-center justify-center text-[8px] font-black mt-0.5">
+                          {idx + 1}
+                        </span>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[10px] font-black text-slate-700 uppercase leading-tight break-words">
+                            {c?.nombre}
+                          </p>
+                          <p className="text-[9px] text-amber-600 font-bold mt-0.5">{mesLabel(l.mes)}</p>
+
+                          {/* Campo de valor personalizado */}
+                          {l.editandoValor ? (
+                            <div className="mt-2 flex items-center gap-2">
+                              <div className="relative flex-1">
+                                <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-emerald-500 font-black text-xs">$</span>
+                                <input type="number" inputMode="numeric" autoFocus
+                                  className="w-full bg-slate-50 border border-emerald-300 p-2 pl-6 rounded-lg text-sm font-black outline-none focus:border-emerald-500"
+                                  placeholder={l.valorSugerido.toString()}
+                                  value={l.valorPersonalizado}
+                                  onChange={e => setLineasAnticipo(prev => prev.map(x =>
+                                    x.id === l.id ? { ...x, valorPersonalizado: e.target.value } : x
+                                  ))}
+                                />
+                              </div>
+                              <button type="button"
+                                onClick={() => setLineasAnticipo(prev => prev.map(x =>
+                                  x.id === l.id ? { ...x, editandoValor: false } : x
+                                ))}
+                                className="text-[9px] font-black text-emerald-600 bg-emerald-50 px-2 py-1.5 rounded-lg hover:bg-emerald-100 transition-colors whitespace-nowrap">
+                                OK
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="mt-1.5 flex items-center gap-1.5">
+                              <span className={`text-sm font-black tabular-nums ${esPersonalizado ? "text-emerald-700" : "text-amber-700"}`}>
+                                ${valorFinal.toLocaleString("es-CO")}
+                              </span>
+                              {esPersonalizado && (
+                                <span className="text-[8px] font-black text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">
+                                  PERSONALIZADO · sugerido ${l.valorSugerido.toLocaleString("es-CO")}
+                                </span>
+                              )}
+                              <button type="button"
+                                onClick={() => setLineasAnticipo(prev => prev.map(x =>
+                                  x.id === l.id ? { ...x, editandoValor: true } : x
+                                ))}
+                                className="ml-1 text-slate-300 hover:text-amber-500 transition-colors">
+                                <Pencil size={10} />
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                        {/* Eliminar */}
+                        <button type="button"
+                          onClick={() => setLineasAnticipo(prev => prev.filter(x => x.id !== l.id))}
+                          className="text-slate-200 hover:text-rose-500 transition-colors flex-shrink-0 mt-0.5">
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    );
+                  })}
+
+                  {/* Subtotal */}
+                  <div className="bg-amber-500 rounded-xl px-4 py-3 flex items-center justify-between">
+                    <span className="text-[9px] font-black text-amber-100 uppercase tracking-widest">Total anticipo</span>
+                    <span className="text-lg font-black text-white tabular-nums">${totalAnticipo.toLocaleString("es-CO")}</span>
+                  </div>
+                </div>
+              )}
+
+              {/* ── DATOS DEL RECIBO ──────────────────────────────── */}
+              {lineasAnticipo.length > 0 && (
+                <div className="border-t border-slate-100 pt-4 space-y-3">
+                  <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Datos del recibo</p>
+
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block">Fecha del Recibo</label>
+                    <div className="relative">
+                      <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-300" size={12} />
+                      <input type="date"
+                        className="w-full bg-slate-50 border border-slate-100 p-3 pl-8 rounded-xl outline-none font-bold text-sm focus:bg-white"
+                        value={formAnticipoBase.fechaRecibo}
+                        onChange={e => setFormAnticipoBase(p => ({ ...p, fechaRecibo: e.target.value }))}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block">N° de Recibo</label>
+                    <div className="relative">
+                      <Hash className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-300" size={12} />
+                      <input
+                        className="w-full bg-slate-50 border border-slate-100 p-3 pl-8 rounded-xl outline-none font-black text-slate-900 text-sm"
+                        value={formAnticipoBase.numeroRecibo}
+                        onChange={e => setFormAnticipoBase(p => ({ ...p, numeroRecibo: e.target.value }))}
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block">Medio de Pago</label>
+                    <div className="flex bg-slate-100 p-1 rounded-xl gap-1">
+                      {["Transferencia", "Efectivo"].map(m => (
+                        <button key={m} type="button"
+                          onClick={() => setFormAnticipoBase(p => ({ ...p, metodo: m }))}
+                          className={`flex-1 py-2 rounded-lg text-[9px] font-black transition-all ${formAnticipoBase.metodo === m ? "bg-white text-slate-900 shadow border" : "text-slate-400"}`}>
+                          {m.toUpperCase()}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block">Referencia</label>
+                      <input
+                        className="w-full bg-slate-50 border border-slate-100 p-3 rounded-xl outline-none font-bold text-sm focus:bg-white"
+                        placeholder="Ref bancaria..."
+                        value={formAnticipoBase.referencia}
+                        onChange={e => setFormAnticipoBase(p => ({ ...p, referencia: e.target.value }))}
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block">Fecha Consignación</label>
+                      <div className="relative">
+                        <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-300" size={12} />
+                        <input type="date"
+                          className="w-full bg-slate-50 border border-slate-100 p-3 pl-8 rounded-xl outline-none font-bold text-sm focus:bg-white"
+                          value={formAnticipoBase.fechaTransaccion}
+                          onChange={e => setFormAnticipoBase(p => ({ ...p, fechaTransaccion: e.target.value }))}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <button type="submit" disabled={guardandoAnticipo || lineasAnticipo.length === 0}
+                    className="w-full bg-amber-500 hover:bg-amber-600 text-white font-black py-4 rounded-xl uppercase text-[10px] tracking-[0.15em] shadow-lg active:scale-[0.98] disabled:opacity-40 transition-all flex items-center justify-center gap-2">
+                    {guardandoAnticipo
+                      ? <Loader2 className="animate-spin" size={15} />
+                      : <><Clock size={13} /> REGISTRAR {lineasAnticipo.length > 1 ? `${lineasAnticipo.length} ANTICIPOS` : "ANTICIPO"} Y GENERAR RECIBO</>
+                    }
+                  </button>
+                </div>
+              )}
+
+              {lineasAnticipo.length === 0 && (
+                <div className="py-6 text-center">
+                  <div className="w-10 h-10 bg-amber-50 rounded-full flex items-center justify-center mx-auto mb-2">
+                    <Clock size={20} className="text-amber-300" />
+                  </div>
+                  <p className="text-[9px] font-black text-slate-300 uppercase tracking-widest">
+                    Agrega al menos un concepto para continuar
+                  </p>
+                </div>
+              )}
             </form>
           </div>
         </div>
