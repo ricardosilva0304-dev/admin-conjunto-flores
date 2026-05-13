@@ -564,12 +564,14 @@ export default function Ingresos({ role }: { role?: string }) {
                   <h4 className="text-sm font-black text-slate-800 uppercase tracking-tight">Unidad al día</h4>
                   <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Sin deudas pendientes.</p>
                 </div>
-              ) : (
-                <div className="divide-y divide-slate-50">
-                  {deudas.map(d => {
+              ) : deudas.length === 1 ? (
+                /* ── 1 sola deuda: fila completa ── */
+                <div className="p-3 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  {(() => {
+                    const d = deudas[0];
                     const sHoy = calcularValorDeudaHoy(d);
                     return (
-                      <div key={d.id} className="p-3 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-slate-50/50 transition-colors">
+                      <>
                         <div className="flex-1 min-w-0">
                           <h4 className="text-xs sm:text-sm font-black text-slate-700 uppercase leading-tight break-words">
                             {d.causaciones_globales?.concepto_nombre || d.concepto_nombre}
@@ -587,6 +589,57 @@ export default function Ingresos({ role }: { role?: string }) {
                             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-emerald-500 font-black text-xs">$</span>
                             <input type="number" inputMode="numeric"
                               className="w-full bg-white border border-slate-200 p-2.5 pl-7 rounded-xl text-right font-black text-sm outline-none focus:border-emerald-500 shadow-inner"
+                              value={abonos[d.id] || ""}
+                              onChange={e => setAbonos({ ...abonos, [d.id]: e.target.value })}
+                              placeholder="0"
+                            />
+                          </div>
+                        </div>
+                      </>
+                    );
+                  })()}
+                </div>
+              ) : (
+                /* ── 2+ deudas: grilla de 2 columnas ── */
+                <div className="p-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {deudas.map(d => {
+                    const sHoy = calcularValorDeudaHoy(d);
+                    const abonado = Number(abonos[d.id] || 0);
+                    const tienePago = abonado > 0;
+                    return (
+                      <div
+                        key={d.id}
+                        className={`rounded-xl border p-3 flex flex-col gap-2 transition-all ${tienePago
+                            ? "border-emerald-300 bg-emerald-50/60 shadow-sm shadow-emerald-100"
+                            : "border-slate-100 bg-slate-50/40 hover:bg-white hover:border-slate-200"
+                          }`}
+                      >
+                        {/* Concepto + periodo */}
+                        <div className="min-w-0">
+                          <h4 className="text-[10px] font-black text-slate-700 uppercase leading-tight break-words line-clamp-2">
+                            {d.causaciones_globales?.concepto_nombre || d.concepto_nombre}
+                          </h4>
+                          <p className="text-[9px] font-bold text-slate-400 uppercase tracking-tight mt-0.5">
+                            {formatPeriodo(d)}
+                          </p>
+                        </div>
+                        {/* Saldo + input */}
+                        <div className="flex items-center gap-2 mt-auto">
+                          <div className="flex-1 min-w-0">
+                            <p className="text-[8px] font-black text-slate-300 uppercase leading-none mb-0.5">Saldo</p>
+                            <p className={`font-black text-sm tabular-nums ${tienePago ? "text-emerald-700" : "text-slate-700"}`}>
+                              ${sHoy.toLocaleString()}
+                            </p>
+                          </div>
+                          <div className="relative w-24 flex-shrink-0">
+                            <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-emerald-500 font-black text-xs">$</span>
+                            <input
+                              type="number"
+                              inputMode="numeric"
+                              className={`w-full border p-2 pl-6 rounded-lg text-right font-black text-xs outline-none transition-all ${tienePago
+                                  ? "border-emerald-400 bg-white focus:border-emerald-500"
+                                  : "border-slate-200 bg-white focus:border-emerald-400"
+                                } shadow-inner`}
                               value={abonos[d.id] || ""}
                               onChange={e => setAbonos({ ...abonos, [d.id]: e.target.value })}
                               placeholder="0"
@@ -817,228 +870,252 @@ export default function Ingresos({ role }: { role?: string }) {
               </button>
             </div>
 
-            <form onSubmit={guardarAnticipo} className="flex-1 overflow-y-auto p-5 space-y-5">
+            <form onSubmit={guardarAnticipo} className="flex-1 overflow-y-auto">
 
-              {/* ── AGREGAR LÍNEA ─────────────────────────────────── */}
-              <div className="bg-slate-50 rounded-2xl p-4 space-y-3 border border-slate-100">
-                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
-                  <Plus size={10} /> Agregar concepto
-                </p>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block">Concepto</label>
-                    <select
-                      className="w-full bg-white border border-slate-200 p-3 rounded-xl font-bold text-sm outline-none focus:border-amber-400 appearance-none"
-                      value={nuevaLinea.concepto_id}
-                      onChange={e => setNuevaLinea(prev => ({ ...prev, concepto_id: e.target.value }))}
-                    >
-                      <option value="">Seleccionar...</option>
-                      {conceptosPago.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
-                    </select>
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block">Mes futuro</label>
-                    <div className="relative">
-                      <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-300" size={12} />
-                      <input type="month"
-                        className="w-full bg-white border border-slate-200 p-3 pl-8 rounded-xl font-bold text-sm outline-none focus:border-amber-400"
-                        value={nuevaLinea.mes}
-                        min={minMesAnticipo()}
-                        onChange={e => setNuevaLinea(prev => ({ ...prev, mes: e.target.value }))}
-                      />
-                    </div>
-                  </div>
+              {/* ══ PASO 1: AGREGAR CONCEPTOS ══════════════════════════ */}
+              <div className="p-4 sm:p-5 space-y-3">
+                {/* Etiqueta de paso */}
+                <div className="flex items-center gap-2">
+                  <span className="w-5 h-5 bg-amber-500 text-white rounded-full flex items-center justify-center text-[9px] font-black flex-shrink-0">1</span>
+                  <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest">¿Qué mes va a pagar por adelantado?</p>
                 </div>
-                {/* Preview del valor sugerido */}
-                {nuevaLinea.concepto_id && nuevaLinea.mes && (() => {
-                  const vals = calcularValoresPorConcepto(nuevaLinea.concepto_id);
-                  return vals.m1 > 0 ? (
-                    <div className="flex items-center justify-between bg-amber-50 rounded-xl px-3 py-2 border border-amber-100">
-                      <span className="text-[9px] font-black text-amber-600 uppercase">Valor con descuento (días 1-10)</span>
-                      <span className="text-sm font-black text-amber-700 tabular-nums">${vals.m1.toLocaleString("es-CO")}</span>
-                    </div>
-                  ) : (
-                    <div className="flex items-center gap-2 bg-rose-50 rounded-xl px-3 py-2 border border-rose-100">
-                      <AlertCircle size={11} className="text-rose-400 flex-shrink-0" />
-                      <span className="text-[9px] font-black text-rose-500 uppercase">Sin vehículos para este concepto</span>
-                    </div>
-                  );
-                })()}
-                <button type="button" onClick={agregarLineaAnticipo}
-                  disabled={!nuevaLinea.concepto_id || !nuevaLinea.mes}
-                  className="w-full bg-amber-500 hover:bg-amber-600 disabled:opacity-30 text-white font-black py-2.5 rounded-xl text-[9px] uppercase tracking-widest transition-all active:scale-[0.98] flex items-center justify-center gap-1.5">
-                  <Plus size={11} /> Agregar al recibo
-                </button>
-              </div>
 
-              {/* ── CARRITO DE LÍNEAS ─────────────────────────────── */}
-              {lineasAnticipo.length > 0 && (
-                <div className="space-y-2">
-                  <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
-                    Conceptos en este recibo ({lineasAnticipo.length})
-                  </p>
-                  {lineasAnticipo.map((l, idx) => {
-                    const c = conceptosPago.find(c => c.id === parseInt(l.concepto_id));
-                    const valorFinal = getValorLinea(l);
-                    const esPersonalizado = Number(l.valorPersonalizado) > 0;
-                    return (
-                      <div key={l.id} className="bg-white border border-slate-200 rounded-xl p-3 flex items-start gap-3">
-                        {/* Número */}
-                        <span className="w-5 h-5 bg-amber-100 text-amber-700 rounded-full flex-shrink-0 flex items-center justify-center text-[8px] font-black mt-0.5">
-                          {idx + 1}
-                        </span>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-[10px] font-black text-slate-700 uppercase leading-tight break-words">
-                            {c?.nombre}
-                          </p>
-                          <p className="text-[9px] text-amber-600 font-bold mt-0.5">{mesLabel(l.mes)}</p>
-
-                          {/* Campo de valor personalizado */}
-                          {l.editandoValor ? (
-                            <div className="mt-2 flex items-center gap-2">
-                              <div className="relative flex-1">
-                                <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-emerald-500 font-black text-xs">$</span>
-                                <input type="number" inputMode="numeric" autoFocus
-                                  className="w-full bg-slate-50 border border-emerald-300 p-2 pl-6 rounded-lg text-sm font-black outline-none focus:border-emerald-500"
-                                  placeholder={l.valorSugerido.toString()}
-                                  value={l.valorPersonalizado}
-                                  onChange={e => setLineasAnticipo(prev => prev.map(x =>
-                                    x.id === l.id ? { ...x, valorPersonalizado: e.target.value } : x
-                                  ))}
-                                />
-                              </div>
-                              <button type="button"
-                                onClick={() => setLineasAnticipo(prev => prev.map(x =>
-                                  x.id === l.id ? { ...x, editandoValor: false } : x
-                                ))}
-                                className="text-[9px] font-black text-emerald-600 bg-emerald-50 px-2 py-1.5 rounded-lg hover:bg-emerald-100 transition-colors whitespace-nowrap">
-                                OK
-                              </button>
-                            </div>
-                          ) : (
-                            <div className="mt-1.5 flex items-center gap-1.5">
-                              <span className={`text-sm font-black tabular-nums ${esPersonalizado ? "text-emerald-700" : "text-amber-700"}`}>
-                                ${valorFinal.toLocaleString("es-CO")}
-                              </span>
-                              {esPersonalizado && (
-                                <span className="text-[8px] font-black text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">
-                                  PERSONALIZADO · sugerido ${l.valorSugerido.toLocaleString("es-CO")}
-                                </span>
-                              )}
-                              <button type="button"
-                                onClick={() => setLineasAnticipo(prev => prev.map(x =>
-                                  x.id === l.id ? { ...x, editandoValor: true } : x
-                                ))}
-                                className="ml-1 text-slate-300 hover:text-amber-500 transition-colors">
-                                <Pencil size={10} />
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                        {/* Eliminar */}
-                        <button type="button"
-                          onClick={() => setLineasAnticipo(prev => prev.filter(x => x.id !== l.id))}
-                          className="text-slate-200 hover:text-rose-500 transition-colors flex-shrink-0 mt-0.5">
-                          <Trash2 size={14} />
-                        </button>
-                      </div>
-                    );
-                  })}
-
-                  {/* Subtotal */}
-                  <div className="bg-amber-500 rounded-xl px-4 py-3 flex items-center justify-between">
-                    <span className="text-[9px] font-black text-amber-100 uppercase tracking-widest">Total anticipo</span>
-                    <span className="text-lg font-black text-white tabular-nums">${totalAnticipo.toLocaleString("es-CO")}</span>
-                  </div>
-                </div>
-              )}
-
-              {/* ── DATOS DEL RECIBO ──────────────────────────────── */}
-              {lineasAnticipo.length > 0 && (
-                <div className="border-t border-slate-100 pt-4 space-y-3">
-                  <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Datos del recibo</p>
-
-                  <div className="space-y-1">
-                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block">Fecha del Recibo</label>
-                    <div className="relative">
-                      <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-300" size={12} />
-                      <input type="date"
-                        className="w-full bg-slate-50 border border-slate-100 p-3 pl-8 rounded-xl outline-none font-bold text-sm focus:bg-white"
-                        value={formAnticipoBase.fechaRecibo}
-                        onChange={e => setFormAnticipoBase(p => ({ ...p, fechaRecibo: e.target.value }))}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block">N° de Recibo</label>
-                    <div className="relative">
-                      <Hash className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-300" size={12} />
-                      <input
-                        className="w-full bg-slate-50 border border-slate-100 p-3 pl-8 rounded-xl outline-none font-black text-slate-900 text-sm"
-                        value={formAnticipoBase.numeroRecibo}
-                        onChange={e => setFormAnticipoBase(p => ({ ...p, numeroRecibo: e.target.value }))}
-                        required
-                      />
-                    </div>
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block">Medio de Pago</label>
-                    <div className="flex bg-slate-100 p-1 rounded-xl gap-1">
-                      {["Transferencia", "Efectivo"].map(m => (
-                        <button key={m} type="button"
-                          onClick={() => setFormAnticipoBase(p => ({ ...p, metodo: m }))}
-                          className={`flex-1 py-2 rounded-lg text-[9px] font-black transition-all ${formAnticipoBase.metodo === m ? "bg-white text-slate-900 shadow border" : "text-slate-400"}`}>
-                          {m.toUpperCase()}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
+                {/* Selector concepto + mes */}
+                <div className="bg-amber-50/60 border border-amber-100 rounded-2xl p-4 space-y-3">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div className="space-y-1">
-                      <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block">Referencia</label>
-                      <input
-                        className="w-full bg-slate-50 border border-slate-100 p-3 rounded-xl outline-none font-bold text-sm focus:bg-white"
-                        placeholder="Ref bancaria..."
-                        value={formAnticipoBase.referencia}
-                        onChange={e => setFormAnticipoBase(p => ({ ...p, referencia: e.target.value }))}
-                      />
+                      <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block">Concepto</label>
+                      <select
+                        className="w-full bg-white border border-amber-200 p-3 rounded-xl font-bold text-sm outline-none focus:border-amber-400 appearance-none"
+                        value={nuevaLinea.concepto_id}
+                        onChange={e => setNuevaLinea(prev => ({ ...prev, concepto_id: e.target.value }))}
+                      >
+                        <option value="">Seleccionar...</option>
+                        {conceptosPago.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
+                      </select>
                     </div>
                     <div className="space-y-1">
-                      <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block">Fecha Consignación</label>
+                      <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block">Mes Futuro</label>
                       <div className="relative">
-                        <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-300" size={12} />
-                        <input type="date"
-                          className="w-full bg-slate-50 border border-slate-100 p-3 pl-8 rounded-xl outline-none font-bold text-sm focus:bg-white"
-                          value={formAnticipoBase.fechaTransaccion}
-                          onChange={e => setFormAnticipoBase(p => ({ ...p, fechaTransaccion: e.target.value }))}
+                        <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-amber-400" size={13} />
+                        <input type="month"
+                          className="w-full bg-white border border-amber-200 p-3 pl-9 rounded-xl font-bold text-sm outline-none focus:border-amber-400"
+                          value={nuevaLinea.mes}
+                          min={minMesAnticipo()}
+                          onChange={e => setNuevaLinea(prev => ({ ...prev, mes: e.target.value }))}
                         />
                       </div>
                     </div>
                   </div>
 
-                  <button type="submit" disabled={guardandoAnticipo || lineasAnticipo.length === 0}
-                    className="w-full bg-amber-500 hover:bg-amber-600 text-white font-black py-4 rounded-xl uppercase text-[10px] tracking-[0.15em] shadow-lg active:scale-[0.98] disabled:opacity-40 transition-all flex items-center justify-center gap-2">
-                    {guardandoAnticipo
-                      ? <Loader2 className="animate-spin" size={15} />
-                      : <><Clock size={13} /> REGISTRAR {lineasAnticipo.length > 1 ? `${lineasAnticipo.length} ANTICIPOS` : "ANTICIPO"} Y GENERAR RECIBO</>
-                    }
+                  {/* Preview del valor sugerido */}
+                  {nuevaLinea.concepto_id && nuevaLinea.mes && (() => {
+                    const vals = calcularValoresPorConcepto(nuevaLinea.concepto_id);
+                    return vals.m1 > 0 ? (
+                      <div className="flex items-center justify-between bg-white rounded-xl px-3 py-2.5 border border-amber-200">
+                        <div>
+                          <p className="text-[8px] font-black text-amber-500 uppercase tracking-widest">Valor con descuento (días 1–10)</p>
+                          <p className="text-[8px] text-slate-400 mt-0.5">Se puede ajustar después de agregar</p>
+                        </div>
+                        <span className="text-base font-black text-amber-700 tabular-nums">${vals.m1.toLocaleString("es-CO")}</span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2 bg-rose-50 rounded-xl px-3 py-2 border border-rose-100">
+                        <AlertCircle size={12} className="text-rose-400 flex-shrink-0" />
+                        <span className="text-[9px] font-black text-rose-500 uppercase">Sin vehículos registrados para este concepto</span>
+                      </div>
+                    );
+                  })()}
+
+                  <button type="button" onClick={agregarLineaAnticipo}
+                    disabled={!nuevaLinea.concepto_id || !nuevaLinea.mes}
+                    className="w-full bg-amber-500 hover:bg-amber-600 disabled:opacity-30 text-white font-black py-3 rounded-xl text-[10px] uppercase tracking-widest transition-all active:scale-[0.98] flex items-center justify-center gap-2">
+                    <Plus size={12} /> Agregar al recibo
                   </button>
                 </div>
-              )}
 
-              {lineasAnticipo.length === 0 && (
-                <div className="py-6 text-center">
-                  <div className="w-10 h-10 bg-amber-50 rounded-full flex items-center justify-center mx-auto mb-2">
-                    <Clock size={20} className="text-amber-300" />
+                {/* ── Lista de conceptos agregados ── */}
+                {lineasAnticipo.length > 0 ? (
+                  <div className="space-y-2">
+                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest pt-1">
+                      Conceptos en este recibo ({lineasAnticipo.length})
+                    </p>
+                    {lineasAnticipo.map((l, idx) => {
+                      const c = conceptosPago.find(c => c.id === parseInt(l.concepto_id));
+                      const valorFinal = getValorLinea(l);
+                      const esPersonalizado = Number(l.valorPersonalizado) > 0;
+                      return (
+                        <div key={l.id} className="bg-white border border-slate-200 rounded-xl p-3 flex items-center gap-3">
+                          <span className="w-6 h-6 bg-amber-100 text-amber-700 rounded-full flex-shrink-0 flex items-center justify-center text-[9px] font-black">
+                            {idx + 1}
+                          </span>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-[10px] font-black text-slate-700 uppercase leading-tight">{c?.nombre}</p>
+                            <p className="text-[9px] text-amber-600 font-bold">{mesLabel(l.mes)}</p>
+                          </div>
+
+                          {/* Valor + editar inline */}
+                          <div className="flex items-center gap-1.5 flex-shrink-0">
+                            {l.editandoValor ? (
+                              <>
+                                <div className="relative w-24">
+                                  <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-emerald-500 font-black text-xs">$</span>
+                                  <input type="number" inputMode="numeric" autoFocus
+                                    className="w-full bg-slate-50 border border-emerald-300 p-2 pl-6 rounded-lg text-sm font-black outline-none focus:border-emerald-500"
+                                    placeholder={l.valorSugerido.toString()}
+                                    value={l.valorPersonalizado}
+                                    onChange={e => setLineasAnticipo(prev => prev.map(x =>
+                                      x.id === l.id ? { ...x, valorPersonalizado: e.target.value } : x
+                                    ))}
+                                  />
+                                </div>
+                                <button type="button"
+                                  onClick={() => setLineasAnticipo(prev => prev.map(x =>
+                                    x.id === l.id ? { ...x, editandoValor: false } : x
+                                  ))}
+                                  className="text-[9px] font-black text-emerald-600 bg-emerald-50 px-2 py-1.5 rounded-lg hover:bg-emerald-100 whitespace-nowrap">
+                                  OK
+                                </button>
+                              </>
+                            ) : (
+                              <div className="text-right">
+                                <div className="flex items-center gap-1">
+                                  <span className={`text-sm font-black tabular-nums ${esPersonalizado ? "text-emerald-700" : "text-amber-700"}`}>
+                                    ${valorFinal.toLocaleString("es-CO")}
+                                  </span>
+                                  <button type="button"
+                                    onClick={() => setLineasAnticipo(prev => prev.map(x =>
+                                      x.id === l.id ? { ...x, editandoValor: true } : x
+                                    ))}
+                                    className="text-slate-300 hover:text-amber-500 transition-colors p-0.5">
+                                    <Pencil size={10} />
+                                  </button>
+                                </div>
+                                {esPersonalizado && (
+                                  <p className="text-[8px] text-slate-400">sugerido ${l.valorSugerido.toLocaleString("es-CO")}</p>
+                                )}
+                              </div>
+                            )}
+                          </div>
+
+                          <button type="button"
+                            onClick={() => setLineasAnticipo(prev => prev.filter(x => x.id !== l.id))}
+                            className="text-slate-200 hover:text-rose-500 transition-colors flex-shrink-0 p-1">
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      );
+                    })}
+
+                    {/* Total */}
+                    <div className="bg-amber-500 rounded-xl px-4 py-3 flex items-center justify-between">
+                      <span className="text-[9px] font-black text-amber-100 uppercase tracking-widest">Total anticipo</span>
+                      <span className="text-lg font-black text-white tabular-nums">${totalAnticipo.toLocaleString("es-CO")}</span>
+                    </div>
                   </div>
-                  <p className="text-[9px] font-black text-slate-300 uppercase tracking-widest">
-                    Agrega al menos un concepto para continuar
-                  </p>
+                ) : (
+                  <div className="py-4 text-center border border-dashed border-amber-200 rounded-xl bg-amber-50/40">
+                    <Clock size={18} className="text-amber-300 mx-auto mb-1.5" />
+                    <p className="text-[9px] font-black text-slate-300 uppercase tracking-widest">
+                      Agrega al menos un concepto arriba
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* ══ DIVISOR ════════════════════════════════════════════ */}
+              <div className="mx-4 sm:mx-5 border-t border-slate-100" />
+
+              {/* ══ PASO 2: DATOS DEL RECIBO ═══════════════════════════ */}
+              <div className={`p-4 sm:p-5 space-y-3 transition-opacity ${lineasAnticipo.length === 0 ? "opacity-40 pointer-events-none select-none" : ""}`}>
+                <div className="flex items-center gap-2">
+                  <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-black flex-shrink-0 ${lineasAnticipo.length > 0 ? "bg-amber-500 text-white" : "bg-slate-200 text-slate-400"}`}>2</span>
+                  <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Datos del recibo de caja</p>
                 </div>
-              )}
+
+                <div className="grid grid-cols-2 gap-3">
+                  {/* Fecha recibo */}
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block">Fecha del Recibo</label>
+                    <div className="relative">
+                      <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-300" size={12} />
+                      <input type="date"
+                        className="w-full bg-slate-50 border border-slate-100 p-3 pl-9 rounded-xl outline-none font-bold text-sm focus:bg-white"
+                        value={formAnticipoBase.fechaRecibo}
+                        onChange={e => setFormAnticipoBase(p => ({ ...p, fechaRecibo: e.target.value }))}
+                      />
+                    </div>
+                  </div>
+                  {/* N° recibo */}
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block">N° de Recibo</label>
+                    <div className="relative">
+                      <Hash className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-300" size={12} />
+                      <input
+                        className="w-full bg-slate-50 border border-slate-100 p-3 pl-9 rounded-xl outline-none font-black text-slate-900 text-sm"
+                        value={formAnticipoBase.numeroRecibo}
+                        onChange={e => setFormAnticipoBase(p => ({ ...p, numeroRecibo: e.target.value }))}
+                        required={lineasAnticipo.length > 0}
+                        placeholder="Nº..."
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Medio de pago */}
+                <div className="space-y-1">
+                  <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block">Medio de Pago</label>
+                  <div className="flex bg-slate-100 p-1 rounded-xl gap-1">
+                    {["Transferencia", "Efectivo"].map(m => (
+                      <button key={m} type="button"
+                        onClick={() => setFormAnticipoBase(p => ({ ...p, metodo: m }))}
+                        className={`flex-1 py-2.5 rounded-lg text-[10px] font-black transition-all ${formAnticipoBase.metodo === m ? "bg-white text-slate-900 shadow border" : "text-slate-400 hover:text-slate-600"}`}>
+                        {m.toUpperCase()}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Referencia + fecha consignación */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block">Referencia</label>
+                    <input
+                      className="w-full bg-slate-50 border border-slate-100 p-3 rounded-xl outline-none font-bold text-sm focus:bg-white placeholder:text-slate-300"
+                      placeholder="Ref bancaria..."
+                      value={formAnticipoBase.referencia}
+                      onChange={e => setFormAnticipoBase(p => ({ ...p, referencia: e.target.value }))}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block">Fecha Consignación</label>
+                    <div className="relative">
+                      <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-300" size={12} />
+                      <input type="date"
+                        className="w-full bg-slate-50 border border-slate-100 p-3 pl-9 rounded-xl outline-none font-bold text-sm focus:bg-white"
+                        value={formAnticipoBase.fechaTransaccion}
+                        onChange={e => setFormAnticipoBase(p => ({ ...p, fechaTransaccion: e.target.value }))}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* ══ BOTÓN FINAL ════════════════════════════════════════ */}
+              <div className="px-4 sm:px-5 pb-5">
+                <button type="submit"
+                  disabled={guardandoAnticipo || lineasAnticipo.length === 0 || !formAnticipoBase.numeroRecibo}
+                  className="w-full bg-amber-500 hover:bg-amber-600 text-white font-black py-4 rounded-xl uppercase text-[10px] tracking-[0.15em] shadow-lg shadow-amber-500/20 active:scale-[0.98] disabled:opacity-40 transition-all flex items-center justify-center gap-2">
+                  {guardandoAnticipo
+                    ? <Loader2 className="animate-spin" size={15} />
+                    : <><Clock size={13} /> Registrar anticipo y generar recibo</>
+                  }
+                </button>
+                {lineasAnticipo.length === 0 && (
+                  <p className="text-center text-[9px] text-slate-300 font-bold mt-2">Agrega al menos un concepto en el paso 1</p>
+                )}
+              </div>
+
             </form>
           </div>
         </div>
