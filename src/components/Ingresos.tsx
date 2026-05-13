@@ -610,13 +610,13 @@ export default function Ingresos({ role }: { role?: string }) {
                       <div
                         key={d.id}
                         className={`rounded-xl border p-3 flex flex-col gap-2 transition-all ${tienePago
-                            ? "border-emerald-300 bg-emerald-50/60 shadow-sm shadow-emerald-100"
-                            : "border-slate-100 bg-slate-50/40 hover:bg-white hover:border-slate-200"
+                          ? "border-emerald-300 bg-emerald-50/60 shadow-sm shadow-emerald-100"
+                          : "border-slate-100 bg-slate-50/40 hover:bg-white hover:border-slate-200"
                           }`}
                       >
                         {/* Concepto + periodo */}
                         <div className="min-w-0">
-                          <h4 className="text-[10px] font-black text-slate-700 uppercase leading-tight break-words line-clamp-2">
+                          <h4 className="text-xs font-black text-slate-800 uppercase leading-tight break-words line-clamp-2">
                             {d.causaciones_globales?.concepto_nombre || d.concepto_nombre}
                           </h4>
                           <p className="text-[9px] font-bold text-slate-400 uppercase tracking-tight mt-0.5">
@@ -637,8 +637,8 @@ export default function Ingresos({ role }: { role?: string }) {
                               type="number"
                               inputMode="numeric"
                               className={`w-full border p-2 pl-6 rounded-lg text-right font-black text-xs outline-none transition-all ${tienePago
-                                  ? "border-emerald-400 bg-white focus:border-emerald-500"
-                                  : "border-slate-200 bg-white focus:border-emerald-400"
+                                ? "border-emerald-400 bg-white focus:border-emerald-500"
+                                : "border-slate-200 bg-white focus:border-emerald-400"
                                 } shadow-inner`}
                               value={abonos[d.id] || ""}
                               onChange={e => setAbonos({ ...abonos, [d.id]: e.target.value })}
