@@ -450,7 +450,7 @@ export default function Ingresos({ role }: { role?: string }) {
               <Receipt size={14} className="text-slate-400" />
             </div>
             <div>
-              <p className="text-[8px] font-black text-slate-300 uppercase tracking-widest leading-none mb-0.5">Último recibo</p>
+              <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest leading-none mb-0.5">Último recibo</p>
               <p className="text-xs font-black text-slate-700">N° {ultimoRecibo.numero}
                 <span className="font-bold text-slate-400 ml-2">{ultimoRecibo.nombre}</span>
               </p>
@@ -458,14 +458,14 @@ export default function Ingresos({ role }: { role?: string }) {
           </div>
           <div className="text-right flex-shrink-0">
             <p className="text-xs font-black text-emerald-600 tabular-nums">${ultimoRecibo.monto.toLocaleString("es-CO")}</p>
-            <p className="text-[8px] font-bold text-slate-300">{ultimoRecibo.fecha}</p>
+            <p className="text-[8px] font-bold text-slate-500">{ultimoRecibo.fecha}</p>
           </div>
         </div>
       )}
 
       {/* ── BUSCADOR ─────────────────────────────────────────────── */}
       <section className="bg-white p-4 sm:p-6 rounded-2xl border border-slate-100 shadow-sm relative z-[40]">
-        <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] block mb-2">
+        <label className="text-[10px] font-black text-slate-600 uppercase tracking-[0.2em] block mb-2">
           Unidad Responsable del Pago
         </label>
         <div className="relative group">
