@@ -513,54 +513,47 @@ export default function Ingresos({ role }: { role?: string }) {
 
         {filteredRes.length > 0 && (
           <div className="absolute top-[calc(100%-6px)] left-3 right-3 sm:left-6 sm:right-6 bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl overflow-hidden z-[100] animate-in fade-in slide-in-from-top-2 duration-200">
-            <div className="p-2 space-y-1">
+            <div className="p-2 space-y-0.5">
               {filteredRes.map(r => {
                 const deudaTotal = deudasPorResidente[r.id];
                 const unidad = `T${r.torre.slice(-1)}-${r.apartamento}`;
                 const tieneDeuda = deudaTotal !== undefined && deudaTotal > 0;
                 return (
                   <button key={r.id} onClick={() => cargarDeudasResidente(r)}
-                    className="w-full p-3 text-left rounded-xl hover:bg-slate-800 flex items-center gap-3 group transition-all active:scale-[0.99]"
+                    className="w-full px-3 py-2.5 text-left rounded-xl hover:bg-slate-800 flex items-center gap-3 group transition-all active:scale-[0.99]"
                   >
-                    {/* Badge torre */}
-                    <div className="w-10 h-10 bg-emerald-950 text-emerald-400 rounded-xl flex-shrink-0 flex items-center justify-center font-black text-xs border border-emerald-900 group-hover:bg-emerald-500 group-hover:text-white group-hover:border-emerald-500 transition-all">
+                    {/* Badge unidad — pill horizontal, nunca se rompe */}
+                    <span className="flex-shrink-0 bg-emerald-950 text-emerald-400 border border-emerald-900 group-hover:bg-emerald-500 group-hover:text-white group-hover:border-emerald-500 transition-all font-black text-[11px] tracking-wide px-2.5 py-1 rounded-lg whitespace-nowrap">
                       {unidad}
-                    </div>
-                    {/* Info */}
-                    <div className="flex-1 min-w-0">
-                      <p className="font-black text-sm text-white uppercase truncate leading-tight group-hover:text-emerald-300 transition-colors">
-                        {r.nombre}
-                      </p>
-                      <p className="text-[10px] text-slate-500 font-semibold mt-0.5 truncate">
-                        {r.telefono ? `📞 ${r.telefono}` : "Sin teléfono registrado"}
-                      </p>
-                    </div>
+                    </span>
+
+                    {/* Nombre */}
+                    <span className="flex-1 min-w-0 font-black text-[12px] text-white uppercase truncate group-hover:text-emerald-300 transition-colors">
+                      {r.nombre}
+                    </span>
+
                     {/* Deuda */}
-                    <div className="flex-shrink-0 text-right ml-1">
+                    <div className="flex-shrink-0 text-right">
                       {deudaTotal === undefined ? (
-                        <div className="w-16 h-5 bg-slate-700 rounded animate-pulse" />
+                        <div className="w-14 h-4 bg-slate-700 rounded animate-pulse" />
                       ) : tieneDeuda ? (
-                        <>
-                          <span className="inline-block bg-rose-950 text-rose-400 border border-rose-900 px-2 py-1 rounded-lg text-[10px] font-black tabular-nums">
-                            ${deudaTotal.toLocaleString("es-CO")}
-                          </span>
-                          <p className="text-[8px] text-rose-500 font-bold uppercase mt-0.5">pendiente</p>
-                        </>
+                        <span className="bg-rose-950 text-rose-400 border border-rose-900 px-2 py-1 rounded-lg text-[10px] font-black tabular-nums whitespace-nowrap">
+                          ${deudaTotal.toLocaleString("es-CO")}
+                        </span>
                       ) : (
-                        <>
-                          <span className="inline-block bg-emerald-950 text-emerald-400 border border-emerald-900 px-2 py-1 rounded-lg text-[10px] font-black">
-                            Al día ✓
-                          </span>
-                        </>
+                        <span className="bg-emerald-950 text-emerald-500 border border-emerald-900 px-2 py-1 rounded-lg text-[10px] font-black whitespace-nowrap">
+                          Al día ✓
+                        </span>
                       )}
                     </div>
-                    <ChevronRight size={14} className="text-slate-600 group-hover:text-emerald-400 flex-shrink-0 transition-all" />
+
+                    <ChevronRight size={13} className="text-slate-600 group-hover:text-emerald-400 flex-shrink-0 transition-all" />
                   </button>
                 );
               })}
             </div>
-            <div className="bg-slate-800 px-4 py-2 text-center border-t border-slate-700">
-              <p className="text-[9px] font-black text-slate-500 uppercase tracking-[0.25em]">Selecciona una unidad</p>
+            <div className="bg-slate-800 px-4 py-1.5 text-center border-t border-slate-700">
+              <p className="text-[8px] font-black text-slate-600 uppercase tracking-[0.25em]">Selecciona una unidad</p>
             </div>
           </div>
         )}
