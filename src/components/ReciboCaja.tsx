@@ -216,6 +216,17 @@ export default function ReciboCaja({ datos, onClose }: ReciboProps) {
       scale: 2,
       useCORS: true,
       backgroundColor: "#ffffff",
+      ignoreElements: (el) => false,
+      onclone: (clonedDoc) => {
+        clonedDoc.querySelectorAll("*").forEach((el) => {
+          const style = (el as HTMLElement).style;
+          if (style) {
+            style.color = style.color?.includes("lab(") ? "" : style.color;
+            style.backgroundColor = style.backgroundColor?.includes("lab(") ? "" : style.backgroundColor;
+          }
+        });
+      },
+      logging: false,
     });
     const imgData = canvas.toDataURL("image/png");
     const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "letter" });
