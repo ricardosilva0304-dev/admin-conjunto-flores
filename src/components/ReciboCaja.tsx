@@ -209,50 +209,61 @@ export default function ReciboCaja({ datos, onClose }: ReciboProps) {
     const content = printRef.current;
     if (!content) return;
 
-    // Import dinámico — solo se ejecuta en el browser, nunca en SSR
     const domtoimage = (await import("dom-to-image-more")).default;
     const nombreArchivo = `RC-${datos.numero}_${datos.unidad.replace(/\s/g, "")}`;
 
-    // ── Sanitiza colores modernos (oklch/lab/color()) a hex seguros ──
-    const sanitizarColores = (nodo: HTMLElement) => {
-      const PROPS = ["color", "backgroundColor", "borderColor", "borderTopColor",
-        "borderBottomColor", "borderLeftColor", "borderRightColor", "outlineColor"];
-      const MAP: Record<string, string> = {
-        // slate palette → grises seguros
-        "slate-50": "#f8fafc", "slate-100": "#f1f5f9", "slate-200": "#e2e8f0",
-        "slate-300": "#cbd5e1", "slate-400": "#94a3b8", "slate-500": "#64748b",
-        "slate-800": "#1e293b", "slate-900": "#0f172a",
-        // emerald
-        "emerald-500": "#10b981", "emerald-600": "#059669",
-        // rose/red
-        "rose-500": "#f43f5e", "rose-600": "#e11d48", "red-600": "#dc2626",
-      };
+    // Ancho fijo desktop — mismo que se ve en pantalla grande
+    const ANCHO_PDF = 1024;
 
-      nodo.querySelectorAll<HTMLElement>("*").forEach((el) => {
-        const cs = window.getComputedStyle(el);
-        PROPS.forEach((prop) => {
-          const val = cs.getPropertyValue(prop);
-          if (val && (val.includes("oklch") || val.includes("lab(") || val.includes("color("))) {
-            // Busca clase Tailwind en el elemento para mapear al hex correcto
-            const clases = Array.from(el.classList);
-            const match = clases.find((c) => Object.keys(MAP).some((k) => c.includes(k)));
-            const hex = match ? MAP[Object.keys(MAP).find((k) => match.includes(k))!] : (prop === "backgroundColor" ? "transparent" : "#1e293b");
-            el.style.setProperty(prop, hex, "important");
-          }
-        });
-      });
-    };
-
-    // Clon fuera de pantalla para no alterar el DOM visible
+    // Clon fuera de pantalla con ancho forzado
     const clon = content.cloneNode(true) as HTMLElement;
-    clon.style.cssText = `position:absolute;left:-9999px;top:0;width:${content.offsetWidth}px;background:#fff;`;
+      clon.style.cssText = `
+      position: fixed;
+      left: -9999px;
+      top: 0;
+      width: ${ANCHO_PDF}px;
+      min-width: ${ANCHO_PDF}px;
+      background: #ffffff;
+      font-family: sans-serif;
+      box-sizing: border-box;
+    `;
     document.body.appendChild(clon);
-    sanitizarColores(clon);
+
+    // Fuerza que los breakpoints sm: y md: de Tailwind se activen
+    // reemplazando clases responsive por sus equivalentes desktop
+    clon.querySelectorAll<HTMLElement>("*").forEach((el) => {
+      const classes = Array.from(el.classList);
+      classes.forEach((cls) => {
+        // Activa clases sm: y md: directamente en el elemento
+        if (cls.startsWith("sm:") || cls.startsWith("md:")) {
+          const base = cls.replace(/^(sm:|md:)/, "");
+          el.classList.add(base);
+        }
+      });
+
+      // Sanitiza colores modernos (oklch/lab) que rompen la captura
+      const cs = window.getComputedStyle(el);
+      const props = [
+        "color", "backgroundColor", "borderColor",
+        "borderTopColor", "borderBottomColor",
+        "borderLeftColor", "borderRightColor",
+      ];
+      props.forEach((prop) => {
+        const val = cs.getPropertyValue(prop);
+        if (val && (val.includes("oklch") || val.includes("lab(") || val.includes("color("))) {
+          el.style.setProperty(prop, prop === "backgroundColor" ? "#ffffff" : "#1e293b", "important");
+        }
+      });
+    });
+
+    // Pequeña pausa para que el DOM pinte el clon correctamente
+    await new Promise((r) => setTimeout(r, 150));
 
     try {
       const dataUrl = await domtoimage.toPng(clon, {
         scale: 2,
         bgcolor: "#ffffff",
+        width: ANCHO_PDF,
       });
 
       const img = new Image();
@@ -270,7 +281,7 @@ export default function ReciboCaja({ datos, onClose }: ReciboProps) {
     } catch (err) {
       console.error("Error generando PDF:", err);
     } finally {
-      document.body.removeChild(clon); // limpia siempre
+      document.body.removeChild(clon);
     }
   };
 
