@@ -236,7 +236,7 @@ export default function ReciboCaja({ datos, onClose }: ReciboProps) {
     const imgH = (canvas.height * pageW) / canvas.width;
     const yOffset = imgH < pageH ? (pageH - imgH) / 2 : 0;
     pdf.addImage(imgData, "PNG", 0, yOffset, imgW, imgH);
-    pdf.save(`${nombreArchivo}.pdf`);
+    pdf.save(`${nombreArchivo}.pdf`); 
   };
 
   return (
