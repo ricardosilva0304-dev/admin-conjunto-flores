@@ -142,6 +142,7 @@ export default function Ingresos({ role }: { role?: string }) {
   }
 
   const [ultimoRecibo, setUltimoRecibo] = useState<{ numero: string; fecha: string; nombre: string; monto: number } | null>(null);
+  const [deudasPorResidente, setDeudasPorResidente] = useState<{ [key: number]: number }>({});
 
   async function cargarUltimoRecibo() {
     const { data } = await supabase
@@ -429,8 +430,30 @@ export default function Ingresos({ role }: { role?: string }) {
       const t = busqueda.toLowerCase().replace(/[-\s]/g, "");
       const u = `${r.torre.replace("Torre ", "")}${r.apartamento}`;
       return r.nombre.toLowerCase().includes(t) || u.includes(t);
-    }).slice(0, 4)
+    }).slice(0, 5)
     : [];
+
+  // Cargar deudas de los resultados filtrados para mostrar en el dropdown
+  useEffect(() => {
+    if (filteredRes.length === 0) return;
+    const ids = filteredRes.map(r => r.id);
+    const faltantes = ids.filter(id => !(id in deudasPorResidente));
+    if (faltantes.length === 0) return;
+    supabase
+      .from("deudas_residentes")
+      .select("residente_id, saldo_pendiente, precio_m1, precio_m2, precio_m3, fecha_vencimiento, causaciones_globales(id, mes_causado, concepto_nombre, tipo_cobro)")
+      .in("residente_id", faltantes)
+      .gt("saldo_pendiente", 0)
+      .then(({ data }) => {
+        if (!data) return;
+        const totales: { [key: number]: number } = {};
+        faltantes.forEach(id => { totales[id] = 0; });
+        data.forEach((d: any) => {
+          totales[d.residente_id] = (totales[d.residente_id] || 0) + calcularValorDeudaHoy(d);
+        });
+        setDeudasPorResidente(prev => ({ ...prev, ...totales }));
+      });
+  }, [busqueda]);
 
   if (loading) return (
     <div className="flex h-96 items-center justify-center">
@@ -444,34 +467,34 @@ export default function Ingresos({ role }: { role?: string }) {
 
       {/* ── ÚLTIMO RECIBO ─────────────────────────────────────── */}
       {ultimoRecibo && (
-        <div className="bg-slate-50 border border-slate-100 rounded-2xl px-5 py-3 flex items-center justify-between gap-4">
+        <div className="bg-slate-800 border border-slate-700 rounded-2xl px-5 py-3.5 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 bg-white border border-slate-200 rounded-xl flex items-center justify-center flex-shrink-0">
-              <Receipt size={14} className="text-slate-400" />
+            <div className="w-9 h-9 bg-slate-700 border border-slate-600 rounded-xl flex items-center justify-center flex-shrink-0">
+              <Receipt size={15} className="text-emerald-400" />
             </div>
             <div>
-              <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest leading-none mb-0.5">Último recibo</p>
-              <p className="text-xs font-black text-slate-700">N° {ultimoRecibo.numero}
-                <span className="font-bold text-slate-400 ml-2">{ultimoRecibo.nombre}</span>
+              <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest leading-none mb-0.5">Último recibo</p>
+              <p className="text-xs font-black text-white">N° {ultimoRecibo.numero}
+                <span className="font-semibold text-slate-300 ml-2">{ultimoRecibo.nombre}</span>
               </p>
             </div>
           </div>
           <div className="text-right flex-shrink-0">
-            <p className="text-xs font-black text-emerald-600 tabular-nums">${ultimoRecibo.monto.toLocaleString("es-CO")}</p>
+            <p className="text-sm font-black text-emerald-400 tabular-nums">${ultimoRecibo.monto.toLocaleString("es-CO")}</p>
             <p className="text-[8px] font-bold text-slate-500">{ultimoRecibo.fecha}</p>
           </div>
         </div>
       )}
 
       {/* ── BUSCADOR ─────────────────────────────────────────────── */}
-      <section className="bg-white p-4 sm:p-6 rounded-2xl border border-slate-100 shadow-sm relative z-[40]">
-        <label className="text-[10px] font-black text-slate-600 uppercase tracking-[0.2em] block mb-2">
+      <section className="bg-slate-800 p-4 sm:p-6 rounded-2xl border border-slate-700 shadow-lg relative z-[40]">
+        <label className="text-[10px] font-black text-slate-300 uppercase tracking-[0.2em] block mb-2">
           Unidad Responsable del Pago
         </label>
         <div className="relative group">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-emerald-500 transition-colors" size={17} />
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-emerald-400 transition-colors" size={17} />
           <input
-            className="w-full bg-slate-50/50 border border-slate-100 pl-12 pr-12 py-4 rounded-xl outline-none font-bold text-slate-700 text-sm focus:bg-white focus:ring-4 ring-emerald-500/5 transition-all placeholder:text-slate-300"
+            className="w-full bg-slate-700 border border-slate-600 pl-12 pr-12 py-4 rounded-xl outline-none font-bold text-white text-sm focus:bg-slate-600 focus:border-emerald-500 focus:ring-4 ring-emerald-500/10 transition-all placeholder:text-slate-500"
             placeholder="Nombre o Unidad (ej: 1101)"
             value={resSeleccionado
               ? `${resSeleccionado.nombre} | T${resSeleccionado.torre.slice(-1)}-${resSeleccionado.apartamento}`
@@ -481,7 +504,7 @@ export default function Ingresos({ role }: { role?: string }) {
           {(busqueda || resSeleccionado) && (
             <button
               onClick={() => { setBusqueda(""); setResSeleccionado(null); }}
-              className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-300 hover:text-rose-500 p-1.5 hover:bg-slate-100 rounded-xl transition-all"
+              className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-rose-400 p-1.5 hover:bg-slate-600 rounded-xl transition-all"
             >
               <X size={17} />
             </button>
@@ -489,31 +512,55 @@ export default function Ingresos({ role }: { role?: string }) {
         </div>
 
         {filteredRes.length > 0 && (
-          <div className="absolute top-[calc(100%-6px)] left-3 right-3 sm:left-6 sm:right-6 bg-white border border-slate-100 rounded-2xl shadow-2xl overflow-hidden z-[100] animate-in fade-in slide-in-from-top-2 duration-200">
-            <div className="p-2">
-              {filteredRes.map(r => (
-                <button key={r.id} onClick={() => cargarDeudasResidente(r)}
-                  className="w-full p-3 mb-0.5 text-left rounded-xl hover:bg-slate-50 flex items-center justify-between group transition-all active:scale-[0.99]"
-                >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-9 h-9 bg-emerald-50 text-emerald-600 rounded-full flex-shrink-0 flex items-center justify-center font-black text-xs border border-emerald-100 group-hover:bg-emerald-500 group-hover:text-white transition-all">
-                      T{r.torre.slice(-1)}
+          <div className="absolute top-[calc(100%-6px)] left-3 right-3 sm:left-6 sm:right-6 bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl overflow-hidden z-[100] animate-in fade-in slide-in-from-top-2 duration-200">
+            <div className="p-2 space-y-1">
+              {filteredRes.map(r => {
+                const deudaTotal = deudasPorResidente[r.id];
+                const unidad = `T${r.torre.slice(-1)}-${r.apartamento}`;
+                const tieneDeuda = deudaTotal !== undefined && deudaTotal > 0;
+                return (
+                  <button key={r.id} onClick={() => cargarDeudasResidente(r)}
+                    className="w-full p-3 text-left rounded-xl hover:bg-slate-800 flex items-center gap-3 group transition-all active:scale-[0.99]"
+                  >
+                    {/* Badge torre */}
+                    <div className="w-10 h-10 bg-emerald-950 text-emerald-400 rounded-xl flex-shrink-0 flex items-center justify-center font-black text-xs border border-emerald-900 group-hover:bg-emerald-500 group-hover:text-white group-hover:border-emerald-500 transition-all">
+                      {unidad}
                     </div>
-                    <span className="font-black text-xs text-slate-800 uppercase truncate group-hover:text-emerald-700 transition-colors">
-                      {r.nombre}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2 flex-shrink-0 ml-2">
-                    <span className="bg-slate-100 text-slate-600 px-2 py-1 rounded-lg text-[10px] font-black group-hover:bg-emerald-600 group-hover:text-white transition-all">
-                      {r.apartamento}
-                    </span>
-                    <ChevronRight size={14} className="text-slate-200 group-hover:text-emerald-500 transition-all" />
-                  </div>
-                </button>
-              ))}
+                    {/* Info */}
+                    <div className="flex-1 min-w-0">
+                      <p className="font-black text-sm text-white uppercase truncate leading-tight group-hover:text-emerald-300 transition-colors">
+                        {r.nombre}
+                      </p>
+                      <p className="text-[10px] text-slate-500 font-semibold mt-0.5 truncate">
+                        {r.telefono ? `📞 ${r.telefono}` : "Sin teléfono registrado"}
+                      </p>
+                    </div>
+                    {/* Deuda */}
+                    <div className="flex-shrink-0 text-right ml-1">
+                      {deudaTotal === undefined ? (
+                        <div className="w-16 h-5 bg-slate-700 rounded animate-pulse" />
+                      ) : tieneDeuda ? (
+                        <>
+                          <span className="inline-block bg-rose-950 text-rose-400 border border-rose-900 px-2 py-1 rounded-lg text-[10px] font-black tabular-nums">
+                            ${deudaTotal.toLocaleString("es-CO")}
+                          </span>
+                          <p className="text-[8px] text-rose-500 font-bold uppercase mt-0.5">pendiente</p>
+                        </>
+                      ) : (
+                        <>
+                          <span className="inline-block bg-emerald-950 text-emerald-400 border border-emerald-900 px-2 py-1 rounded-lg text-[10px] font-black">
+                            Al día ✓
+                          </span>
+                        </>
+                      )}
+                    </div>
+                    <ChevronRight size={14} className="text-slate-600 group-hover:text-emerald-400 flex-shrink-0 transition-all" />
+                  </button>
+                );
+              })}
             </div>
-            <div className="bg-slate-50 p-2 text-center border-t border-slate-100">
-              <p className="text-[9px] font-black text-slate-300 uppercase tracking-[0.25em]">Selecciona una unidad</p>
+            <div className="bg-slate-800 px-4 py-2 text-center border-t border-slate-700">
+              <p className="text-[9px] font-black text-slate-500 uppercase tracking-[0.25em]">Selecciona una unidad</p>
             </div>
           </div>
         )}
