@@ -214,36 +214,64 @@ export default function ReciboCaja({ datos, onClose }: ReciboProps) {
 
     const nombreArchivo = `RC-${datos.numero}_${datos.unidad.replace(/\s/g, "")}`;
 
+    // ── Sanitiza colores modernos (oklch/lab/color()) a hex seguros ──
+    const sanitizarColores = (nodo: HTMLElement) => {
+      const PROPS = ["color", "backgroundColor", "borderColor", "borderTopColor",
+        "borderBottomColor", "borderLeftColor", "borderRightColor", "outlineColor"];
+      const MAP: Record<string, string> = {
+        // slate palette → grises seguros
+        "slate-50": "#f8fafc", "slate-100": "#f1f5f9", "slate-200": "#e2e8f0",
+        "slate-300": "#cbd5e1", "slate-400": "#94a3b8", "slate-500": "#64748b",
+        "slate-800": "#1e293b", "slate-900": "#0f172a",
+        // emerald
+        "emerald-500": "#10b981", "emerald-600": "#059669",
+        // rose/red
+        "rose-500": "#f43f5e", "rose-600": "#e11d48", "red-600": "#dc2626",
+      };
+
+      nodo.querySelectorAll<HTMLElement>("*").forEach((el) => {
+        const cs = window.getComputedStyle(el);
+        PROPS.forEach((prop) => {
+          const val = cs.getPropertyValue(prop);
+          if (val && (val.includes("oklch") || val.includes("lab(") || val.includes("color("))) {
+            // Busca clase Tailwind en el elemento para mapear al hex correcto
+            const clases = Array.from(el.classList);
+            const match = clases.find((c) => Object.keys(MAP).some((k) => c.includes(k)));
+            const hex = match ? MAP[Object.keys(MAP).find((k) => match.includes(k))!] : (prop === "backgroundColor" ? "transparent" : "#1e293b");
+            el.style.setProperty(prop, hex, "important");
+          }
+        });
+      });
+    };
+
+    // Clon fuera de pantalla para no alterar el DOM visible
+    const clon = content.cloneNode(true) as HTMLElement;
+    clon.style.cssText = `position:absolute;left:-9999px;top:0;width:${content.offsetWidth}px;background:#fff;`;
+    document.body.appendChild(clon);
+    sanitizarColores(clon);
+
     try {
-      // dom-to-image-more renderiza el nodo sin romper con colores modernos
-      const dataUrl = await domtoimage.toPng(content, {
+      const dataUrl = await domtoimage.toPng(clon, {
         scale: 2,
         bgcolor: "#ffffff",
-        // Forzar fuentes y colores seguros
-        style: {
-          "font-family": "sans-serif",
-        },
       });
 
       const img = new Image();
       img.src = dataUrl;
       await new Promise((res) => (img.onload = res));
 
-      const pdf = new jsPDF({
-        orientation: "portrait",
-        unit: "mm",
-        format: "letter",
-      });
-
+      const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "letter" });
       const pageW = pdf.internal.pageSize.getWidth();
       const pageH = pdf.internal.pageSize.getHeight();
       const imgH = (img.naturalHeight * pageW) / img.naturalWidth;
       const yOffset = imgH < pageH ? (pageH - imgH) / 2 : 0;
 
       pdf.addImage(dataUrl, "PNG", 0, yOffset, pageW, imgH);
-      pdf.save(`${nombreArchivo}.pdf`); // ← descarga directa, sin diálogo
+      pdf.save(`${nombreArchivo}.pdf`);
     } catch (err) {
       console.error("Error generando PDF:", err);
+    } finally {
+      document.body.removeChild(clon); // limpia siempre
     }
   };
 
