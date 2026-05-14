@@ -2,7 +2,9 @@
 import React, { useState, useRef } from "react";
 import { X } from "lucide-react";
 import { numeroALetras } from "@/lib/utils";
-import emailjs from '@emailjs/browser';
+import jsPDF from "jspdf";
+import html2canvas from "html2canvas";
+
 
 interface ReciboProps {
   datos: {
@@ -206,36 +208,24 @@ export default function ReciboCaja({ datos, onClose }: ReciboProps) {
   };
 
   // Abre diálogo "Guardar como PDF" con nombre predefinido
-  const handleGuardarPDF = () => {
+  const handleGuardarPDF = async () => {
     const content = printRef.current;
     if (!content) return;
-    // Nombre: RC-27936_T8-202.pdf
     const nombreArchivo = `RC-${datos.numero}_${datos.unidad.replace(/\s/g, "")}`;
-    const iframe = document.createElement("iframe");
-    iframe.style.cssText = "position:fixed;bottom:0;right:0;width:0;height:0;border:0;";
-    document.body.appendChild(iframe);
-    const doc = iframe.contentWindow?.document;
-    if (!doc) return;
-    doc.write(`<html><head><title>${nombreArchivo}</title>${getStyles()}
-      <style>
-        ${baseStyles}
-        @page { size: letter; margin: 15mm; }
-      </style>
-    </head><body><div class="print-wrap">${content.innerHTML}</div>
-    <script>
-      window.onload = () => {
-        // Fuerza destino PDF en Chrome/Edge; en otros muestra el diálogo normal
-        if (window.chrome) {
-          const style = document.createElement('style');
-          style.textContent = '@page { size: letter; margin: 15mm; }';
-          document.head.appendChild(style);
-        }
-        window.print();
-        setTimeout(() => window.frameElement?.remove(), 500);
-      };
-    <\/script>
-    </body></html>`);
-    doc.close();
+    const canvas = await html2canvas(content, {
+      scale: 2,
+      useCORS: true,
+      backgroundColor: "#ffffff",
+    });
+    const imgData = canvas.toDataURL("image/png");
+    const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "letter" });
+    const pageW = pdf.internal.pageSize.getWidth();
+    const pageH = pdf.internal.pageSize.getHeight();
+    const imgW = pageW;
+    const imgH = (canvas.height * pageW) / canvas.width;
+    const yOffset = imgH < pageH ? (pageH - imgH) / 2 : 0;
+    pdf.addImage(imgData, "PNG", 0, yOffset, imgW, imgH);
+    pdf.save(`${nombreArchivo}.pdf`);
   };
 
   return (
