@@ -212,31 +212,35 @@ export default function ReciboCaja({ datos, onClose }: ReciboProps) {
     const content = printRef.current;
     if (!content) return;
     const nombreArchivo = `RC-${datos.numero}_${datos.unidad.replace(/\s/g, "")}`;
-    const canvas = await html2canvas(content, {
-      scale: 2,
-      useCORS: true,
-      backgroundColor: "#ffffff",
-      ignoreElements: (el) => false,
-      onclone: (clonedDoc) => {
-        clonedDoc.querySelectorAll("*").forEach((el) => {
-          const style = (el as HTMLElement).style;
-          if (style) {
-            style.color = style.color?.includes("lab(") ? "" : style.color;
-            style.backgroundColor = style.backgroundColor?.includes("lab(") ? "" : style.backgroundColor;
-          }
-        });
-      },
-      logging: false,
-    });
-    const imgData = canvas.toDataURL("image/png");
-    const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "letter" });
-    const pageW = pdf.internal.pageSize.getWidth();
-    const pageH = pdf.internal.pageSize.getHeight();
-    const imgW = pageW;
-    const imgH = (canvas.height * pageW) / canvas.width;
-    const yOffset = imgH < pageH ? (pageH - imgH) / 2 : 0;
-    pdf.addImage(imgData, "PNG", 0, yOffset, imgW, imgH);
-    pdf.save(`${nombreArchivo}.pdf`); 
+
+    // Clona el contenido en una ventana oculta con estilos limpios
+    const ventana = window.open("", "_blank", "width=900,height=700");
+    if (!ventana) return;
+
+    const estilos = Array.from(document.querySelectorAll("style, link[rel='stylesheet']"))
+      .map(s => s.outerHTML).join("");
+
+    ventana.document.write(`
+    <html>
+      <head>
+        <title>${nombreArchivo}</title>
+        ${estilos}
+        <style>
+          * { color-scheme: light !important; }
+          @page { size: letter; margin: 15mm; }
+          body { background: white !important; margin: 0; padding: 0; }
+          * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+        </style>
+      </head>
+      <body>${content.innerHTML}</body>
+    </html>
+  `);
+    ventana.document.close();
+    ventana.onload = () => {
+      ventana.focus();
+      ventana.print();
+      ventana.onafterprint = () => ventana.close();
+    };
   };
 
   return (
