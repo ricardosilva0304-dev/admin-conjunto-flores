@@ -279,8 +279,7 @@ const ReciboContenido = ({ datos }: { datos: any }) => {
 };
 
 export default function ReciboCaja({ datos, onClose }: ReciboProps) {
-  const printRef = useRef<HTMLDivElement>(null);  // para pantalla (Tailwind)
-  const pdfRef = useRef<HTMLDivElement>(null);     // para PDF (inline styles)
+  const printRef = useRef<HTMLDivElement>(null);
 
   const getStyles = () =>
     Array.from(document.querySelectorAll("style, link[rel='stylesheet']"))
@@ -310,30 +309,43 @@ export default function ReciboCaja({ datos, onClose }: ReciboProps) {
   };
 
   const handleGuardarPDF = async () => {
-    const content = pdfRef.current; // ← captura el nodo con estilos inline
+    const content = printRef.current;
     if (!content) return;
 
-    const domtoimage = (await import("dom-to-image-more")).default;
+    const html2canvas = (await import("html2canvas")).default;
     const nombreArchivo = `RC-${datos.numero}_${datos.unidad.replace(/\s/g, "")}`;
 
     try {
-      const dataUrl = await domtoimage.toPng(content, {
-        scale: 2,
-        bgcolor: "#ffffff",
-        width: 900,
+      // Forzar ancho desktop para captura consistente sin importar el dispositivo
+      const originalWidth = content.style.width;
+      const originalMaxWidth = content.style.maxWidth;
+      content.style.width = "900px";
+      content.style.maxWidth = "900px";
+
+      const canvas = await html2canvas(content, {
+        scale: 2.5,
+        useCORS: true,
+        backgroundColor: "#ffffff",
+        logging: false,
+        allowTaint: false,
+        windowWidth: 900,
       });
 
-      const img = new Image();
-      img.src = dataUrl;
-      await new Promise((res) => (img.onload = res));
+      // Restaurar estilos originales
+      content.style.width = originalWidth;
+      content.style.maxWidth = originalMaxWidth;
+
+      const dataUrl = canvas.toDataURL("image/png");
 
       const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "letter" });
       const pageW = pdf.internal.pageSize.getWidth();
       const pageH = pdf.internal.pageSize.getHeight();
-      const imgH = (img.naturalHeight * pageW) / img.naturalWidth;
-      const yOffset = imgH < pageH ? (pageH - imgH) / 2 : 0;
+      const margin = 10;
+      const usableW = pageW - margin * 2;
+      const imgH = (canvas.height * usableW) / canvas.width;
+      const yOffset = imgH < (pageH - margin * 2) ? (pageH - imgH) / 2 : margin;
 
-      pdf.addImage(dataUrl, "PNG", 0, yOffset, pageW, imgH);
+      pdf.addImage(dataUrl, "PNG", margin, yOffset, usableW, imgH);
       pdf.save(`${nombreArchivo}.pdf`);
     } catch (err) {
       console.error("Error generando PDF:", err);
@@ -361,18 +373,10 @@ export default function ReciboCaja({ datos, onClose }: ReciboProps) {
       </div>
 
       {/* RECIBO VISIBLE EN PANTALLA (Tailwind) */}
-      <div ref={printRef} className="w-full max-w-4xl bg-white shadow-2xl animate-in zoom-in-95 duration-500 mb-10 rounded-xl sm:rounded-2xl overflow-hidden">
+      <div ref={printRef} className="w-full max-w-4xl bg-white shadow-2xl animate-in zoom-in-95 duration-500 mb-10 rounded-xl sm:rounded-2xl overflow-hidden" style={{ borderRadius: 0 }}>
         <ReciboContenido datos={datos} />
       </div>
 
-      {/* RECIBO OCULTO PARA PDF (estilos inline, siempre desktop) */}
-      <div
-        ref={pdfRef}
-        style={{ position: "fixed", left: "-9999px", top: 0, pointerEvents: "none", zIndex: -1 }}
-        aria-hidden="true"
-      >
-        <ReciboParaPDF datos={datos} />
-      </div>
     </div>
   );
 }
