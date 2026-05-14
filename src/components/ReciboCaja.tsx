@@ -213,34 +213,43 @@ export default function ReciboCaja({ datos, onClose }: ReciboProps) {
     if (!content) return;
     const nombreArchivo = `RC-${datos.numero}_${datos.unidad.replace(/\s/g, "")}`;
 
-    // Clona el contenido en una ventana oculta con estilos limpios
-    const ventana = window.open("", "_blank", "width=900,height=700");
-    if (!ventana) return;
+    // Clona el nodo y limpia todos los colores lab() antes de renderizar
+    const clon = content.cloneNode(true) as HTMLElement;
+    clon.style.position = "absolute";
+    clon.style.left = "-9999px";
+    clon.style.width = content.offsetWidth + "px";
+    document.body.appendChild(clon);
 
-    const estilos = Array.from(document.querySelectorAll("style, link[rel='stylesheet']"))
-      .map(s => s.outerHTML).join("");
+    // Recorre todos los elementos y elimina colores problemáticos
+    clon.querySelectorAll("*").forEach((el) => {
+      const h = el as HTMLElement;
+      const computed = window.getComputedStyle(h);
+      ["color", "backgroundColor", "borderColor", "outlineColor"].forEach((prop) => {
+        const val = computed.getPropertyValue(prop);
+        if (val && (val.includes("lab(") || val.includes("oklch(") || val.includes("color("))) {
+          h.style.setProperty(prop, prop === "backgroundColor" ? "transparent" : "#000000");
+        }
+      });
+    });
 
-    ventana.document.write(`
-    <html>
-      <head>
-        <title>${nombreArchivo}</title>
-        ${estilos}
-        <style>
-          * { color-scheme: light !important; }
-          @page { size: letter; margin: 15mm; }
-          body { background: white !important; margin: 0; padding: 0; }
-          * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-        </style>
-      </head>
-      <body>${content.innerHTML}</body>
-    </html>
-  `);
-    ventana.document.close();
-    ventana.onload = () => {
-      ventana.focus();
-      ventana.print();
-      ventana.onafterprint = () => ventana.close();
-    };
+    try {
+      const canvas = await html2canvas(clon, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: "#ffffff",
+        logging: false,
+      });
+      const imgData = canvas.toDataURL("image/png");
+      const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "letter" });
+      const pageW = pdf.internal.pageSize.getWidth();
+      const pageH = pdf.internal.pageSize.getHeight();
+      const imgH = (canvas.height * pageW) / canvas.width;
+      const yOffset = imgH < pageH ? (pageH - imgH) / 2 : 0;
+      pdf.addImage(imgData, "PNG", 0, yOffset, pageW, imgH);
+      pdf.save(`${nombreArchivo}.pdf`);
+    } finally {
+      document.body.removeChild(clon);
+    }
   };
 
   return (
