@@ -3,9 +3,6 @@ import React, { useState, useRef } from "react";
 import { X } from "lucide-react";
 import { numeroALetras } from "@/lib/utils";
 import jsPDF from "jspdf";
-// @ts-ignore — dom-to-image-more no tiene tipos oficiales
-import domtoimage from "dom-to-image-more";
-
 
 interface ReciboProps {
   datos: {
@@ -212,6 +209,8 @@ export default function ReciboCaja({ datos, onClose }: ReciboProps) {
     const content = printRef.current;
     if (!content) return;
 
+    // Import dinámico — solo se ejecuta en el browser, nunca en SSR
+    const domtoimage = (await import("dom-to-image-more")).default;
     const nombreArchivo = `RC-${datos.numero}_${datos.unidad.replace(/\s/g, "")}`;
 
     // ── Sanitiza colores modernos (oklch/lab/color()) a hex seguros ──
