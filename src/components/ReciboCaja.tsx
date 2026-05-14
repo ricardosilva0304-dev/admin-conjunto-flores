@@ -177,28 +177,63 @@ const ReciboContenido = ({ datos }: { datos: any }) => {
 export default function ReciboCaja({ datos, onClose }: ReciboProps) {
   const printRef = useRef<HTMLDivElement>(null);
 
+  const getStyles = () =>
+    Array.from(document.querySelectorAll("style, link[rel='stylesheet']"))
+      .map(s => s.outerHTML).join("");
+
+  const baseStyles = `
+    @page { size: letter; margin: 15mm; }
+    body { background: white !important; margin: 0; padding: 0; font-family: sans-serif; }
+    .print-wrap { width: 100%; height: auto; }
+    * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+  `;
+
+  // Abre diálogo de impresora física
   const handlePrint = () => {
     const content = printRef.current;
     if (!content) return;
     const iframe = document.createElement("iframe");
-    iframe.style.position = "fixed"; iframe.style.bottom = "0"; iframe.style.right = "0";
-    iframe.style.width = "0"; iframe.style.height = "0"; iframe.style.border = "0";
+    iframe.style.cssText = "position:fixed;bottom:0;right:0;width:0;height:0;border:0;";
     document.body.appendChild(iframe);
     const doc = iframe.contentWindow?.document;
     if (!doc) return;
+    doc.write(`<html><head><title>RC-${datos.numero}</title>${getStyles()}
+      <style>${baseStyles}</style>
+    </head><body><div class="print-wrap">${content.innerHTML}</div>
+    <script>window.onload=()=>{window.print();setTimeout(()=>window.frameElement?.remove(),500);};<\/script>
+    </body></html>`);
+    doc.close();
+  };
 
-    const styles = Array.from(document.querySelectorAll("style, link[rel='stylesheet']"))
-      .map(s => s.outerHTML).join("");
-
-    doc.write(`<html><head><title>RC-${datos.numero}</title>${styles}
+  // Abre diálogo "Guardar como PDF" con nombre predefinido
+  const handleGuardarPDF = () => {
+    const content = printRef.current;
+    if (!content) return;
+    // Nombre: RC-27936_T8-202.pdf
+    const nombreArchivo = `RC-${datos.numero}_${datos.unidad.replace(/\s/g, "")}`;
+    const iframe = document.createElement("iframe");
+    iframe.style.cssText = "position:fixed;bottom:0;right:0;width:0;height:0;border:0;";
+    document.body.appendChild(iframe);
+    const doc = iframe.contentWindow?.document;
+    if (!doc) return;
+    doc.write(`<html><head><title>${nombreArchivo}</title>${getStyles()}
       <style>
+        ${baseStyles}
         @page { size: letter; margin: 15mm; }
-        body { background: white !important; margin: 0; padding: 0; font-family: sans-serif; }
-        .print-wrap { width: 100%; height: auto; }
-        * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
       </style>
     </head><body><div class="print-wrap">${content.innerHTML}</div>
-    <script>window.onload=()=>{window.print();setTimeout(()=>window.frameElement.remove(),200);};<\/script>
+    <script>
+      window.onload = () => {
+        // Fuerza destino PDF en Chrome/Edge; en otros muestra el diálogo normal
+        if (window.chrome) {
+          const style = document.createElement('style');
+          style.textContent = '@page { size: letter; margin: 15mm; }';
+          document.head.appendChild(style);
+        }
+        window.print();
+        setTimeout(() => window.frameElement?.remove(), 500);
+      };
+    <\/script>
     </body></html>`);
     doc.close();
   };
@@ -209,12 +244,24 @@ export default function ReciboCaja({ datos, onClose }: ReciboProps) {
 
       {/* ── BARRA DE ACCIONES ───────────────────────────────────── */}
       <div className="no-print w-full max-w-4xl bg-white p-3 sm:p-4 rounded-xl sm:rounded-2xl mb-4 sm:mb-6 flex justify-between items-center shadow-2xl border border-white/20 sticky top-0 z-10">
-        <button
-          onClick={handlePrint}
-          className="bg-slate-900 text-white px-5 sm:px-8 py-2.5 sm:py-3 rounded-xl font-black text-[10px] sm:text-[11px] uppercase tracking-widest hover:bg-black transition-all active:scale-95"
-        >
-          IMPRIMIR SOPORTE
-        </button>
+        <div className="flex items-center gap-2 sm:gap-3">
+          {/* Botón imprimir → manda a impresora */}
+          <button
+            onClick={handlePrint}
+            className="flex items-center gap-2 bg-slate-900 hover:bg-black text-white px-4 sm:px-6 py-2.5 sm:py-3 rounded-xl font-black text-[10px] sm:text-[11px] uppercase tracking-widest transition-all active:scale-95"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 6 2 18 2 18 9" /><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" /><rect x="6" y="14" width="12" height="8" /></svg>
+            Imprimir
+          </button>
+          {/* Botón PDF → guarda con nombre RC-XXXXX_T8-202 */}
+          <button
+            onClick={handleGuardarPDF}
+            className="flex items-center gap-2 bg-rose-600 hover:bg-rose-700 text-white px-4 sm:px-6 py-2.5 sm:py-3 rounded-xl font-black text-[10px] sm:text-[11px] uppercase tracking-widest transition-all active:scale-95"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="12" y1="18" x2="12" y2="12" /><line x1="9" y1="15" x2="15" y2="15" /></svg>
+            Guardar PDF
+          </button>
+        </div>
         <button
           onClick={onClose}
           className="p-2.5 sm:p-3 bg-slate-100 text-slate-400 hover:text-rose-500 rounded-xl transition-all"
