@@ -3,7 +3,8 @@ import React, { useState, useRef } from "react";
 import { X } from "lucide-react";
 import { numeroALetras } from "@/lib/utils";
 import jsPDF from "jspdf";
-import html2canvas from "html2canvas";
+// @ts-ignore — dom-to-image-more no tiene tipos oficiales
+import domtoimage from "dom-to-image-more";
 
 
 interface ReciboProps {
@@ -207,48 +208,42 @@ export default function ReciboCaja({ datos, onClose }: ReciboProps) {
     doc.close();
   };
 
-  // Abre diálogo "Guardar como PDF" con nombre predefinido
   const handleGuardarPDF = async () => {
     const content = printRef.current;
     if (!content) return;
+
     const nombreArchivo = `RC-${datos.numero}_${datos.unidad.replace(/\s/g, "")}`;
 
-    // Clona el nodo y limpia todos los colores lab() antes de renderizar
-    const clon = content.cloneNode(true) as HTMLElement;
-    clon.style.position = "absolute";
-    clon.style.left = "-9999px";
-    clon.style.width = content.offsetWidth + "px";
-    document.body.appendChild(clon);
-
-    // Recorre todos los elementos y elimina colores problemáticos
-    clon.querySelectorAll("*").forEach((el) => {
-      const h = el as HTMLElement;
-      const computed = window.getComputedStyle(h);
-      ["color", "backgroundColor", "borderColor", "outlineColor"].forEach((prop) => {
-        const val = computed.getPropertyValue(prop);
-        if (val && (val.includes("lab(") || val.includes("oklch(") || val.includes("color("))) {
-          h.style.setProperty(prop, prop === "backgroundColor" ? "transparent" : "#000000");
-        }
-      });
-    });
-
     try {
-      const canvas = await html2canvas(clon, { 
+      // dom-to-image-more renderiza el nodo sin romper con colores modernos
+      const dataUrl = await domtoimage.toPng(content, {
         scale: 2,
-        useCORS: true,
-        backgroundColor: "#ffffff",
-        logging: false,
+        bgcolor: "#ffffff",
+        // Forzar fuentes y colores seguros
+        style: {
+          "font-family": "sans-serif",
+        },
       });
-      const imgData = canvas.toDataURL("image/png");
-      const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "letter" });
+
+      const img = new Image();
+      img.src = dataUrl;
+      await new Promise((res) => (img.onload = res));
+
+      const pdf = new jsPDF({
+        orientation: "portrait",
+        unit: "mm",
+        format: "letter",
+      });
+
       const pageW = pdf.internal.pageSize.getWidth();
       const pageH = pdf.internal.pageSize.getHeight();
-      const imgH = (canvas.height * pageW) / canvas.width;
+      const imgH = (img.naturalHeight * pageW) / img.naturalWidth;
       const yOffset = imgH < pageH ? (pageH - imgH) / 2 : 0;
-      pdf.addImage(imgData, "PNG", 0, yOffset, pageW, imgH);
-      pdf.save(`${nombreArchivo}.pdf`);
-    } finally {
-      document.body.removeChild(clon);
+
+      pdf.addImage(dataUrl, "PNG", 0, yOffset, pageW, imgH);
+      pdf.save(`${nombreArchivo}.pdf`); // ← descarga directa, sin diálogo
+    } catch (err) {
+      console.error("Error generando PDF:", err);
     }
   };
 
