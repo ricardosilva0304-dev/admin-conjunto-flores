@@ -233,7 +233,7 @@ export default function ReciboCaja({ datos, onClose }: ReciboProps) {
     });
 
     try {
-      const canvas = await html2canvas(clon, {
+      const canvas = await html2canvas(clon, { 
         scale: 2,
         useCORS: true,
         backgroundColor: "#ffffff",
