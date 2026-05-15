@@ -325,7 +325,7 @@ export default function HistorialRecibos() {
                               </div>
                               <div className="min-w-0">
                                 <p className="text-xs font-black text-slate-900 uppercase leading-tight truncate">
-                                  {grupo.info.nombre}
+                                  Apto {apto}
                                 </p>
                                 <p className="text-[9px] font-bold text-slate-400 truncate">
                                   {grupo.pagos.length} recibo
