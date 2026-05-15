@@ -450,16 +450,16 @@ export default function Causacion({ role }: { role?: string }) {
             </div>
           </div>
 
-          {/* ── FILTRO TIPO (pills con scroll) ── */}
+          {/* ── FILTRO TIPO ── */}
           <div>
             <label className="text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-0.5 mb-2 block">Aplicar a</label>
-            <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
+            <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2">
               {filtroTabs.map(({ key, label, icon, count }) => {
                 const activo = filtroTipo === key;
                 return (
                   <button key={key}
                     onClick={() => { setFiltroTipo(key); setResidentesSeleccionados(new Set()); }}
-                    className={`flex items-center gap-2 px-3.5 py-2 rounded-xl font-black text-[11px] whitespace-nowrap flex-shrink-0 border transition-all duration-200
+                    className={`flex items-center justify-center sm:justify-start gap-2 px-3.5 py-2.5 sm:py-2 rounded-xl font-black text-[11px] border transition-all duration-200
                       ${activo
                         ? "bg-slate-900 text-white border-slate-900 shadow-md shadow-slate-900/20"
                         : "bg-white text-slate-500 border-slate-200 hover:border-slate-300 hover:text-slate-700"}`}
@@ -477,40 +477,42 @@ export default function Causacion({ role }: { role?: string }) {
           </div>
 
           {/* ── TOGGLE SELECCIÓN MANUAL ── */}
-          <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
-            <button
-              onClick={() => { setModoSeleccion(!modoSeleccion); setResidentesSeleccionados(new Set()); }}
-              className={`flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border font-black text-[11px] uppercase tracking-widest transition-all
-                ${modoSeleccion
-                  ? "bg-violet-50 border-violet-300 text-violet-700"
-                  : "bg-slate-50 border-slate-200 text-slate-500 hover:border-slate-300"}`}
-            >
-              <UserCheck size={14} />
-              {modoSeleccion ? "Selección manual activa" : "Elegir residentes específicos"}
-            </button>
+          <div className="space-y-3">
+            <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 items-stretch sm:items-center">
+              <button
+                onClick={() => { setModoSeleccion(!modoSeleccion); setResidentesSeleccionados(new Set()); }}
+                className={`flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border font-black text-[11px] uppercase tracking-widest transition-all
+                  ${modoSeleccion
+                    ? "bg-violet-50 border-violet-300 text-violet-700"
+                    : "bg-slate-50 border-slate-200 text-slate-500 hover:border-slate-300"}`}
+              >
+                <UserCheck size={14} />
+                {modoSeleccion ? "Selección manual activa" : "Elegir residentes específicos"}
+              </button>
 
-            <div className="flex-1 flex items-center justify-end">
-              <span className={`text-[11px] font-black px-3 py-1.5 rounded-xl
-                ${modoSeleccion && residentesSeleccionados.size === 0
-                  ? "bg-amber-50 text-amber-600 border border-amber-200"
-                  : "bg-emerald-50 text-emerald-700 border border-emerald-200"}`}>
-                {modoSeleccion
-                  ? residentesSeleccionados.size === 0
-                    ? "Ningún residente seleccionado"
-                    : `${residentesSeleccionados.size} residente${residentesSeleccionados.size !== 1 ? "s" : ""} seleccionado${residentesSeleccionados.size !== 1 ? "s" : ""}`
-                  : `${residentesPorTipo.length} residente${residentesPorTipo.length !== 1 ? "s" : ""} (todos)`}
-              </span>
+              <div className="flex gap-2 sm:flex-1 sm:justify-end items-center">
+                <span className={`flex-1 sm:flex-none text-center sm:text-left text-[11px] font-black px-3 py-2 rounded-xl
+                  ${modoSeleccion && residentesSeleccionados.size === 0
+                    ? "bg-amber-50 text-amber-600 border border-amber-200"
+                    : "bg-emerald-50 text-emerald-700 border border-emerald-200"}`}>
+                  {modoSeleccion
+                    ? residentesSeleccionados.size === 0
+                      ? "Ninguno seleccionado"
+                      : `${residentesSeleccionados.size} seleccionado${residentesSeleccionados.size !== 1 ? "s" : ""}`
+                    : `${residentesPorTipo.length} residentes (todos)`}
+                </span>
+
+                <button
+                  onClick={generarCausacion}
+                  disabled={generando || !conceptoId || !mesDeuda || !fechaLimite || (modoSeleccion && residentesSeleccionados.size === 0)}
+                  className="sm:w-40 bg-slate-900 text-white py-2 sm:py-3 px-5 sm:px-6 rounded-xl sm:rounded-2xl font-black text-xs sm:text-sm hover:bg-emerald-600 transition-all active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center gap-2 flex-shrink-0 shadow-lg shadow-slate-900/20 hover:shadow-emerald-500/20"
+                >
+                  {generando
+                    ? <><Loader2 className="animate-spin" size={15} /><span>Procesando...</span></>
+                    : <><Zap size={14} strokeWidth={2.5} /><span>Procesar</span></>}
+                </button>
+              </div>
             </div>
-
-            <button
-              onClick={generarCausacion}
-              disabled={generando || !conceptoId || !mesDeuda || !fechaLimite || (modoSeleccion && residentesSeleccionados.size === 0)}
-              className="sm:w-40 bg-slate-900 text-white py-2.5 sm:py-3 px-5 sm:px-6 rounded-xl sm:rounded-2xl font-black text-xs sm:text-sm hover:bg-emerald-600 transition-all active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center gap-2 flex-shrink-0 shadow-lg shadow-slate-900/20 hover:shadow-emerald-500/20"
-            >
-              {generando
-                ? <><Loader2 className="animate-spin" size={15} /><span>Procesando...</span></>
-                : <><Zap size={14} strokeWidth={2.5} /><span>Procesar</span></>}
-            </button>
           </div>
 
           {/* ── SELECTOR DE RESIDENTES (cuando modoSeleccion = true) ── */}
