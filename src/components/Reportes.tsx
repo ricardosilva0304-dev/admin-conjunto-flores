@@ -21,7 +21,16 @@ interface ReporteCarteraData {
   summary: { totalEnMora: number; unidadesEnMora: number; };
 }
 interface ReporteCensoData { tipo: 'CENSO'; residentes: any[]; }
-type ReporteData = ReporteFinancieroData | ReporteCarteraData | ReporteCensoData | null;
+interface ReporteVehiculosData {
+  tipo: 'VEHICULOS';
+  carros: any[];
+  motos: any[];
+  bicis: any[];
+  totalCarros: number;
+  totalMotos: number;
+  totalBicis: number;
+}
+type ReporteData = ReporteFinancieroData | ReporteCarteraData | ReporteCensoData | ReporteVehiculosData | null;
 
 const MESES = ["ENERO", "FEBRERO", "MARZO", "ABRIL", "MAYO", "JUNIO", "JULIO", "AGOSTO", "SEPTIEMBRE", "OCTUBRE", "NOVIEMBRE", "DICIEMBRE"];
 
@@ -114,6 +123,29 @@ export default function Reportes() {
       } else if (tipoReporte === "Directorio Residentes") {
         const { data } = await supabase.from("residentes").select("*").in('torre', TORRES_REQUERIDAS).order('torre').order('apartamento');
         setDatosReporte({ tipo: 'CENSO', residentes: data || [] });
+      } else if (tipoReporte === "Vehículos") {
+        const ORDEN_TORRES: Record<string, number> = { "Torre 5": 0, "Torre 6": 1, "Torre 7": 2, "Torre 8": 3, "Torre 1": 4 };
+        const { data } = await supabase.from("residentes").select("*").order('torre').order('apartamento');
+        const todos = (data || []).sort((a, b) => {
+          const oa = ORDEN_TORRES[a.torre] ?? 9;
+          const ob = ORDEN_TORRES[b.torre] ?? 9;
+          if (oa !== ob) return oa - ob;
+          return parseInt(a.apartamento) - parseInt(b.apartamento);
+        });
+        // Expandir: una fila por vehículo
+        const carros: any[] = [];
+        const motos: any[] = [];
+        const bicis: any[] = [];
+        todos.forEach(r => {
+          const unidad = `T${r.torre.slice(-1)}-${r.apartamento}`;
+          for (let i = 0; i < (r.carros || 0); i++) carros.push({ ...r, unidad, vehiculo_num: i + 1 });
+          for (let i = 0; i < (r.motos || 0); i++) motos.push({ ...r, unidad, vehiculo_num: i + 1 });
+          for (let i = 0; i < (r.bicis || 0); i++) bicis.push({ ...r, unidad, vehiculo_num: i + 1 });
+        });
+        setDatosReporte({
+          tipo: 'VEHICULOS', carros, motos, bicis,
+          totalCarros: carros.length, totalMotos: motos.length, totalBicis: bicis.length,
+        });
       }
     } catch (e) { alert("Error: " + (e as Error).message); }
     finally { setLoading(false); }
@@ -146,6 +178,7 @@ export default function Reportes() {
             <option value="Solo Egresos">Libro de Gastos</option>
             <option value="Estado Cartera">Estado de Cartera</option>
             <option value="Directorio Residentes">Censo Residentes</option>
+            <option value="Vehículos">Reporte de Vehículos</option>
           </select>
           {needsMes && (
             <input type="month"
@@ -490,6 +523,83 @@ export default function Reportes() {
                   </table>
                 </section>
               )}
+
+              {/* ── VEHÍCULOS ── */}
+              {datosReporte.tipo === 'VEHICULOS' && (() => {
+                const resumen = [
+                  { label: 'Carros', count: datosReporte.totalCarros, color: 'bg-blue-50 border-blue-100 text-blue-700' },
+                  { label: 'Motos', count: datosReporte.totalMotos, color: 'bg-amber-50 border-amber-100 text-amber-700' },
+                  { label: 'Bicicletas', count: datosReporte.totalBicis, color: 'bg-emerald-50 border-emerald-100 text-emerald-700' },
+                ];
+                const TablaVehiculo = ({ titulo, datos, color, num }: { titulo: string; datos: any[]; color: string; num: number }) => (
+                  <div className="space-y-3">
+                    <div className={`flex items-center justify-between px-4 py-2.5 rounded-xl border ${color}`}>
+                      <h3 className="text-[11px] font-black uppercase tracking-widest">{titulo}</h3>
+                      <span className="text-[11px] font-black tabular-nums">{num} unidad{num !== 1 ? 'es' : ''}</span>
+                    </div>
+                    {datos.length === 0 ? (
+                      <p className="text-center text-[10px] text-slate-300 italic py-4">Sin registros</p>
+                    ) : (
+                      <table className="w-full text-left border-collapse">
+                        <thead>
+                          <tr className="border-b border-slate-200">
+                            <th className="pb-2 text-[9px] font-black uppercase tracking-widest text-slate-400">#</th>
+                            <th className="pb-2 text-[9px] font-black uppercase tracking-widest text-slate-400">Unidad</th>
+                            <th className="pb-2 text-[9px] font-black uppercase tracking-widest text-slate-400">Torre</th>
+                            <th className="pb-2 text-[9px] font-black uppercase tracking-widest text-slate-400">Propietario</th>
+                            <th className="pb-2 text-[9px] font-black uppercase tracking-widest text-slate-400">Teléfono</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {datos.map((r, i) => (
+                            <tr key={`${r.id}-${r.vehiculo_num}`} className={`border-b border-slate-50 ${i % 2 !== 0 ? 'bg-slate-50/60' : ''}`}>
+                              <td className="py-2 text-[10px] font-bold text-slate-300 tabular-nums w-6">{i + 1}</td>
+                              <td className="py-2">
+                                <span className="inline-block bg-slate-900 text-white text-[9px] font-black px-2 py-0.5 rounded-lg">
+                                  {r.unidad}
+                                </span>
+                              </td>
+                              <td className="py-2 text-[10px] text-slate-500 font-semibold">{r.torre}</td>
+                              <td className="py-2 text-[10px] font-black text-slate-800 uppercase">{r.nombre}</td>
+                              <td className="py-2 text-[10px] text-slate-400">{r.celular || '—'}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    )}
+                  </div>
+                );
+                return (
+                  <section className="space-y-8">
+                    {/* KPIs resumen */}
+                    <div className="grid grid-cols-3 gap-3">
+                      {resumen.map(({ label, count, color }) => (
+                        <div key={label} className={`rounded-2xl border px-5 py-4 ${color}`}>
+                          <p className="text-[9px] font-black uppercase tracking-widest opacity-70 mb-1">{label}</p>
+                          <p className="text-3xl font-black tabular-nums leading-none">{count}</p>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Tablas */}
+                    <TablaVehiculo titulo="🚗  Carros" datos={datosReporte.carros} color="bg-blue-50 border-blue-200 text-blue-800" num={datosReporte.totalCarros} />
+                    <TablaVehiculo titulo="🏍️  Motos" datos={datosReporte.motos} color="bg-amber-50 border-amber-200 text-amber-800" num={datosReporte.totalMotos} />
+                    <TablaVehiculo titulo="🚲  Bicicletas" datos={datosReporte.bicis} color="bg-emerald-50 border-emerald-200 text-emerald-800" num={datosReporte.totalBicis} />
+
+                    {/* Pie */}
+                    <div className="pt-6 border-t border-slate-100 flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4">
+                      <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest">
+                        Documento de uso interno · No es una factura legal
+                      </p>
+                      <div className="text-right">
+                        <div className="w-36 border-t border-slate-400 mb-1 ml-auto" />
+                        <p className="text-[10px] font-black uppercase text-slate-800">Administración</p>
+                        <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">Conjunto Flores</p>
+                      </div>
+                    </div>
+                  </section>
+                );
+              })()}
 
             </div>
           </div>
